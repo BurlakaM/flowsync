@@ -1,17 +1,24 @@
-import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';  // типізація для Request
+import {
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { JwtService } from "@nestjs/jwt";
+import {ConfigService} from '@nestjs/config';
+import {Request} from 'express';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-    constructor(private jwtService: JwtService, private configService: ConfigService) {
+  constructor(
+        private jwtService: JwtService,
+        private configService: ConfigService,
+    ) {
         super();
     }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const request = context.switchToHttp().getRequest<Request>();  // тут вказуємо тип для request
+        const request = context.switchToHttp().getRequest<Request>();
         const token = this.extractTokenFromHeader(request);
         if (!token) throw new UnauthorizedException();
 
@@ -32,7 +39,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         return type === 'Bearer' ? token : undefined;
     }
 
-    getRequest(context: ExecutionContext): Request {
-        return context.switchToHttp().getRequest();
+    // Виправлена сигнатура під NestJS 10
+    getRequest<T = any>(context: ExecutionContext): T {
+        const ctx = context.switchToHttp();
+        return ctx.getRequest<T>();
     }
 }
