@@ -1,5 +1,4 @@
 import {Injectable} from '@nestjs/common';
-import {task} from "@prisma/client";
 import {PrismaService} from "../prisma.service";
 import {TasksDto} from "./tasks.dto";
 import {UserService} from "../users/users.service";
