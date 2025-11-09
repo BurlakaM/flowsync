@@ -1,0 +1,244 @@
+/* === Color Palette === */
+:root {
+    --primary-color: #5238d0; /* Основний колір */
+    --secondary-color: #c2ccaa; /* Другорядний колір */
+    --accent-color: #41d53c; /* Акцентний колір */
+    --light-color: #f8f9fa; /* Світлий колір */
+    --dark-color: #060607; /* Темний колір */
+    --body-font: 'Rubik', sans-serif; /* Шрифт */
+}
+
+/* === General Reset === */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--body-font) !important;
+    background-color: var(--light-color);
+    color: var(--dark-color);
+    line-height: 1.6;
+    margin: 0;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+#root {
+    background: url('../img/background.jpg') no-repeat;
+    background-size: cover;
+}
+.content {
+    flex: 1;
+}
+.footer {
+    background: #333;
+    color: #fff;
+    text-align: center;
+    padding: 1rem;
+}
+.two-column {
+    width: 50%;
+}
+.has-column {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+/* === Utility Classes === */
+.w-30 {
+    width: 30% !important;
+}
+@media (max-width: 1000px) {
+    .w-30 {
+        width: 50% !important;
+    }
+}
+@media (max-width: 768px) {
+    .w-30 {
+        width: 100% !important;
+    }
+}
+.w-40 {
+    width: 40% !important;
+}
+@media (max-width: 1000px) {
+    .w-40 {
+        width: 50% !important;
+    }
+}
+@media (max-width: 768px) {
+    .w-40 {
+        width: 100% !important;
+    }
+}
+.text-p {
+    color: var(--primary-color) !important;
+}
+
+.text-s {
+    color: var(--secondary-color) !important;
+}
+
+.text-accent {
+    color: var(--accent-color) !important;
+}
+
+.bg-p {
+    background-color: var(--primary-color) !important;
+}
+
+.bg-s {
+    background-color: var(--secondary-color) !important;
+}
+
+.bg-accent {
+    background-color: var(--accent-color) !important;
+}
+.btn-p {
+    background-color: var(--primary-color) !important;
+    color: var(--secondary-color) !important;
+}
+.btn-p:hover {
+    background-color: darken(var(--primary-color), 10%);
+}
+
+.btn-s {
+    border:1px solid var(--secondary-color) !important;
+    color: var(--secondary-color) !important;
+}
+
+.btn-s:hover {
+    border:1px solid var(--secondary-color) !important;
+    background: var(--secondary-color) !important;
+    color: var(--primary-color) !important;
+}
+
+.btn-s:hover {
+    background-color: darken(var(--secondary-color), 10%);
+}
+
+.btn-accent {
+    background-color: var(--accent-color);
+    color: #fff;
+}
+
+.btn-accent:hover {
+    background-color: darken(var(--accent-color), 10%);
+}
+
+
+/* === Images === */
+img {
+    max-width: 400px;
+    height: 100%;
+    width: 100%;
+    display: block;
+}
+.logo {
+    width: 10% !important;
+    margin-left: 2%;
+    height: 110px;
+    fill: var(--secondary-color);
+    color: var(--secondary-color);
+}
+/* === Main Styles === */
+
+.auth-form {
+    overflow-x: hidden;
+    background: -webkit-linear-gradient(rgba(35, 43, 85, 0.75), rgba(35, 43, 85, 0.95)), url(https://dl.dropboxusercontent.com/u/22006283/preview/codepen/clouds-cloudy-forest-mountain.jpg) no-repeat center center;;
+}
+.auth-tab {
+    color: var(--secondary-color);
+    opacity: 0.7;
+    text-transform: uppercase;
+    font-size: 1rem;
+    padding: 0.5rem 0;
+    margin: 20px 0 40px 0;
+    cursor: pointer;
+}
+.auth-tab.active {
+    border-bottom: 2px solid var(--secondary-color);
+    opacity: 1;
+}
+.auth-tabs-content {
+    overflow-x: hidden;
+    display: flex; /* Вирівнювання вкладок по горизонталі */
+    width: 200%; /* Ширина для розміщення двох вкладок поруч */
+    transition: transform 1s ease; /* Анімація переміщення вкладок */
+    position: relative; /* Для контролю позиціонування дочірніх елементів */
+}
+.auth-tab-content {
+    display: flex;
+    flex-direction: column;
+    width: 50%; /* Ширина кожної вкладки */
+    flex-shrink: 0; /* Вимикає стиснення вкладок */
+    opacity: 0; /* Початкова прозорість */
+    visibility: hidden; /* Приховує вкладку */
+    transition: opacity 0.5s ease, visibility 0.5s ease; /* Анімація прозорості */
+}
+
+.auth-tab-content.active {
+    opacity: 1; /* Робить вкладку видимою */
+    visibility: visible; /* Відображає вкладку */
+}
+.auth-tabs-content.sign-in-active {
+    transform: translateX(0); /* Переміщення до першої вкладки */
+}
+
+.auth-tabs-content.sign-up-active {
+    transform: translateX(-50%); /* Переміщення до другої вкладки */
+}
+/* === Footer === */
+.footer {
+    width: 100%;
+    height: 100px;
+    background-color: var(--dark-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 150px;
+}
+.footer p, .footer a {
+    color: var(--light-color) !important;
+}
+.input-wrapper {
+    margin: 20px 0;
+}
+
+/* === Input === */
+:focus {outline: none;
+}
+.input input {
+    width: 100%;
+    height: 100%;
+    background: inherit;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+    padding: 1rem;
+    border: none;
+    transition: 0.3s ease all;
+    color: var(--secondary-color);
+    border-bottom: 1px solid var(--secondary-color);
+}
+input[type="password"] {
+    font-weight: bold;
+}
+.input input:focus {
+    background: rgba(194, 204, 170, 0.22);
+}
+.input-title {
+    font-size: 1rem;
+    color: var(--secondary-color);
+    font-weight: bold;
+    margin-bottom: 0.2rem;
+}
