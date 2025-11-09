@@ -1,0 +1,73 @@
+# ========================
+# Node.js
+# ========================
+**/node_modules
+**/npm-debug.log
+**/yarn-error.log
+**/.pnp.*
+**/.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# ========================
+# Environment variables
+# ========================
+**/.env
+**/.env.local
+**/.env.*.local
+
+# ========================
+# Build output
+# ========================
+**/dist
+**/build
+**/out
+
+# ========================
+# Logs
+# ========================
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ========================
+# OS files
+# ========================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ========================
+# IDE / Editor
+# ========================
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# ========================
+# Docker
+# ========================
+
+**/docker-compose.override.yml
+**/docker-compose.dev.yml
+**/docker-compose.local.yml
+docker-compose.override.yml
+docker-compose.dev.yml
+docker-compose.local.yml
+
+# ========================
+# Temporary / Misc
+# ========================
+*.swp
+*.tmp
+*.bak
+*.orig
+*.old
