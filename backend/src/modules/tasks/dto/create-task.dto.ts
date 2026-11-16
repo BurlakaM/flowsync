@@ -1,15 +1,13 @@
 import { IsNumber, IsString } from 'class-validator';
 
 // The author is taken from the access token, not from the request body.
-export class TasksDto {
+export class CreateTaskDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
-  description: string;
+  description!: string;
 
   @IsNumber()
-  project_id: number;
+  project_id!: number;
 }
-
-export type TasksUpdateDto = Partial<TasksDto>;

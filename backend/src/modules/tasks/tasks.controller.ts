@@ -1,12 +1,13 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../../common/types/authenticated-user.type';
+import { CreateTaskDto } from './dto/create-task.dto';
 import { TasksService } from './tasks.service';
-import { TasksDto } from './tasks.dto';
-import { JwtAuthGuard } from '../conception/jwt.auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { AuthenticatedUser } from '../common/types/authenticated-user.type';
 
+@ApiTags('tasks')
+@ApiBearerAuth()
 @Controller('tasks')
-@UseGuards(JwtAuthGuard)
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
@@ -16,7 +17,10 @@ export class TasksController {
   }
 
   @Post()
-  createTask(@CurrentUser() user: AuthenticatedUser, @Body() dto: TasksDto) {
+  createTask(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateTaskDto,
+  ) {
     return this.tasksService.create(user.id, dto);
   }
 }

@@ -1,14 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
-import { CommentsDto } from './comments.dto';
+import { PrismaService } from '../../database/prisma.service';
+import { CreateCommentDto } from './dto/create-comment.dto';
 
 @Injectable()
 export class CommentsService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: number, dto: CommentsDto) {
+  async create(userId: number, dto: CreateCommentDto) {
     // A user may comment only on tasks they can see: own, assigned to them, or in their project.
-    const task = await this.prismaService.task.findFirst({
+    const task = await this.prisma.task.findFirst({
       where: {
         id: dto.task_id,
         OR: [
@@ -21,19 +21,11 @@ export class CommentsService {
     });
     if (!task) throw new NotFoundException('Task not found');
 
-    return this.prismaService.comment.create({
+    return this.prisma.comment.create({
       data: {
         text: dto.text,
-        user: {
-          connect: {
-            id: userId,
-          },
-        },
-        task: {
-          connect: {
-            id: task.id,
-          },
-        },
+        user: { connect: { id: userId } },
+        task: { connect: { id: task.id } },
       },
     });
   }

@@ -1,18 +1,12 @@
 import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Test } from '@nestjs/testing';
-import * as request from 'supertest';
-import { AppModule } from '../../src/app.module';
-import { configureApp } from '../../src/app.setup';
-import { PrismaService } from '../../src/prisma.service';
+import request from 'supertest';
+import { seedRoles } from '../../prisma/roles';
+import { PrismaService } from '../../src/database/prisma.service';
+import { createTestApp } from '../utils/create-test-app';
+import { cleanDatabase } from '../utils/db';
 
-jest.setTimeout(30000);
-
-// Until phase 2.8 these tests run on the dev database: every record gets a unique email
-// prefix and is removed afterwards (deleting a user cascades to its projects/tasks/comments).
-const RUN_ID = Date.now();
-const EMAIL_PREFIX = `e2e-${RUN_ID}-`;
-const email = (name: string) => `${EMAIL_PREFIX}${name}@example.test`;
+const email = (name: string) => `${name}@example.test`;
 const PASSWORD = 'password-123';
 
 describe('Security (e2e)', () => {
@@ -21,23 +15,13 @@ describe('Security (e2e)', () => {
   const server = () => app.getHttpServer();
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    configureApp(app);
-    await app.init();
-
+    app = await createTestApp();
     prisma = app.get(PrismaService);
-    if (!(await prisma.role.findFirst({ where: { name: 'user' } }))) {
-      await prisma.role.create({ data: { name: 'user' } });
-    }
+    await cleanDatabase(prisma);
+    await seedRoles(prisma);
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({
-      where: { email: { startsWith: EMAIL_PREFIX } },
-    });
     await app.close();
   });
 

@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma.service';
-import { UserDto } from './user.dto';
 import * as bcrypt from 'bcryptjs';
+import { PrismaService } from '../../database/prisma.service';
+import { CreateUserDto } from './dto/create-user.dto';
 
 const DEFAULT_ROLE_NAME = 'user';
 
@@ -15,11 +15,10 @@ export const userSelect = {
 } satisfies Prisma.userSelect;
 
 @Injectable()
-export class UserService {
-  constructor(private prisma: PrismaService) {}
+export class UsersService {
+  constructor(private readonly prisma: PrismaService) {}
 
-  // Створення користувача
-  async createUser(dto: UserDto) {
+  async createUser(dto: CreateUserDto) {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     const defaultRole = await this.prisma.role.findFirstOrThrow({
       where: { name: DEFAULT_ROLE_NAME },
@@ -29,11 +28,7 @@ export class UserService {
         name: dto.name,
         email: dto.email,
         password: hashedPassword,
-        role: {
-          connect: {
-            id: defaultRole.id,
-          },
-        },
+        role: { connect: { id: defaultRole.id } },
       },
       select: userSelect,
     });
@@ -53,8 +48,6 @@ export class UserService {
    * Never return the result of this method from a controller.
    */
   findByEmailForAuth(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email: email },
-    });
+    return this.prisma.user.findUnique({ where: { email } });
   }
 }

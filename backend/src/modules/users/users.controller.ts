@@ -1,23 +1,28 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
-import { UserService } from './users.service';
-import { UserDto } from './user.dto';
-import { JwtAuthGuard } from '../conception/jwt.auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { AuthenticatedUser } from '../common/types/authenticated-user.type';
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
+import { AuthenticatedUser } from '../../common/types/authenticated-user.type';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UsersService } from './users.service';
 
+@ApiTags('users')
 @Controller('users')
-export class UserController {
-  constructor(private userService: UserService) {}
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
 
-  // Public on purpose: registration.
+  // Public: registration. Limited to 5 requests per minute per IP.
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
-  createUser(@Body() dto: UserDto) {
-    return this.userService.createUser(dto);
+  createUser(@Body() dto: CreateUserDto) {
+    return this.usersService.createUser(dto);
   }
 
+  @ApiBearerAuth()
   @Get('me')
-  @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: AuthenticatedUser) {
-    return this.userService.getProfile(user.id);
+    return this.usersService.getProfile(user.id);
   }
 }

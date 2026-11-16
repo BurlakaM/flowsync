@@ -1,18 +1,13 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-
-// Used when CORS_ORIGINS is not set: the local frontends (docker, CRA, Vite).
-const DEFAULT_CORS_ORIGINS = [
-  'http://localhost:8080',
-  'http://localhost:3001',
-  'http://localhost:5173',
-];
+import helmet from 'helmet';
+import { AppConfigService } from './config/app-config.service';
 
 /** Shared by main.ts and e2e tests so that tests run against the real configuration. */
 export function configureApp(app: INestApplication): void {
-  const config = app.get(ConfigService);
+  const config = app.get(AppConfigService);
 
   app.setGlobalPrefix('api');
+  app.use(helmet());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -20,11 +15,13 @@ export function configureApp(app: INestApplication): void {
       transform: true,
     }),
   );
+  app.enableCors({ origin: config.corsOrigins });
+  // Lets PrismaService disconnect cleanly on SIGTERM (docker stop).
+  app.enableShutdownHooks();
 
-  const origins = config
-    .get<string>('CORS_ORIGINS')
-    ?.split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  app.enableCors({ origin: origins?.length ? origins : DEFAULT_CORS_ORIGINS });
+  // Behind nginx every request comes from the proxy; trust it to get the real client IP
+  // (needed by the rate limiter).
+  if (config.trustProxy > 0) {
+    app.getHttpAdapter().getInstance().set('trust proxy', config.trustProxy);
+  }
 }
