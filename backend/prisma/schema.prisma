@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Conventions: PascalCase models, camelCase fields; the database uses snake_case plural tables
+// and snake_case columns (@@map / @map). Every foreign key has an index.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,80 +10,133 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model user {
-  id                Int               @id @default(autoincrement())
-  name              String
-  email             String            @unique
-  password          String
-  role              role              @relation(fields: [role_id], references: [id])
-  role_id           Int
-  tasks             task[]
-  projects          project[]
-  tasks_assignments task_assignment[]
-  comments          comment[]
+enum Role {
+  USER
+  ADMIN
+
+  @@map("role")
 }
 
-model role {
-  id   Int    @id @default(autoincrement())
-  name String
-  user user[]
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+
+  @@map("task_status")
 }
 
-model task {
-  id              Int               @id @default(autoincrement())
-  name            String
-  description     String
-  user            user              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  user_id         Int
-  project_id      Int
-  project         project           @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  task_assignment task_assignment[]
-  tags            tag[]
-  comments        comment[]
-  task_tags       task_tags[]
-  creared_at      DateTime          @default(now())
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ownedProjects Project[]       @relation("ProjectOwner")
+  memberships   ProjectMember[]
+  createdTasks  Task[]          @relation("TaskCreator")
+  assignments   TaskAssignee[]
+  comments      Comment[]
+
+  @@map("users")
 }
 
-model task_assignment {
-  id      Int  @id @default(autoincrement())
-  task_id Int
-  user_id Int
-  task    task @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  user    user @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-}
-
-model task_tags {
-  id      Int  @id @default(autoincrement())
-  task_id Int
-  tag_id  Int
-  tasks   task @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  tags    tag  @relation(fields: [tag_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-}
-
-model project {
+model Project {
   id          Int      @id @default(autoincrement())
   name        String
-  description String
-  image       String
-  user        user     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  user_id     Int
-  task        task[]
-  creared_at  DateTime @default(now())
+  description String?
+  image       String?
+  ownerId     Int      @map("owner_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // A user who owns projects cannot be deleted until the projects are moved or removed.
+  owner   User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members ProjectMember[]
+  tasks   Task[]
+  tags    Tag[]
+
+  @@index([ownerId])
+  @@map("projects")
 }
 
-model comment {
-  id         Int      @id @default(autoincrement())
-  text       String
-  user       user     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  user_id    Int
-  task       task     @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  task_id    Int
-  creared_at DateTime @default(now())
+/// Members of a project other than its owner.
+model ProjectMember {
+  projectId Int      @map("project_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
 }
 
-model tag {
-  id        Int         @id @default(autoincrement())
+model Task {
+  id          Int        @id @default(autoincrement())
+  name        String
+  description String?
+  status      TaskStatus @default(TODO)
+  projectId   Int        @map("project_id")
+  createdById Int?       @map("created_by_id")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Deleting the author keeps the task.
+  createdBy User?          @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignees TaskAssignee[]
+  tags      Tag[]          @relation("TaskTags")
+  comments  Comment[]
+
+  @@index([projectId, status])
+  @@index([createdById])
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  taskId    Int      @map("task_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
+  @@map("task_assignees")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  text      String
+  taskId    Int      @map("task_id")
+  authorId  Int?     @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  task   Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Deleting the author keeps the discussion.
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
   name      String
-  tasks     task[]
-  task_tags task_tags[]
+  projectId Int      @map("project_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]  @relation("TaskTags")
+
+  @@unique([projectId, name])
+  @@map("tags")
 }

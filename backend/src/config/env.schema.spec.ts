@@ -13,7 +13,18 @@ describe('validateEnv', () => {
       JWT_EXPIRES_IN: '1h',
       TRUST_PROXY: 0,
       LOG_LEVEL: 'info',
+      BCRYPT_ROUNDS: 10,
     });
+  });
+
+  it('keeps the bcrypt cost between 4 and 15', () => {
+    expect(validateEnv({ ...valid, BCRYPT_ROUNDS: '4' }).BCRYPT_ROUNDS).toBe(4);
+    expect(() => validateEnv({ ...valid, BCRYPT_ROUNDS: '3' })).toThrow(
+      /BCRYPT_ROUNDS/,
+    );
+    expect(() => validateEnv({ ...valid, BCRYPT_ROUNDS: '16' })).toThrow(
+      /BCRYPT_ROUNDS/,
+    );
   });
 
   it('coerces numeric variables from strings', () => {

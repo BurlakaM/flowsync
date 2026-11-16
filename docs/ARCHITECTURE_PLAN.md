@@ -36,8 +36,8 @@
 | B6 | Немає глобального `ValidationPipe`: `POST /users`, `POST /auth/login` не валідуються; у `main.ts` `enableCors()` для всіх origin | `main.ts` | 0 |
 | B7 | Два конкуруючі механізми JWT: кастомний `canActivate` кладе в `request.user` payload (`sub`), а `JwtStrategy.validate` повертає `{userId, username}` і ніколи не використовується | `conception/jwt.auth.guard.ts`, `auth/jwt.strategy.ts` | 0 |
 | B8 | Немає валідації env; `SECRET_KEY` може бути `undefined`; паролі БД захардкоджені в compose | `app.module.ts`, `docker-compose.yml` | 1–2 ✓ |
-| B9 | `prisma db push` при старті контейнера замість міграцій | `docker-compose.yml` | 3 |
-| B10 | Схема БД: помилка `creared_at`, моделі в `snake_case`, дубль зв'язку task↔tag (`tags` і `task_tags`), немає `updatedAt`, немає індексів на FK, обов'язкові `description`/`image` | `schema.prisma` | 3 |
+| B9 | `prisma db push` при старті контейнера замість міграцій | `docker-compose.yml` | 3 ✓ |
+| B10 | Схема БД: помилка `creared_at`, моделі в `snake_case`, дубль зв'язку task↔tag (`tags` і `task_tags`), немає `updatedAt`, немає індексів на FK, обов'язкові `description`/`image` | `schema.prisma` | 3 ✓ |
 | B11 | `strictNullChecks` і `noImplicitAny` вимкнені, `any` у сервісах | `tsconfig.json` | 2 ✓ |
 | B12 | Nest 10 (актуальна гілка вже 12); Node 20 досяг end-of-life у квітні 2026 | `package.json`, Dockerfile | 1–2 ✓ |
 | B13 | Два lock-файли в backend (`yarn.lock` і `package-lock.json`) | `backend/` | 1 |
@@ -78,6 +78,9 @@
 | D19 | Runtime | Node 24 LTS (або 22, якщо залежність не підтримує 24) | Node 20 — EOL. Node 26 уже LTS (з листопада 2026), але CRA на ній не перевірений (backend уже на Nest 12 / Prisma 6.19): повернутися після фази 5 |
 | D20 | TypeScript | `~6.0` зі `strict: true`: `@nestjs/schematics@12` вимагає ≥ 6, а `typescript-eslint` ще не підтримує ≥ 6.1 | TS 5.9 несумісний із Nest 12; TS 7 (нативний) поки не підтримують `typescript-eslint` та частина інструментів |
 | D21 | Логування й захист API | `nestjs-pino` (JSON у production, pretty у dev, токени редагуються), `helmet`, `@nestjs/throttler` (100/хв глобально, 5/хв для логіну й реєстрації), `TRUST_PROXY` за nginx | Власний логер/middleware: дублює готове |
+| D22 | Модель доступу | Власник проєкту — `Project.ownerId`; додаткові учасники — `ProjectMember`; перевірка доступу в сервісах. Ролі користувача — `enum Role` | Власник у `ProjectMember` теж: дублює дані |
+| D23 | Міграції | `prisma migrate` (SQL у репозиторії), у Docker `migrate deploy` на старті; CI перевіряє розбіжність схеми й міграцій | `db push`: не лишає історії й небезпечний для даних |
+| D24 | Права доступу | Єдине джерело правди «хто бачить проєкт» — `ProjectsService` (власник або учасник); сторонній → 404, учасник без права → 403; ADMIN не обходить доступ до проєктів | Глобальний обхід для ADMIN: розширює поверхню атаки; CASL: зайве, правил поки мало |
 
 ## 4. Цільова архітектура
 
@@ -197,31 +200,51 @@ frontend/src/
 
 ### Фаза 3 — Модель даних і міграції · розмір M
 
-Закриває B9, B10. **Фази 3 і 4 ведемо в одній гілці** `refactor/phase-3-4-domain` (перейменування полів ламає сервіси), але окремими комітами.
+Закриває B9, B10. **Статус: виконано 2026-11-16** (не закомічено). **Фази 3 і 4 ведемо в одній гілці** `refactor/phase-3-4-domain` (перейменування полів ламає сервіси), але окремими комітами.
 
-- [ ] 3.1 Переписати `schema.prisma`: моделі PascalCase з `@@map("snake_case_plural")`, поля camelCase з `@map`; `createdAt`/`updatedAt`; `enum Role` (D3), `enum TaskStatus` (`TODO`, `IN_PROGRESS`, `DONE`); один неявний m:n між `Task` і `Tag` (видалити `task_tags`); призначення виконавців — `TaskAssignee` із складеним ключем; `ProjectMember` (доступ до проєкту); індекси на всіх FK; політики `onDelete`; `description`/`image` необов'язкові
-- [ ] 3.2 `prisma migrate dev --name init`; закомітити `prisma/migrations` (дані тестові, тому міграція даних не потрібна)
-- [ ] 3.3 Compose: `prisma migrate deploy` замість `db push` (окремий одноразовий сервіс `migrate` або крок у команді запуску)
-- [ ] 3.4 `prisma/seed.ts`: демо-дані (admin, user, проєкт, кілька задач) — ідемпотентно, лише dev
+- [x] 3.1 Переписати `schema.prisma`: моделі PascalCase з `@@map("snake_case_plural")`, поля camelCase з `@map`; `createdAt`/`updatedAt`; `enum Role` (D3), `enum TaskStatus` (`TODO`, `IN_PROGRESS`, `DONE`); один неявний m:n між `Task` і `Tag` (видалити `task_tags`); призначення виконавців — `TaskAssignee` із складеним ключем; `ProjectMember` (доступ до проєкту); індекси на всіх FK; політики `onDelete`; `description`/`image` необов'язкові
+- [x] 3.2 `prisma migrate dev --name init`; закомітити `prisma/migrations` (дані тестові, тому міграція даних не потрібна)
+- [x] 3.3 Compose: `prisma migrate deploy` замість `db push` (крок у команді запуску; `prisma` CLI переміщено в `dependencies`, прод-образ збирається без dev-залежностей)
+- [x] 3.4 `prisma/seed.ts`: демо-дані (admin, user, проєкт, кілька задач) — ідемпотентно, лише dev
 
 **Готово, коли:** `prisma migrate reset` + seed відпрацьовують на чистій БД; `prisma validate` проходить; CI запускає міграції на тестовій БД.
 
-### Фаза 4 — Модулі backend · розмір L
+**Що вийшло інакше, ніж планувалось:**
+- Нова схема несумісна зі старими таблицями, а `migrate dev` на БД, створеній `db push`, пропонує `reset`. Щоб нічого не втратити, старий `flowsync` лише **перейменовано** у `flowsync_backup_phase2` (там 2 тестові користувачі), а міграції застосовано до нової порожньої `flowsync`. Резервну БД можна видалити: `DROP DATABASE flowsync_backup_phase2;`.
+- Доступ до проєкту: власник = `Project.ownerId`, інші учасники — `ProjectMember` (власник не дублюється). Теги належать проєкту (`@@unique([projectId, name])`). `onDelete`: власник проєкту `Restrict`, автор задачі/коментаря `SetNull`, дочірні сутності `Cascade`.
+- Контракт API змінився: поля запитів і відповідей тепер camelCase (`projectId`, `taskId`, `createdById`, `authorId`, відповідь користувача: `role: "USER"` замість `role_id`, `createdAt`). `/auth/login` і `/auth/validate-token` не змінювались.
+- Роль як `enum` прибрала таблицю `role` і seed ролей; реєстрація більше не залежить від даних у БД.
+- Додано перевірку в CI: `prisma migrate diff ... --exit-code` падає, якщо `schema.prisma` змінили без міграції (перевірено позитивно й негативно).
+- e2e-тести тепер застосовують міграції (`migrate deploy`) замість `db push`, тож самі перевіряють коректність міграцій.
+- Не зроблено: `package.json#prisma` (конфіг seed) у Prisma 7 застаріває, тоді потрібен `prisma.config.ts`; це частина окремого кроку міграції на Prisma 7.
+
+### Фаза 4 — Модулі backend · розмір L · **виконано 2026-11-16** (не закомічено)
 
 Порядок: **auth → users → projects → tasks → comments → tags**. У кожному модулі виконати чекліст:
 DTO (`Create`/`Update`/`Response`/`Query`), тонкий контролер, сервіс із перевіркою доступу, Swagger-декоратори,
 unit-тести сервісу, e2e (401 / 400 / 404 / успіх), видалення старого коду.
 
-- [ ] 4.1 **auth:** `POST /auth/register` (роль завжди `USER`), `POST /auth/login`, `GET /auth/me`; `bcrypt`-cost з конфігурації; троттлінг логіну; `validate-token` лишається як deprecated до фази 6
-- [ ] 4.2 **users:** `GET/PATCH /users/me`; адмінський `GET /users` (`@Roles('ADMIN')`)
-- [ ] 4.3 **projects:** CRUD; список лише проєктів, де користувач — учасник; власник керує учасниками
-- [ ] 4.4 **tasks:** `GET/POST /projects/:projectId/tasks`, `GET/PATCH/DELETE /tasks/:id`; фільтри (статус, виконавець, тег), пагінація, сортування; призначення виконавців
-- [ ] 4.5 **comments:** список/створення у задачі; редагування й видалення лише автором
-- [ ] 4.6 **tags:** CRUD у межах проєкту
-- [ ] 4.7 Поріг покриття сервісів тестами ≥ 70% (`strict: true` уже ввімкнено у фазі 2)
-- [ ] 4.8 Експортувати `openapi.json` скриптом `npm run openapi:export`
+- [x] 4.1 **auth:** `POST /auth/register` (роль завжди `USER`), `POST /auth/login`, `GET /auth/me`; `bcrypt`-cost з конфігурації; троттлінг логіну; `validate-token` лишається як deprecated до фази 6
+- [x] 4.2 **users:** `GET/PATCH /users/me`; адмінський `GET /users` (`@Roles('ADMIN')`)
+- [x] 4.3 **projects:** CRUD; список лише проєктів, де користувач — учасник; власник керує учасниками
+- [x] 4.4 **tasks:** `GET/POST /projects/:projectId/tasks`, `GET/PATCH/DELETE /tasks/:id`; фільтри (статус, виконавець, тег), пагінація, сортування; призначення виконавців
+- [x] 4.5 **comments:** список/створення у задачі; редагування й видалення лише автором
+- [x] 4.6 **tags:** CRUD у межах проєкту
+- [x] 4.7 Поріг покриття сервісів тестами ≥ 70% (`strict: true` уже ввімкнено у фазі 2)
+- [x] 4.8 Експортувати `openapi.json` скриптом `npm run openapi:export`
 
 **Готово, коли:** немає жодного ендпоїнта без guard (крім `@Public()`); жодна відповідь не містить `password`; у коді немає `any`; усі e2e зелені.
+
+**Що вийшло інакше або додатково:**
+- Реалізовано 30 ендпоїнтів (список у README). Реєстрація переїхала на `POST /auth/register`; `POST /users` видалено (фронтенд його не викликав). `POST /tasks` і `POST /comments` замінені вкладеними маршрутами. `/auth/login` (поле `access_token`) і `/auth/validate-token` не змінені до фази 6.
+- Модель доступу (D24): проєкт бачать власник і учасники, стороннім він «не існує» (404); учасник без права отримує 403. Роль ADMIN дає лише `GET /users`, але не доступ до чужих проєктів.
+- Права: учасники створюють і редагують задачі, коментарі й теги; проєкт, склад і видалення тегів — лише власник; задачу видаляє автор або власник; коментар редагує лише автор, видаляє автор або власник (модерація).
+- `PATCH /tasks/:id`: `assigneeIds` і `tagIds`, якщо передані, замінюють поточні набори (порожній масив очищає); виконавці мають бути учасниками проєкту, теги — з того ж проєкту (інакше 400).
+- `GET /tasks` — задачі всіх доступних проєктів із тими ж фільтрами, що й вкладений `GET /projects/:id/tasks`.
+- Гігієна вводу: `@Trim()`, `@NormalizeEmail()` (email регістронезалежний, дубль → 409), пароль ≤ 72 символів (ліміт bcrypt), `BCRYPT_ROUNDS` у конфігу.
+- `openapi.json` експортується без БД (режим Nest `preview`) і перевіряється в CI; це основа для типізованого клієнта у фазі 7. У CI також увімкнено поріг покриття сервісів.
+- Тести: 101 unit (поріг покриття сервісів 70% проходить) і 117 e2e (матриця «власник / учасник / сторонній / без токена»). Перевірка мутацією: вимкнення перевірки власника ламає 3 unit і 3 e2e тести.
+- Не зроблено: refresh-токени (фаза 7), ролі учасників проєкту вище `OWNER`/`MEMBER`, пошук користувачів для запрошення, м'яке видалення.
 
 ### Фаза 5 — Фундамент frontend · розмір L
 
@@ -296,3 +319,5 @@ CASL для тонких прав · деплой на VPS (Caddy/Traefik) · us
 | 2026-11-16 | Фаза 0 (0.1–0.9) | Закрито B1–B7: немає `password` у відповідях, роль не приймається, `/users/me` замість `/users/:email`, guard і токен-автор у tasks/comments, перевірка доступу, глобальний `ValidationPipe`, один механізм JWT (`AuthGuard('jwt')`), CORS за списком, `JwtModule.registerAsync`. 20 e2e-тестів зелені (`test/e2e/security.e2e-spec.ts`), живі перевірки в Docker | Додано `src/common/` (`@CurrentUser`, `AuthenticatedUser`) і `src/app.setup.ts`. Видалено зламаний шаблонний `test/app.e2e-spec.ts`. `validate-token` лишається до фази 6 |
 | 2026-11-16 | Фаза 1 (1.1–1.9, 1.11) | npm-only і назви пакетів, Node 24, `.env.example` ×3, БД `jira` → `flowsync` (`ALTER DATABASE`, дані збережено), compose dev/прод + `Dockerfile` з цілями `dev`/`build`/`prod`, nginx (SPA-fallback, проксі `/api`, заголовки безпеки), непривілегійовані користувачі, healthcheck-и, ESLint 9 + Prettier, CI (`ci.yml`) і деплой після CI (`deploy.yml`), Dependabot, новий README. Перевірено: lint/typecheck, 20 e2e, dev-режим із hot reload, прод-режим (200 на `/dashboard`, 401 через проксі, порти API/БД закриті) | Не комітилось. Видалено зламаний `App.test.js` (шаблон CRA). У CI frontend-збірка з `CI=false`. 1.10 (Husky) відкладено. Для `deploy.yml` (`workflow_run`) файл має бути в `main` |
 | 2026-11-16 | Фаза 2 (2.1–2.8) | Nest 10 → 11 → 12.5, TypeScript 6.0, Prisma 6.19, Vitest 5 + SWC замість Jest, `tsx` для seed. Структура `config/ database/ common/ health/ modules/`; zod-валідація env (`SECRET_KEY` → `JWT_SECRET`, у production ≥ 32 символів); глобальні `JwtAuthGuard` (`@Public`), `RolesGuard` (`@Roles`), throttler; `AllExceptionsFilter` + `PrismaExceptionFilter` з єдиним тілом помилки; пагінація; Swagger `/api/docs`; `helmet`; `nestjs-pino`; `/api/health` (його ж тепер використовує Docker healthcheck); `strict: true`; окрема тестова БД (`db_test`, профіль `test`). Перевірено: lint/типи/збірка, 42 unit, 26 e2e, dev- і прод-режим у Docker (проксі, 404 на Swagger у prod, rate limit, fail-fast на короткому секреті) | Не комітилось. Потрібно: `JWT_SECRET` ≥ 32 символів для прод-режиму (у локальному `.env` зараз 19). Хостовий Node 22.22.0 нижче вимоги `@nestjs/schematics` (≥ 22.22.3 / 24.15): у Docker і CI Node 24 |
+| 2026-11-16 | Фаза 3 (3.1–3.4) | Нова `schema.prisma`: PascalCase-моделі з `@@map`, `createdAt`/`updatedAt`, `enum Role` і `TaskStatus`, `ProjectMember`, `TaskAssignee` зі складеним ключем, теги проєкту, неявний m:n Task–Tag, індекси на всіх FK, явні `onDelete`. Міграція `init`, `migrate deploy` у Docker, `prisma` CLI в `dependencies` і прод-образ без dev-залежностей, перевірка розбіжності схеми в CI, демо-seed (dev) замість seed ролей. Сервіси, DTO й тести переведені на нову модель. Перевірено: lint/типи, 42 unit, 27 e2e (міграції на свіжій БД), seed двічі, чиста БД, dev і прод у Docker | Не комітилось. Старі дані збережено в `flowsync_backup_phase2`. Контракт API змінився (camelCase). Продовження — фаза 4 у цій самій гілці |
+| 2026-11-16 | Фаза 4 (4.1–4.8) | Модулі auth, users, projects (з учасниками), tasks (фільтри, пагінація, сортування, виконавці, теги), comments, tags; 30 ендпоїнтів, response DTO й Swagger, нормалізація вводу, `BCRYPT_ROUNDS`, поріг покриття сервісів, `npm run openapi:export` + перевірка актуальності в CI. Перевірено: lint/типи/збірка, 101 unit, 117 e2e, мутація, живий сценарій у Docker на демо-даних і на новому потоці | Не комітилось. Контракт API змінився (frontend використовує лише `/auth/login` і `/auth/validate-token`, вони не змінені). Далі — фаза 5 (frontend) |

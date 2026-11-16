@@ -12,6 +12,8 @@ import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CommentsModule } from './modules/comments/comments.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { TagsModule } from './modules/tags/tags.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -49,8 +51,10 @@ import { UsersModule } from './modules/users/users.module';
     PrismaModule,
     AuthModule,
     UsersModule,
+    ProjectsModule,
     TasksModule,
     CommentsModule,
+    TagsModule,
     HealthModule,
   ],
   providers: [

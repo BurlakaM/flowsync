@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -15,6 +16,14 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
   ) {}
+
+  register(dto: CreateUserDto) {
+    return this.usersService.createUser(dto);
+  }
+
+  me(userId: number) {
+    return this.usersService.getProfile(userId);
+  }
 
   /** Returns the user (without the password hash) when the credentials are valid. */
   async validateUser(dto: LoginDto): Promise<TokenSubject | null> {

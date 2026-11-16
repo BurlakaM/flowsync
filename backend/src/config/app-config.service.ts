@@ -62,4 +62,8 @@ export class AppConfigService {
   get logLevel(): Env['LOG_LEVEL'] {
     return this.config.get('LOG_LEVEL', { infer: true });
   }
+
+  get bcryptRounds(): number {
+    return this.config.get('BCRYPT_ROUNDS', { infer: true });
+  }
 }

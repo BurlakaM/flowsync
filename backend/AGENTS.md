@@ -1,8 +1,9 @@
 # Backend (NestJS) — правила
 
 Спільні правила: `../AGENTS.md`. План і поточна фаза: `../docs/ARCHITECTURE_PLAN.md`.
-Структура нижче вже реальна (фаза 2). Ще не змінено лише схему БД і доменні модулі: вони мігрують у фазах 3–4
-(поки що поля й таблиці в `snake_case`, ролі в таблиці `role`).
+Структура, схема БД і доменні модулі нижче реальні (фази 2–4).
+Готові модулі: auth, users, projects, tasks, comments, tags. Frontend поки користується лише `/auth/login` та
+`/auth/validate-token`, тож їх контракт (зокрема поле `access_token`) стабільний до фази 6.
 
 ## Структура
 
@@ -22,7 +23,7 @@ src/
    ├─ x.service.ts
    ├─ x.service.spec.ts       unit-тест поруч із сервісом
    └─ x.module.ts
-prisma/                     schema.prisma, seed.ts, roles.ts
+prisma/                     schema.prisma, migrations/, seed.ts (демо-дані, лише dev)
 test/                       e2e/*.e2e-spec.ts, utils/ (createTestApp, cleanDatabase), setup-env.ts, global-setup.ts
 ```
 
@@ -114,7 +115,13 @@ async list(userId: number, query: PaginationQueryDto) {
 ## Правила
 
 **API**
-- JSON у camelCase. Колекції повертай з пагінацією (`PaginationQueryDto`, `paginationArgs`, `toPage`).
+- JSON у camelCase. Колекції повертай з пагінацією (`PaginationQueryDto`, `paginationArgs`, `toPage`); коротким довідникам
+  (теги проєкту) пагінація не потрібна.
+- Ресурси вкладені лише тоді, коли батько потрібен у URL: `projects/:projectId/tasks`, `tasks/:taskId/comments`; окремий елемент
+  адресується власним id (`tasks/:id`). `DELETE` повертає `204` без тіла.
+- Відповіді описуй класами `*-response.dto.ts` і `@ApiOkResponse({ type })`: з них будуються Swagger і `openapi.json`.
+  Після зміни API виконай `npm run openapi:export` і закоміть `openapi.json` (CI падає, якщо файл застарів).
+- Вхід чисти `@Trim()` і `@NormalizeEmail()` (`common/decorators/transform.decorators.ts`); невідомі поля тіла дають `400`.
 - Помилки — виключення Nest (`NotFoundException`, `ForbiddenException`, `ConflictException`); не повертай `null` замість 404.
   Усі помилки мають єдине тіло `{ statusCode, error, message, path, timestamp }` (`AllExceptionsFilter`).
 - Помилки Prisma (`P2002` → 409, `P2025` → 404, `P2003` → 409) мапить `PrismaExceptionFilter`; у сервісах не лови їх без потреби.
@@ -126,8 +133,12 @@ async list(userId: number, query: PaginationQueryDto) {
 - Обмеження за роллю — `@Roles(Role.Admin)` (перевіряє глобальний `RolesGuard`).
 - Користувач у запиті — `AuthenticatedUser { id; email; role }`, дістається через `@CurrentUser()`. Ніяких `req.user.sub`.
   `JwtStrategy` читає користувача з БД на кожен запит, тож токен видаленого користувача одразу недійсний.
-- Реєстрація завжди створює роль `user`; роль у тілі запиту заборонена (400).
+- Реєстрація завжди створює роль `USER` (значення за замовчуванням у схемі); роль у тілі запиту заборонена (400).
+  Роль — це `enum Role` з Prisma (`USER`, `ADMIN`), імпортується з `common/types/role.type.ts`.
 - Доступ до ресурсу перевіряє сервіс (членство в проєкті), а не контролер; чужий ресурс → `NotFoundException`.
+  Учасник без потрібного права (змінити проєкт, видалити чужу задачу чи коментар) → `ForbiddenException`.
+  «Хто бачить проєкт» описано лише в `ProjectsService` (`accessFilter`, `assertAccess`, `assertOwner`): інші модулі беруть його звідти,
+  а не дублюють умови. Роль ADMIN не дає доступу до чужих проєктів.
 - Обмеження частоти: глобально 100 запитів/хв з IP, для логіну й реєстрації `@Throttle` 5/хв. У `NODE_ENV=test` вимкнено.
 
 **Конфігурація**
@@ -138,11 +149,15 @@ async list(userId: number, query: PaginationQueryDto) {
 **Дані**
 - Prisma лише в сервісах/репозиторіях, ніколи в контролерах. Raw SQL — лише з обґрунтуванням у коментарі.
 - Схема змінюється через `npx prisma migrate dev --name <verb_noun>`; **вже закомічену міграцію не редагуй**.
-  До фази 3 діє тимчасовий `prisma db push`.
+  Нову міграцію комітимо разом зі змінами `schema.prisma`; CI падає, якщо схема розійшлась з міграціями. `prisma db push` не використовуємо.
+  `prisma migrate reset` лише на dev-базі й лише з дозволу власника.
 - Перевірка деструктивних міграцій (drop, rename з даними) — лише з дозволу власника.
 - Кілька записів, що мають бути атомарними, — `prisma.$transaction`.
 - Для списків не допускай N+1: `include`/`select` у одному запиті.
-- Seed: `prisma/seed.ts` ідемпотентний і запускається через `tsx`; спільна логіка (ролі) в `prisma/roles.ts`.
+- Схема: моделі PascalCase, поля camelCase, у БД snake_case (`@@map`/`@map`); кожен зовнішній ключ має індекс; `onDelete` указується явно.
+  Доступ до проєкту: власник = `Project.ownerId`, решта учасників у `ProjectMember`; задачі й коментарі зберігаються після видалення автора (`SetNull`).
+- Seed: `prisma/seed.ts` наповнює лише dev демо-даними (ідемпотентний, у production пропускається), запускається через `tsx`.
+  Ролей у БД сидити не потрібно: це enum.
 
 **Код**
 - Файли kebab-case із суфіксом ролі (`tasks.service.ts`, `create-task.dto.ts`); один клас на файл; класи PascalCase.
@@ -159,11 +174,14 @@ async list(userId: number, query: PaginationQueryDto) {
   `vitest-mock-extended` (`mockDeep<PrismaService>()`); глобали `describe/it/vi/expect` доступні без імпорту.
 - **E2E** (`test/e2e/*.e2e-spec.ts`, `npm run test:e2e`): кожен ендпоїнт — мінімум 401 без токена, 400 на некоректне тіло,
   404 на чужий ресурс, успішний сценарій. Застосунок створює `createTestApp()` (справжній `AppModule` + `configureApp`),
-  у `beforeAll` викликай `cleanDatabase(prisma)` і `seedRoles(prisma)`.
+  у `beforeAll` викликай `cleanDatabase(prisma)`. Схему до тестової БД застосовує `global-setup` (`prisma migrate deploy`).
 - Тести йдуть на **окрему БД** `flowsync_test`: `docker compose --profile test up -d db_test` (порт 5434, дані в пам'яті).
   `cleanDatabase` і `globalSetup` відмовляються працювати з БД, назва якої не містить `test` (у CI дозволено).
   **Ніколи не вказуй `TEST_DATABASE_URL` на робочу БД.**
 - Назви: `it('returns 404 when task belongs to another project')` — поведінка, а не реалізація.
+- e2e-сценарії пишуться через `createApi(app)` (`test/utils/api.ts`): `signUp`, `signUpAdmin`, `get`/`post`/`patch`/`del`.
+  Для кожного ресурсу перевіряй матрицю: власник, учасник, сторонній, без токена.
+- Unit-тести сервісів покривають гілки доступу й валідації; поріг покриття сервісів 70% (`npm run test:cov`, його ж перевіряє CI).
 - Нова перевірка безпеки (guard, доступ) без тесту не вважається виконаною.
 
 ## Команди
@@ -176,6 +194,7 @@ npm run typecheck    # tsc --noEmit
 npm test             # unit; test:cov — покриття
 npm run test:e2e     # e2e (потрібен db_test)
 npm run build        # nest build -> dist/main.js
+npm run openapi:export  # збирає й записує openapi.json (БД не потрібна)
 ```
 
 ## Чекліст нового модуля

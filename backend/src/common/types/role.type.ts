@@ -1,8 +1,3 @@
-// Role names as they are stored in the `role` table.
-// Plan phase 3 replaces the table with a Prisma enum and this type follows it.
-export const Role = {
-  User: 'user',
-  Admin: 'admin',
-} as const;
-
-export type Role = (typeof Role)[keyof typeof Role];
+// The Role enum (USER, ADMIN) is defined in prisma/schema.prisma; it is re-exported here so that
+// the rest of the application does not import from @prisma/client just for roles.
+export { Role } from '@prisma/client';

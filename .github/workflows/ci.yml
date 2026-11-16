@@ -50,10 +50,16 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
-      # Global setup of the e2e tests pushes the schema to TEST_DATABASE_URL.
+      # Unit tests with the coverage threshold for the services (see vitest.config.ts).
+      - run: npm run test:cov
+      # Global setup of the e2e tests applies the committed migrations to TEST_DATABASE_URL.
       - run: npm run test:e2e
+      # Fails (exit code 2) when schema.prisma was changed without creating a migration.
+      - run: npx prisma migrate diff --from-url "$TEST_DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
       - run: npm run build
+      # Fails when the API changed but backend/openapi.json was not regenerated (npm run openapi:export).
+      - run: npm run openapi:export
+      - run: git diff --exit-code -- openapi.json
 
   frontend:
     runs-on: ubuntu-latest

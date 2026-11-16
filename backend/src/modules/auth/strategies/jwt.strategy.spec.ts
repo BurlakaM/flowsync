@@ -20,13 +20,13 @@ describe('JwtStrategy', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: 3,
       email: 'a@b.co',
-      role: { name: 'admin' },
+      role: 'ADMIN',
     } as never);
 
     expect(await strategy.validate({ sub: 3, email: 'a@b.co' })).toEqual({
       id: 3,
       email: 'a@b.co',
-      role: 'admin',
+      role: 'ADMIN',
     });
   });
 

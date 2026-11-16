@@ -13,7 +13,7 @@ services:
       # Bind mounts from Windows do not deliver file-system events, so tsc --watch must poll.
       TSC_WATCHFILE: PriorityPollingInterval
       TSC_WATCHDIRECTORY: RecursiveDirectoryUsingDynamicPriorityPolling
-    command: sh -c "npx prisma db push && npx prisma db seed && npm run start:dev"
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run start:dev"
     volumes:
       - ./backend/src:/app/src
       - ./backend/prisma:/app/prisma
