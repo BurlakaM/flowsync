@@ -13,6 +13,19 @@ services:
       # Bind mounts from Windows do not deliver file-system events, so tsc --watch must poll.
       TSC_WATCHFILE: PriorityPollingInterval
       TSC_WATCHDIRECTORY: RecursiveDirectoryUsingDynamicPriorityPolling
+      # Email goes to Mailpit, a fake mail server (read the messages on http://localhost:8025).
+      # These lines override SMTP_* from backend/.env, so development never sends real email.
+      # To try a real mail server in development, delete the four lines below and set SMTP_* in backend/.env.
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      MAIL_FROM: FlowSync <noreply@flowsync.test>
+      APP_URL: http://localhost:5173
+      # File storage: the s3 service below, with development-only credentials (they protect nothing but your own test files).
+      S3_ENDPOINT: http://s3:9000
+      S3_BUCKET: flowsync
+      S3_ACCESS_KEY: flowsync
+      S3_SECRET_KEY: flowsync-dev-only
+      S3_FORCE_PATH_STYLE: "true"
     command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm run start:dev"
     volumes:
       - ./backend/src:/app/src
@@ -40,6 +53,34 @@ services:
     ports:
       - "5433:5432"
 
+  redis:
+    ports:
+      - "6380:6379"
+
+  # An S3-compatible file store for project pictures (RustFS: MinIO no longer publishes free images).
+  # Its credentials are for development only. Any S3 service works in its place.
+  s3:
+    image: rustfs/rustfs:latest
+    container_name: flowsync-s3
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: flowsync
+      RUSTFS_SECRET_KEY: flowsync-dev-only
+    volumes:
+      - s3_data:/data
+    networks:
+      - app_network
+
+  # Catches every email the application sends in development; nothing leaves your machine.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: flowsync-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+    networks:
+      - app_network
+
   # Disposable database for the e2e tests (data lives in memory):
   #   docker compose --profile test up -d db_test
   db_test:
@@ -58,3 +99,6 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+
+volumes:
+  s3_data:
