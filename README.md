@@ -99,23 +99,31 @@ npm run dev             # Vite з HMR (проксі /api → localhost:3000)
 npm run format:check
 npm run lint
 npm run typecheck
-npm test                # Vitest + Testing Library + MSW
+npm test                # Vitest + Testing Library + MSW + axe (доступність)
+npm run api:types       # типи з ../backend/openapi.json (після зміни API; CI перевіряє)
+npm run test:e2e        # Playwright: потрібен запущений прод-подібний стек (:8080) і Chrome
 npm run build
 ```
 
 ## API
 
-Усі маршрути мають префікс `/api` і потребують `Authorization: Bearer <token>`, крім реєстрації, логіну та `/health`.
+Усі маршрути мають префікс `/api` і потребують `Authorization: Bearer <token>`, крім реєстрації, логіну, `refresh`, `logout` та `/health`.
 Інтерактивна документація: Swagger на `/api/docs` (лише в dev); повний опис у [backend/openapi.json](backend/openapi.json).
 
 | Ресурс | Ендпоїнти |
 |---|---|
-| auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
+| auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` |
 | users | `GET`/`PATCH /users/me`, `GET /users` (лише ADMIN: пагінація, `?search=`) |
 | projects | `GET`/`POST /projects`, `GET`/`PATCH`/`DELETE /projects/:id`, `GET`/`POST /projects/:id/members`, `DELETE /projects/:id/members/:userId` |
 | tasks | `GET /tasks`, `GET`/`POST /projects/:id/tasks`, `GET`/`PATCH`/`DELETE /tasks/:id` |
 | comments | `GET`/`POST /tasks/:id/comments`, `PATCH`/`DELETE /comments/:id` |
 | tags | `GET`/`POST /projects/:id/tags`, `PATCH`/`DELETE /tags/:id` |
+
+Сесія: `POST /auth/login` повертає короткий access-токен (15 хв) у тілі, а refresh-токен ставить в `httpOnly` cookie
+(`SameSite=Strict`, `Path=/api/auth`). Frontend тримає access-токен лише в пам'яті; після перезавантаження сторінки або на 401
+він викликає `POST /auth/refresh`, і сервер видає нову пару (ротація: кожен refresh-токен працює один раз). Повторне використання
+вже використаного токена вважається крадіжкою й закриває всю сесію. `POST /auth/logout` відкликає сесію. Кожна відповідь має
+заголовок `X-Request-Id` (його ж містять логи й тіло помилки).
 
 Правила: проєкт бачать його власник і учасники (стороннім він здається неіснуючим, `404`). Учасники створюють і редагують задачі,
 коментарі та теги; проєкт, учасників і теги змінює лише власник; задачу видаляє автор або власник; коментар редагує лише автор.
@@ -143,7 +151,9 @@ npx prisma db seed                                 # демо-дані (лише
 | `.env` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | БД у Docker і `DATABASE_URL` backend у compose |
 | `backend/.env` | `JWT_SECRET` | секрет підпису JWT; у production ≥ 32 символів. Застосунок не стартує без нього |
 | `backend/.env` | `DATABASE_URL` | БД для запуску на хості; у compose перекривається |
-| `backend/.env` | `JWT_EXPIRES_IN` | необов'язково: час життя токена (`15m`, `1h`, `7d`), типово `1h` |
+| `backend/.env` | `JWT_EXPIRES_IN` | необов'язково: час життя access-токена (`15m`, `1h`), типово `15m` |
+| `backend/.env` | `REFRESH_TOKEN_TTL_DAYS` | необов'язково: час життя сесії (refresh-cookie), 1-90 днів, типово `7` |
+| `backend/.env` | `COOKIE_SECURE` | необов'язково: `true`, коли сайт працює через HTTPS (cookie тоді йде лише захищеним каналом); для `http://localhost` лишайте `false` |
 | `backend/.env` | `CORS_ORIGINS` | необов'язково: дозволені origin через кому |
 | `backend/.env` | `LOG_LEVEL`, `PORT` | необов'язково: рівень логів (типово `info`), порт (типово `3000`) |
 | `backend/.env` | `BCRYPT_ROUNDS` | необов'язково: складність bcrypt (4-15), типово `10` |
@@ -158,7 +168,7 @@ npx prisma db seed                                 # демо-дані (лише
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): на кожен PR і push у `main`. Backend: `prisma validate`, Prettier, ESLint, типи, unit та e2e
-  (на Postgres у service-контейнері), перевірка, що `schema.prisma` не розійшлась з міграціями, збірка. Frontend: Prettier, ESLint, типи, тести, збірка. Потім збірка Docker-образів.
+  (на Postgres у service-контейнері), перевірка, що `schema.prisma` не розійшлась з міграціями, збірка. Frontend: Prettier, ESLint, перевірка згенерованих типів, типи, тести, збірка. Обидва пакети перевіряються `npm audit`. Окрема джоба `e2e` піднімає прод-подібний стек і проганяє Playwright. Потім збірка Docker-образів.
 - **Deploy** (`.github/workflows/deploy.yml`): після успішного CI на `main` публікує образи в Docker Hub:
   `<DOCKER_USERNAME>/flowsync-back` і `<DOCKER_USERNAME>/flowsync-front` з тегами `:<sha коміту>` та `:latest`.
   Потрібні секрети репозиторію `DOCKER_USERNAME` і `DOCKER_PASSWORD` (токен доступу Docker Hub).

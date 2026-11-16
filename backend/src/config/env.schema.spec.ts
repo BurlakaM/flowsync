@@ -10,11 +10,25 @@ describe('validateEnv', () => {
     expect(validateEnv(valid)).toMatchObject({
       NODE_ENV: 'development',
       PORT: 3000,
-      JWT_EXPIRES_IN: '1h',
+      JWT_EXPIRES_IN: '15m',
+      REFRESH_TOKEN_TTL_DAYS: 7,
+      COOKIE_SECURE: false,
       TRUST_PROXY: 0,
       LOG_LEVEL: 'info',
       BCRYPT_ROUNDS: 10,
     });
+  });
+
+  it('reads the cookie flag and keeps the session length in range', () => {
+    expect(validateEnv({ ...valid, COOKIE_SECURE: 'true' }).COOKIE_SECURE).toBe(
+      true,
+    );
+    expect(() => validateEnv({ ...valid, COOKIE_SECURE: 'yes' })).toThrow(
+      /COOKIE_SECURE/,
+    );
+    expect(() =>
+      validateEnv({ ...valid, REFRESH_TOKEN_TTL_DAYS: '0' }),
+    ).toThrow(/REFRESH_TOKEN_TTL_DAYS/);
   });
 
   it('keeps the bcrypt cost between 4 and 15', () => {

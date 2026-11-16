@@ -13,21 +13,19 @@ describe('authStorage', () => {
     expect(authStorage.getToken()).toBeNull();
   });
 
-  it('keeps the key used by the previous frontend, so sessions survive', () => {
-    localStorage.setItem('access_token', 'old-session');
+  it('never writes the token to localStorage', () => {
+    authStorage.setToken('jwt-token');
 
-    expect(authStorage.getToken()).toBe('old-session');
+    expect(JSON.stringify({ ...localStorage })).not.toContain('jwt-token');
+    expect(localStorage.getItem('access_token')).toBeNull();
   });
 
-  it('behaves as signed out when the storage is unavailable', () => {
-    const blocked = vi
-      .spyOn(Storage.prototype, 'getItem')
-      .mockImplementation(() => {
-        throw new Error('storage is blocked');
-      });
+  it('removes the token that earlier versions left in localStorage', async () => {
+    localStorage.setItem('access_token', 'old-session');
 
-    expect(authStorage.getToken()).toBeNull();
-    expect(authStorage.hasToken()).toBe(false);
-    blocked.mockRestore();
+    vi.resetModules();
+    await import('./auth-storage');
+
+    expect(localStorage.getItem('access_token')).toBeNull();
   });
 });

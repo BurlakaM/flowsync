@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { resolveRequestId } from './common/request-id';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -25,6 +26,7 @@ import { UsersModule } from './modules/users/users.module';
       useFactory: (config: AppConfigService) => ({
         pinoHttp: {
           level: config.logLevel,
+          genReqId: resolveRequestId,
           redact: ['req.headers.authorization', 'req.headers.cookie'],
           // Health checks run every few seconds and would drown the real traffic.
           autoLogging: {

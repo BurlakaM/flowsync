@@ -5,6 +5,7 @@ import type { User } from '../types';
 
 export const authKeys = {
   me: ['auth', 'me'] as const,
+  session: ['auth', 'session'] as const,
 };
 
 export const getMe = () => apiClient.get<User>('/auth/me');

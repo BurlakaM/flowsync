@@ -123,16 +123,21 @@ async list(userId: number, query: PaginationQueryDto) {
   Після зміни API виконай `npm run openapi:export` і закоміть `openapi.json` (CI падає, якщо файл застарів).
 - Вхід чисти `@Trim()` і `@NormalizeEmail()` (`common/decorators/transform.decorators.ts`); невідомі поля тіла дають `400`.
 - Помилки — виключення Nest (`NotFoundException`, `ForbiddenException`, `ConflictException`); не повертай `null` замість 404.
-  Усі помилки мають єдине тіло `{ statusCode, error, message, path, timestamp }` (`AllExceptionsFilter`).
+  Усі помилки мають єдине тіло `{ statusCode, error, message, path, timestamp, requestId }` (`AllExceptionsFilter`).
+  `requestId` збігається із заголовком `X-Request-Id` і з `req.id` у логах: беруть із вхідного заголовка (якщо він схожий на id) або генерують UUID.
 - Помилки Prisma (`P2002` → 409, `P2025` → 404, `P2003` → 409) мапить `PrismaExceptionFilter`; у сервісах не лови їх без потреби.
 - Swagger: Nest CLI plugin описує DTO автоматично (файли `*.dto.ts`); додавай `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation` вручну.
 
 **Автентифікація й доступ**
 - Усі маршрути закриті глобальним `JwtAuthGuard`. Публічним маршрут робить лише `@Public()` і коментар про причину
-  (зараз: реєстрація, логін, health).
+  (зараз: реєстрація, логін, `refresh`, `logout`, health).
 - Обмеження за роллю — `@Roles(Role.Admin)` (перевіряє глобальний `RolesGuard`).
 - Користувач у запиті — `AuthenticatedUser { id; email; role }`, дістається через `@CurrentUser()`. Ніяких `req.user.sub`.
   `JwtStrategy` читає користувача з БД на кожен запит, тож токен видаленого користувача одразу недійсний.
+- Сесія: access-JWT живе 15 хв; refresh-токен — випадкові 48 байт в `httpOnly` cookie `refresh_token` (`SameSite=Strict`, `Path=/api/auth`),
+  у БД лише SHA-256 хеш (`RefreshToken`). Кожен refresh-токен діє один раз (ротація); повторне використання вже витраченого токена
+  (поза вікном 10 с для двох вкладок) відкликає всю родину токенів. Логіка — `RefreshTokensService`, HTTP-частина (cookie) — лише в `AuthController`.
+  Cookie `Secure` вмикає `COOKIE_SECURE=true` (HTTPS).
 - Реєстрація завжди створює роль `USER` (значення за замовчуванням у схемі); роль у тілі запиту заборонена (400).
   Роль — це `enum Role` з Prisma (`USER`, `ADMIN`), імпортується з `common/types/role.type.ts`.
 - Доступ до ресурсу перевіряє сервіс (членство в проєкті), а не контролер; чужий ресурс → `NotFoundException`.

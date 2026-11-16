@@ -3,15 +3,21 @@ import { FullPageSpinner } from '@/components/spinner';
 import { getErrorStatus } from '@/lib/api-client';
 import { authStorage } from '@/lib/auth-storage';
 import { useMe } from '../api/get-me';
+import { useRestoreSession } from '../api/restore-session';
 import { buildLoginPath } from '../utils/redirect';
 
 /** Renders the nested routes only for a signed-in user; everyone else is sent to the login page. */
 export function ProtectedRoute() {
   const location = useLocation();
+  const restore = useRestoreSession();
   const me = useMe();
   const loginPath = buildLoginPath(location.pathname + location.search);
 
-  if (!authStorage.hasToken()) return <Navigate to={loginPath} replace />;
+  if (!authStorage.hasToken()) {
+    // A reload dropped the in-memory token: wait for the refresh cookie to bring it back.
+    if (restore.isFetching) return <FullPageSpinner />;
+    return <Navigate to={loginPath} replace />;
+  }
   if (me.isPending) return <FullPageSpinner />;
 
   if (me.isError) {

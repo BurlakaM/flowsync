@@ -2,19 +2,26 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import { RefreshTokensService } from './refresh-tokens.service';
 
 describe('AuthService', () => {
   const findByEmailForAuth = vi.fn();
   const createUser = vi.fn();
   const getProfile = vi.fn();
   const sign = vi.fn();
+  const issue = vi.fn();
+  const consume = vi.fn();
+  const revokeByToken = vi.fn();
   let service: AuthService;
+
+  const refreshExpiresAt = new Date('2026-12-01T00:00:00.000Z');
 
   beforeEach(() => {
     vi.resetAllMocks();
     service = new AuthService(
       { findByEmailForAuth, createUser, getProfile } as unknown as UsersService,
       { sign } as unknown as JwtService,
+      { issue, consume, revokeByToken } as unknown as RefreshTokensService,
     );
   });
 
@@ -55,13 +62,62 @@ describe('AuthService', () => {
     });
   });
 
-  it('signs a token whose subject is the user id', () => {
-    sign.mockReturnValue('signed-token');
+  describe('login', () => {
+    it('signs an access token for the user and starts a new refresh family', async () => {
+      sign.mockReturnValue('signed-token');
+      issue.mockResolvedValue({
+        token: 'refresh-1',
+        expiresAt: refreshExpiresAt,
+      });
 
-    expect(service.login({ id: 9, email: 'a@b.co' })).toEqual({
-      access_token: 'signed-token',
+      const session = await service.login({ id: 9, email: 'a@b.co' });
+
+      expect(session).toEqual({
+        accessToken: 'signed-token',
+        refreshToken: 'refresh-1',
+        refreshExpiresAt,
+      });
+      expect(sign).toHaveBeenCalledWith({ email: 'a@b.co', sub: 9 });
+      expect(issue).toHaveBeenCalledWith(9);
     });
-    expect(sign).toHaveBeenCalledWith({ email: 'a@b.co', sub: 9 });
+  });
+
+  describe('refresh', () => {
+    it('spends the token and continues its family with a new pair', async () => {
+      consume.mockResolvedValue({ userId: 9, familyId: 'family-1' });
+      getProfile.mockResolvedValue({ id: 9, email: 'a@b.co' });
+      issue.mockResolvedValue({
+        token: 'refresh-2',
+        expiresAt: refreshExpiresAt,
+      });
+      sign.mockReturnValue('access-2');
+
+      const session = await service.refresh('refresh-1');
+
+      expect(consume).toHaveBeenCalledWith('refresh-1');
+      expect(issue).toHaveBeenCalledWith(9, 'family-1');
+      expect(session).toEqual({
+        accessToken: 'access-2',
+        refreshToken: 'refresh-2',
+        refreshExpiresAt,
+      });
+    });
+
+    it('issues nothing when the token is rejected', async () => {
+      consume.mockRejectedValue(new Error('invalid'));
+
+      await expect(service.refresh('bad')).rejects.toThrow('invalid');
+      expect(issue).not.toHaveBeenCalled();
+      expect(sign).not.toHaveBeenCalled();
+    });
+  });
+
+  it('revokes the refresh family on logout', async () => {
+    revokeByToken.mockResolvedValue(undefined);
+
+    await service.logout('refresh-1');
+
+    expect(revokeByToken).toHaveBeenCalledWith('refresh-1');
   });
 
   it('registers through the users service', async () => {

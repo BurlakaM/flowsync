@@ -8,12 +8,15 @@ export interface ErrorResponseBody {
   message: string | string[];
   path: string;
   timestamp: string;
+  /** The id of the request (also in the X-Request-Id header and in the logs). */
+  requestId?: string;
 }
 
 export function buildErrorBody(
   statusCode: number,
   message: string | string[],
   path: string,
+  requestId?: string,
 ): ErrorResponseBody {
   return {
     statusCode,
@@ -21,6 +24,7 @@ export function buildErrorBody(
     message,
     path,
     timestamp: new Date().toISOString(),
+    ...(requestId && { requestId }),
   };
 }
 
@@ -30,4 +34,10 @@ export function buildErrorBody(
  */
 export function requestPath(request: Pick<Request, 'originalUrl'>): string {
   return request.originalUrl.split('?')[0];
+}
+
+/** The id assigned by the request logger (pino-http), if the request went through it. */
+export function requestIdOf(request: object): string | undefined {
+  const id = (request as { id?: unknown }).id;
+  return typeof id === 'string' ? id : undefined;
 }

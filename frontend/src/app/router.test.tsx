@@ -83,8 +83,43 @@ describe('application routes', () => {
     expect(router.state.location.pathname).toBe('/projects');
   });
 
-  it('signs the user out', async () => {
+  it('restores the session from the refresh cookie after a reload', async () => {
+    // No token in memory, like right after a reload: only the httpOnly cookie is left.
+    server.use(
+      http.post('*/api/auth/refresh', () =>
+        HttpResponse.json({ access_token: 'fresh-token' }, { status: 201 }),
+      ),
+      http.get('*/api/auth/me', () => HttpResponse.json(ann)),
+      http.get('*/api/projects', () => HttpResponse.json(emptyPage)),
+    );
+    const { router } = renderApp('/projects');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Projects' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/projects');
+    expect(authStorage.getToken()).toBe('fresh-token');
+  });
+
+  it('goes to the login page when the refresh cookie is missing or refused', async () => {
+    // The default handler refuses the refresh.
+    const { router } = renderApp('/projects');
+
+    expect(
+      await screen.findByRole('heading', { name: /sign in to flowsync/i }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/login');
+  });
+
+  it('signs the user out and revokes the refresh cookie', async () => {
     signedInAs();
+    let loggedOut = false;
+    server.use(
+      http.post('*/api/auth/logout', () => {
+        loggedOut = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
     const user = userEvent.setup();
     const { router } = renderApp('/');
 
@@ -92,6 +127,7 @@ describe('application routes', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
     expect(authStorage.hasToken()).toBe(false);
+    expect(loggedOut).toBe(true);
   });
 
   it('sends a user with an expired session back to the login page', async () => {

@@ -1,37 +1,14 @@
-import type { UserSummary } from '@/types/api';
+import type { Schemas } from '@/types/api';
 
-export type ProjectRole = 'OWNER' | 'MEMBER';
+export type Project = Schemas['ProjectResponseDto'];
+export type ProjectDetails = Schemas['ProjectDetailsDto'];
+export type Member = Schemas['MemberResponseDto'];
+export type ProjectRole = Project['myRole'];
 
-export interface Project {
-  id: number;
-  name: string;
-  description: string | null;
-  image: string | null;
-  ownerId: number;
-  /** The role of the signed-in user in this project. */
-  myRole: ProjectRole;
-  tasksCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Member {
-  userId: number;
-  name: string;
-  email: string;
-  role: ProjectRole;
-  joinedAt: string;
-}
-
-export interface ProjectDetails extends Project {
-  owner: UserSummary;
-  members: Member[];
-}
-
-export interface ProjectInput {
-  name: string;
-  description: string;
-}
+/** What the project form always sends: the API treats the description as optional, the form as empty text. */
+export type ProjectInput = Required<
+  Pick<Schemas['CreateProjectDto'], 'name' | 'description'>
+>;
 
 export interface ProjectListParams {
   search?: string;

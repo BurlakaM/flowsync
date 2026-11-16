@@ -81,6 +81,121 @@ describe('apiClient', () => {
     expect(bodies).toEqual([{ name: 'a' }, { name: 'b' }]);
   });
 
+  describe('renewing an expired access token', () => {
+    const unauthorized = () => new HttpResponse(null, { status: 401 });
+
+    it('refreshes once and repeats the request with the new token', async () => {
+      authStorage.setToken('expired');
+      const seen: (string | null)[] = [];
+      server.use(
+        http.get('*/api/secret', ({ request }) => {
+          seen.push(request.headers.get('authorization'));
+          return request.headers.get('authorization') === 'Bearer fresh'
+            ? HttpResponse.json({ ok: true })
+            : unauthorized();
+        }),
+        http.post('*/api/auth/refresh', () =>
+          HttpResponse.json({ access_token: 'fresh' }, { status: 201 }),
+        ),
+      );
+
+      expect(await apiClient.get('/secret')).toEqual({ ok: true });
+      expect(seen).toEqual(['Bearer expired', 'Bearer fresh']);
+      expect(authStorage.getToken()).toBe('fresh');
+    });
+
+    it('shares one refresh between parallel requests, because a refresh token works once', async () => {
+      authStorage.setToken('expired');
+      let refreshes = 0;
+      server.use(
+        http.get('*/api/a', ({ request }) =>
+          request.headers.get('authorization') === 'Bearer fresh'
+            ? HttpResponse.json({ name: 'a' })
+            : unauthorized(),
+        ),
+        http.get('*/api/b', ({ request }) =>
+          request.headers.get('authorization') === 'Bearer fresh'
+            ? HttpResponse.json({ name: 'b' })
+            : unauthorized(),
+        ),
+        http.post('*/api/auth/refresh', async () => {
+          refreshes += 1;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return HttpResponse.json({ access_token: 'fresh' }, { status: 201 });
+        }),
+      );
+
+      const [a, b] = await Promise.all([
+        apiClient.get('/a'),
+        apiClient.get('/b'),
+      ]);
+
+      expect(a).toEqual({ name: 'a' });
+      expect(b).toEqual({ name: 'b' });
+      expect(refreshes).toBe(1);
+    });
+
+    it('ends the session when the refresh is refused', async () => {
+      const onUnauthorized = vi.fn();
+      setUnauthorizedHandler(onUnauthorized);
+      authStorage.setToken('expired');
+      server.use(http.get('*/api/secret', unauthorized));
+
+      const error = await failureOf(apiClient.get('/secret'));
+
+      expect(getErrorStatus(error)).toBe(401);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(authStorage.hasToken()).toBe(false);
+    });
+
+    it('gives up after one retry instead of looping', async () => {
+      authStorage.setToken('expired');
+      let requests = 0;
+      server.use(
+        http.get('*/api/secret', () => {
+          requests += 1;
+          return unauthorized();
+        }),
+        http.post('*/api/auth/refresh', () =>
+          HttpResponse.json({ access_token: 'fresh' }, { status: 201 }),
+        ),
+      );
+
+      const error = await failureOf(apiClient.get('/secret'));
+
+      expect(getErrorStatus(error)).toBe(401);
+      expect(requests).toBe(2);
+    });
+
+    it.each(['/auth/login', '/auth/register', '/auth/logout'])(
+      'does not try to refresh after a 401 from %s',
+      async (path) => {
+        let refreshes = 0;
+        server.use(
+          http.post(`*/api${path}`, unauthorized),
+          http.post('*/api/auth/refresh', () => {
+            refreshes += 1;
+            return unauthorized();
+          }),
+        );
+
+        await failureOf(apiClient.post(path, {}));
+
+        expect(refreshes).toBe(0);
+      },
+    );
+
+    it('does not report an expired session when there never was a token', async () => {
+      const onUnauthorized = vi.fn();
+      setUnauthorizedHandler(onUnauthorized);
+      server.use(http.get('*/api/secret', unauthorized));
+
+      await failureOf(apiClient.get('/secret'));
+
+      expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+  });
+
   describe('expired sessions', () => {
     it('reacts to a 401 when a token is stored', async () => {
       const onUnauthorized = vi.fn();

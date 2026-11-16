@@ -83,7 +83,7 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
 **Дані й стан**
 - Запити до API — лише через `lib/api-client.ts` і хуки TanStack Query в `features/*/api`. Жодного `fetch`/`axios` у компонентах і жодного `useEffect` для завантаження даних.
 - Серверний стан живе в TanStack Query й не дублюється в `useState`/`zustand`. Фільтри, сторінка, сортування — в URL (search params).
-- Токен читається й пишеться лише в `lib/auth-storage.ts`; прямий `localStorage` у решті коду заборонений.
+- Access-токен живе лише в пам'яті (`lib/auth-storage.ts`), у `localStorage`/`sessionStorage` його не пишуть. Refresh-токен — `httpOnly` cookie, JS його не бачить: сесію після перезавантаження відновлює `useRestoreSession`, а прострочений токен оновлює `api-client` (один спільний `POST /auth/refresh` на всі паралельні запити).
 - Змінні середовища — лише `VITE_*`, читаються через `config/env.ts`. У фронтенді секретів не буває.
 
 **Компоненти**
@@ -100,7 +100,7 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
   У новому реєстрі немає компонента `form`: для форм використовуй `field` разом із `react-hook-form`.
 
 **Типи**
-- Без `any` і `@ts-ignore`; типи відповідей API лежать у `features/*/types` (після фази 7 — генеруються з OpenAPI, тоді не дублюй їх вручну).
+- Без `any` і `@ts-ignore`; типи відповідей API беруться з `src/types/api.generated.ts` (генерується з `backend/openapi.json`: `npm run api:types`, файл не редагують). У `features/*/types` лише аліаси на згенеровані схеми й суто UI-типи.
 
 **Доступність**
 - Кожне поле має `<label>`; кнопки — `<button>`, посилання — `<a>/<Link>`, не `div` з `onClick`.
@@ -112,6 +112,8 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
 - Мережу мокай через MSW (`testing/mocks`), а не мокай `axios` чи хуки.
 - Покривай: хуки/мутації фіч, форми (валідація, успіх, помилка сервера), захищений маршрут.
 - Рендер у тестах — через `testing/test-utils.tsx` (QueryClient, Router).
+- Доступність: нова сторінка чи діалог додається в `app/accessibility.test.tsx` (`expectNoA11yViolations`, axe; контраст у jsdom не перевіряється).
+- Наскрізні сценарії — Playwright у `e2e/` проти прод-подібного стеку (`npm run test:e2e`); локально береться встановлений Chrome.
 
 ## Чекліст нової фічі
 

@@ -1,44 +1,18 @@
-import type { UserSummary } from '@/types/api';
+import type { Schemas } from '@/types/api';
 
-export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
+export type Task = Schemas['TaskResponseDto'];
+export type TaskDetails = Schemas['TaskDetailsDto'];
+export type TaskTag = Schemas['TaskTagDto'];
+export type Tag = Schemas['TagResponseDto'];
+export type TaskStatus = Task['status'];
 
-export interface TaskTag {
-  id: number;
-  name: string;
-}
-
-export interface Tag extends TaskTag {
-  projectId: number;
-  createdAt: string;
-}
-
-export interface Task {
-  id: number;
-  name: string;
-  description: string | null;
-  status: TaskStatus;
-  projectId: number;
-  createdById: number | null;
-  assignees: UserSummary[];
-  tags: TaskTag[];
-  commentsCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface TaskDetails extends Task {
-  project: { id: number; name: string };
-  /** Null when the account of the author was deleted. */
-  createdBy: UserSummary | null;
-}
-
-export interface TaskInput {
-  name: string;
-  description: string;
-  status: TaskStatus;
-  assigneeIds: number[];
-  tagIds: number[];
-}
+/** What the task form always sends: every field is set, the API accepts any subset when updating. */
+export type TaskInput = Required<
+  Pick<
+    Schemas['CreateTaskDto'],
+    'name' | 'description' | 'status' | 'assigneeIds' | 'tagIds'
+  >
+>;
 
 /** A person a task can be assigned to; the page that composes features supplies them (e.g. project members). */
 export interface AssigneeOption {

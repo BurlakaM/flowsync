@@ -23,7 +23,14 @@ export const envSchema = z
     JWT_EXPIRES_IN: z
       .string()
       .regex(/^\d+[smhd]$/, 'use a duration such as 15m, 1h or 7d')
-      .default('1h'),
+      .default('15m'),
+    /** How long a refresh token (and the session behind it) lives. */
+    REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+    /** Marks the refresh cookie Secure (sent only over HTTPS). Keep false for http://localhost. */
+    COOKIE_SECURE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
     /** Comma-separated list of allowed origins. Empty means the local frontends. */
     CORS_ORIGINS: z.string().optional(),
     /** Number of reverse proxies in front of the app (nginx = 1); needed for the client IP. */
