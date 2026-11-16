@@ -46,6 +46,15 @@ export class AppConfigService {
     return this.config.get('JWT_EXPIRES_IN', { infer: true });
   }
 
+  get refreshTokenTtlMs(): number {
+    const days = this.config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true });
+    return days * 24 * 60 * 60 * 1000;
+  }
+
+  get cookieSecure(): boolean {
+    return this.config.get('COOKIE_SECURE', { infer: true });
+  }
+
   get corsOrigins(): string[] {
     const raw = this.config.get('CORS_ORIGINS', { infer: true });
     const origins = raw
