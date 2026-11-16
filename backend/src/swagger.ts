@@ -1,9 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-/** OpenAPI docs at /api/docs. Only mounted outside production (see main.ts). */
-export function setupSwagger(app: INestApplication): void {
-  const document = SwaggerModule.createDocument(
+/** The OpenAPI document of the API (paths include the global prefix of the app). */
+export function buildOpenApiDocument(app: INestApplication) {
+  return SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
       .setTitle('FlowSync API')
@@ -11,5 +11,11 @@ export function setupSwagger(app: INestApplication): void {
       .addBearerAuth()
       .build(),
   );
-  SwaggerModule.setup('docs', app, document, { useGlobalPrefix: true });
+}
+
+/** OpenAPI docs at /api/docs. Only mounted outside production (see main.ts). */
+export function setupSwagger(app: INestApplication): void {
+  SwaggerModule.setup('docs', app, buildOpenApiDocument(app), {
+    useGlobalPrefix: true,
+  });
 }

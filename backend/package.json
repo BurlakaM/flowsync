@@ -21,7 +21,8 @@
     "db:push": "prisma db push && prisma db seed",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"prisma/**/*.ts\"",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "openapi:export": "nest build && node dist/openapi-export.js"
   },
   "dependencies": {
     "@nestjs/common": "^12",

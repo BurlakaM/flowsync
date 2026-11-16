@@ -29,6 +29,8 @@ export const envSchema = z
     /** Number of reverse proxies in front of the app (nginx = 1); needed for the client IP. */
     TRUST_PROXY: z.coerce.number().int().min(0).default(0),
     LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+    /** bcrypt cost: higher is slower and safer. Tests use the minimum. */
+    BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(10),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.JWT_SECRET.length < 32) {
