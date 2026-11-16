@@ -1,15 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { TextField } from '@/components/form/text-field';
 import { Spinner } from '@/components/spinner';
 import { Button } from '@/components/ui/button';
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { FieldGroup } from '@/components/ui/field';
 import { getErrorMessage, getErrorStatus } from '@/lib/api-client';
 import { useLogin } from '../api/login';
 
@@ -45,39 +40,19 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   return (
     <form onSubmit={submit} noValidate className="space-y-6">
       <FieldGroup>
-        <Controller
+        <TextField
+          control={form.control}
           name="email"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
-              <Input
-                {...field}
-                id="email"
-                type="email"
-                autoComplete="email"
-                aria-invalid={fieldState.invalid}
-              />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
+          label="Email"
+          type="email"
+          autoComplete="email"
         />
-        <Controller
-          name="password"
+        <TextField
           control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
-              <Input
-                {...field}
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                aria-invalid={fieldState.invalid}
-              />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
+          name="password"
+          label="Password"
+          type="password"
+          autoComplete="current-password"
         />
       </FieldGroup>
 
