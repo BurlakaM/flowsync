@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { AuthLayout } from '@/components/layouts/auth-layout';
 import { getSafeRedirect, RegisterForm } from '@/features/auth';
 import { authStorage } from '@/lib/auth-storage';
 
 export default function RegisterRoute() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const redirectTo = getSafeRedirect(params.get('redirectTo'));
@@ -12,16 +14,16 @@ export default function RegisterRoute() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      description="Start tracking your projects and tasks."
+      title={t('Create your account')}
+      description={t('Start tracking your projects and tasks.')}
       footer={
         <>
-          Already have an account?&nbsp;
+          {t('Already have an account?')}&nbsp;
           <Link
             to={`/login${params.has('redirectTo') ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
             className="text-foreground underline"
           >
-            Sign in
+            {t('Sign in')}
           </Link>
         </>
       }

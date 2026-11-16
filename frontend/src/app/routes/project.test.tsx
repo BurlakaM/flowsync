@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { authStorage } from '@/lib/auth-storage';
@@ -17,7 +17,7 @@ const projectDetails = (myRole: 'OWNER' | 'MEMBER' = 'OWNER') => ({
   id: 7,
   name: 'Roadmap',
   description: 'Plans for the year',
-  image: null,
+  hasImage: false,
   ownerId: 1,
   myRole,
   tasksCount: 1,
@@ -74,6 +74,12 @@ beforeEach(() => {
     http.get('*/api/auth/me', () => HttpResponse.json(ann)),
     http.get('*/api/projects/7', () => HttpResponse.json(projectDetails())),
     http.get('*/api/projects/7/tags', () => HttpResponse.json([tag])),
+    http.get('*/api/projects/7/activity', () =>
+      HttpResponse.json({
+        items: [],
+        meta: { page: 1, limit: 15, total: 0, totalPages: 0 },
+      }),
+    ),
   );
 });
 
@@ -184,6 +190,59 @@ describe('project page', () => {
     expect(last?.get('assigneeId')).toBe('2');
     expect(last?.get('sortBy')).toBe('name');
     expect(last?.get('limit')).toBe('20');
+  });
+
+  it('shows the tasks as a board and asks for as many as one request allows', async () => {
+    const limits: (string | null)[] = [];
+    server.use(
+      http.get('*/api/projects/7/tasks', ({ request }) => {
+        limits.push(new URL(request.url).searchParams.get('limit'));
+        return HttpResponse.json(taskPage([task(9, 'Fix login')]));
+      }),
+    );
+    const user = userEvent.setup();
+    const { router } = renderApp('/projects/7');
+
+    await screen.findByRole('link', { name: 'Fix login' });
+    await user.click(screen.getByRole('button', { name: 'Board' }));
+
+    expect(
+      await screen.findByRole('region', { name: /To do/ }),
+    ).toBeInTheDocument();
+    expect(router.state.location.search).toBe('?view=board');
+    await waitFor(() => expect(limits.at(-1)).toBe('100'));
+
+    await user.click(screen.getByRole('button', { name: 'List' }));
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+  });
+
+  it('shows the best matches first after a search and returns to the default order when it is cleared', async () => {
+    server.use(
+      http.get('*/api/projects/7/tasks', () =>
+        HttpResponse.json(taskPage([task(9, 'Fix login')])),
+      ),
+    );
+    const user = userEvent.setup();
+    const { router } = renderApp('/projects/7');
+    await screen.findByRole('link', { name: 'Fix login' });
+    expect(
+      screen.queryByRole('option', { name: 'Best match' }),
+    ).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Search tasks'), 'login');
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+
+    await waitFor(() =>
+      expect(router.state.location.search).toBe(
+        '?search=login&sortBy=relevance&order=desc',
+      ),
+    );
+    expect(screen.getByLabelText('Sort by')).toHaveValue('relevance:desc');
+
+    await user.clear(screen.getByLabelText('Search tasks'));
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+
+    await waitFor(() => expect(router.state.location.search).toBe(''));
   });
 
   it('offers to clear the filters when nothing matches', async () => {

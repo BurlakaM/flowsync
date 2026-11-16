@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { tKey } from '@/i18n/t-key';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -9,8 +11,8 @@ import { getErrorMessage, getErrorStatus } from '@/lib/api-client';
 import { useLogin } from '../api/login';
 
 const loginSchema = z.object({
-  email: z.email('Enter a valid email address'),
-  password: z.string().min(1, 'Enter your password'),
+  email: z.email(tKey('Enter a valid email address')),
+  password: z.string().min(1, tKey('Enter your password')),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -21,6 +23,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
+  const { t } = useTranslation();
   const login = useLogin();
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -33,7 +36,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   const serverError = login.isError
     ? getErrorStatus(login.error) === 401
-      ? 'Invalid email or password'
+      ? t('Invalid email or password')
       : getErrorMessage(login.error)
     : null;
 
@@ -43,14 +46,14 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         <TextField
           control={form.control}
           name="email"
-          label="Email"
+          label={t('Email')}
           type="email"
           autoComplete="email"
         />
         <TextField
           control={form.control}
           name="password"
-          label="Password"
+          label={t('Password')}
           type="password"
           autoComplete="current-password"
         />
@@ -64,7 +67,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
       <Button type="submit" className="w-full" disabled={login.isPending}>
         {login.isPending && <Spinner className="text-current" />}
-        Sign in
+        {t('Sign in')}
       </Button>
     </form>
   );

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '@/lib/api-client';
 import { NativeSelect } from '@/components/ui/native-select';
 import { useUpdateTask } from '../api/task-mutations';
@@ -18,12 +19,13 @@ export function StatusSelect({
   status,
   onChanged,
 }: StatusSelectProps) {
+  const { t } = useTranslation();
   const update = useUpdateTask(taskId);
 
   return (
     <div className="space-y-1">
       <NativeSelect
-        aria-label={`Status of ${taskName}`}
+        aria-label={t('Status of {{name}}', { name: taskName })}
         value={status}
         disabled={update.isPending}
         className="w-36"
@@ -36,7 +38,7 @@ export function StatusSelect({
       >
         {TASK_STATUSES.map((value) => (
           <option key={value} value={value}>
-            {STATUS_LABELS[value]}
+            {t(STATUS_LABELS[value])}
           </option>
         ))}
       </NativeSelect>

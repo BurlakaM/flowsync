@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 
 interface PaginationProps {
@@ -12,11 +13,12 @@ export function Pagination({
   totalPages,
   onPageChange,
 }: PaginationProps) {
+  const { t } = useTranslation();
   if (totalPages <= 1) return null;
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t('Pagination')}
       className="flex items-center justify-between pt-4"
     >
       <Button
@@ -25,10 +27,10 @@ export function Pagination({
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
       >
-        Previous
+        {t('Previous')}
       </Button>
       <span className="text-sm text-muted-foreground">
-        Page {page} of {totalPages}
+        {t('Page {{page}} of {{totalPages}}', { page, totalPages })}
       </span>
       <Button
         variant="outline"
@@ -36,7 +38,7 @@ export function Pagination({
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
       >
-        Next
+        {t('Next')}
       </Button>
     </nav>
   );

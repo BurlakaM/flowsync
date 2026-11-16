@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Pagination } from '@/components/pagination';
@@ -18,6 +19,7 @@ export default function ProjectsRoute() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
+  const { t } = useTranslation();
 
   // Search and page live in the URL: the list can be shared and survives a reload.
   const search = params.get('search') ?? '';
@@ -49,8 +51,8 @@ export default function ProjectsRoute() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Projects</h1>
-        <Button onClick={() => setCreating(true)}>New project</Button>
+        <h1 className="text-2xl font-semibold">{t('Projects')}</h1>
+        <Button onClick={() => setCreating(true)}>{t('New project')}</Button>
       </div>
 
       <form
@@ -63,30 +65,32 @@ export default function ProjectsRoute() {
         <Input
           name="search"
           type="search"
-          aria-label="Search projects"
-          placeholder="Search projects"
+          aria-label={t('Search projects')}
+          placeholder={t('Search projects')}
           defaultValue={search}
         />
         <Button type="submit" variant="outline">
-          Search
+          {t('Search')}
         </Button>
       </form>
 
       {projects.isPending ? (
-        <LoadingState label="Loading projects" />
+        <LoadingState label={t('Loading projects')} />
       ) : projects.isError ? (
         <ErrorState
           error={projects.error}
-          what="projects"
+          title={t('Could not load projects')}
           onRetry={() => void projects.refetch()}
         />
       ) : projects.data.items.length === 0 ? (
         <EmptyState
-          title={search ? 'No projects match your search' : 'No projects yet'}
+          title={
+            search ? t('No projects match your search') : t('No projects yet')
+          }
           description={
             search
-              ? 'Try a different search term.'
-              : 'Create your first project to start adding tasks.'
+              ? t('Try a different search term.')
+              : t('Create your first project to start adding tasks.')
           }
           action={
             search ? (
@@ -94,10 +98,12 @@ export default function ProjectsRoute() {
                 variant="outline"
                 onClick={() => updateParams({ search: null, page: null })}
               >
-                Clear search
+                {t('Clear search')}
               </Button>
             ) : (
-              <Button onClick={() => setCreating(true)}>New project</Button>
+              <Button onClick={() => setCreating(true)}>
+                {t('New project')}
+              </Button>
             )
           }
         />

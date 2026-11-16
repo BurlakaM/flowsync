@@ -5,13 +5,9 @@ import {
   type FieldPath,
   type FieldValues,
 } from 'react-hook-form';
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { FormFieldError } from './form-field-error';
 
 interface TextFieldProps<TValues extends FieldValues> extends Omit<
   ComponentProps<typeof Input>,
@@ -46,7 +42,7 @@ export function TextField<TValues extends FieldValues>({
             aria-invalid={fieldState.invalid}
           />
           {description && <FieldDescription>{description}</FieldDescription>}
-          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          {fieldState.invalid && <FormFieldError error={fieldState.error} />}
         </Field>
       )}
     />

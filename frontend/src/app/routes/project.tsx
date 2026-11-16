@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { EmptyState } from '@/components/states/empty-state';
@@ -7,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import {
   DeleteProjectDialog,
   ProjectFormDialog,
+  ProjectImage,
   ProjectMembers,
   useProject,
 } from '@/features/projects';
+import { ActivityFeed } from '@/features/activity';
 import { TagsManager } from '@/features/tasks';
 import { ProjectTasks } from './project-tasks';
 
@@ -19,21 +22,22 @@ export default function ProjectRoute() {
   const project = useProject(projectId);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { t } = useTranslation();
 
   if (!Number.isInteger(projectId) || projectId < 1) {
     return (
       <EmptyState
-        title="Project not found"
-        description="The link is not valid."
+        title={t('Project not found')}
+        description={t('The link is not valid.')}
       />
     );
   }
-  if (project.isPending) return <LoadingState label="Loading project" />;
+  if (project.isPending) return <LoadingState label={t('Loading project')} />;
   if (project.isError) {
     return (
       <ErrorState
         error={project.error}
-        what="the project"
+        title={t('Could not load the project')}
         onRetry={() => void project.refetch()}
       />
     );
@@ -49,25 +53,28 @@ export default function ProjectRoute() {
           to="/projects"
           className="text-sm text-muted-foreground hover:underline"
         >
-          ← All projects
+          ← {t('All projects')}
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold">{data.name}</h1>
-            <p className="text-muted-foreground">
-              {data.description || 'No description'}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Owner: {data.owner.name}
-            </p>
+          <div className="flex items-start gap-4">
+            <ProjectImage project={data} className="size-16 text-2xl" />
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold">{data.name}</h1>
+              <p className="text-muted-foreground">
+                {data.description || t('No description')}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t('Owner: {{name}}', { name: data.owner.name })}
+              </p>
+            </div>
           </div>
           {isOwner && (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setEditing(true)}>
-                Edit
+                {t('Edit')}
               </Button>
               <Button variant="destructive" onClick={() => setDeleting(true)}>
-                Delete
+                {t('Delete')}
               </Button>
             </div>
           )}
@@ -80,6 +87,8 @@ export default function ProjectRoute() {
         <ProjectMembers project={data} />
         <TagsManager projectId={data.id} canManage={isOwner} />
       </div>
+
+      <ActivityFeed projectId={data.id} />
 
       <ProjectFormDialog
         open={editing}

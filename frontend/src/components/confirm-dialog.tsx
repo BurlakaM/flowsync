@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -33,6 +34,7 @@ export function ConfirmDialog({
   isPending = false,
   error,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -46,7 +48,9 @@ export function ConfirmDialog({
           </p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isPending}>
+            {t('Cancel')}
+          </AlertDialogCancel>
           {/* A plain button, not AlertDialogAction: the dialog must not close before the request ends. */}
           <Button
             variant="destructive"

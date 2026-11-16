@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next';
+import { tKey } from '@/i18n/t-key';
+import { FormFieldError } from '@/components/form/form-field-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -12,24 +15,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage } from '@/lib/api-client';
 import { useCreateProject, useUpdateProject } from '../api/project-mutations';
 import type { Project } from '../types';
+import { ProjectImageField } from './project-image-field';
 
 const projectSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, 'Enter a name')
-    .max(100, 'Use at most 100 characters'),
-  description: z.string().trim().max(2000, 'Use at most 2000 characters'),
+    .min(1, tKey('Enter a name'))
+    .max(100, tKey('Use at most 100 characters')),
+  description: z.string().trim().max(2000, tKey('Use at most 2000 characters')),
 });
 
 type ProjectValues = z.infer<typeof projectSchema>;
@@ -48,17 +47,22 @@ export function ProjectFormDialog({
   project,
   onSaved,
 }: ProjectFormDialogProps) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{project ? 'Edit project' : 'New project'}</DialogTitle>
+          <DialogTitle>
+            {project ? t('Edit project') : t('New project')}
+          </DialogTitle>
           <DialogDescription>
             {project
-              ? 'Change the name or the description of the project.'
-              : 'Projects group tasks that belong together.'}
+              ? t('Change the name or the description of the project.')
+              : t('Projects group tasks that belong together.')}
           </DialogDescription>
         </DialogHeader>
+        {/* The picture can be added once the project exists. */}
+        {project && <ProjectImageField project={project} />}
         {/* Mounted only while open, so every opening starts from the current values. */}
         <ProjectForm
           project={project}
@@ -80,6 +84,7 @@ interface ProjectFormProps {
 }
 
 function ProjectForm({ project, onCancel, onSaved }: ProjectFormProps) {
+  const { t } = useTranslation();
   const create = useCreateProject();
   const update = useUpdateProject(project?.id ?? 0);
   const mutation = project ? update : create;
@@ -102,7 +107,7 @@ function ProjectForm({ project, onCancel, onSaved }: ProjectFormProps) {
         <TextField
           control={form.control}
           name="name"
-          label="Name"
+          label={t('Name')}
           autoComplete="off"
         />
         <Controller
@@ -110,14 +115,16 @@ function ProjectForm({ project, onCancel, onSaved }: ProjectFormProps) {
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="description">Description</FieldLabel>
+              <FieldLabel htmlFor="description">{t('Description')}</FieldLabel>
               <Textarea
                 {...field}
                 id="description"
                 rows={4}
                 aria-invalid={fieldState.invalid}
               />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              {fieldState.invalid && (
+                <FormFieldError error={fieldState.error} />
+              )}
             </Field>
           )}
         />
@@ -131,11 +138,11 @@ function ProjectForm({ project, onCancel, onSaved }: ProjectFormProps) {
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('Cancel')}
         </Button>
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending && <Spinner className="text-current" />}
-          {project ? 'Save changes' : 'Create project'}
+          {project ? t('Save changes') : t('Create project')}
         </Button>
       </DialogFooter>
     </form>

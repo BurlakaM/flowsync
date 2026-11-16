@@ -1,7 +1,12 @@
 import { TASK_STATUSES } from '../constants';
 import type { TaskFilters, TaskSortBy, TaskStatus } from '../types';
 
-const SORT_FIELDS: readonly TaskSortBy[] = ['createdAt', 'updatedAt', 'name'];
+const SORT_FIELDS: readonly TaskSortBy[] = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'relevance',
+];
 
 const positiveInt = (value: string | null): number | undefined => {
   const number = Number(value);

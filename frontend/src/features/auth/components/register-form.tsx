@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { tKey } from '@/i18n/t-key';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -9,12 +11,12 @@ import { getErrorMessage } from '@/lib/api-client';
 import { useRegister } from '../api/register';
 
 const registerSchema = z.object({
-  name: z.string().trim().min(1, 'Enter your name').max(100),
-  email: z.email('Enter a valid email address').max(255),
+  name: z.string().trim().min(1, tKey('Enter your name')).max(100),
+  email: z.email(tKey('Enter a valid email address')).max(255),
   password: z
     .string()
-    .min(8, 'Use at least 8 characters')
-    .max(72, 'Use at most 72 characters'),
+    .min(8, tKey('Use at least 8 characters'))
+    .max(72, tKey('Use at most 72 characters')),
 });
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -25,6 +27,7 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ onSuccess }: RegisterFormProps) {
+  const { t } = useTranslation();
   const register = useRegister();
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -41,23 +44,23 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
         <TextField
           control={form.control}
           name="name"
-          label="Name"
+          label={t('Name')}
           autoComplete="name"
         />
         <TextField
           control={form.control}
           name="email"
-          label="Email"
+          label={t('Email')}
           type="email"
           autoComplete="email"
         />
         <TextField
           control={form.control}
           name="password"
-          label="Password"
+          label={t('Password')}
           type="password"
           autoComplete="new-password"
-          description="8 to 72 characters."
+          description={t('8 to 72 characters.')}
         />
       </FieldGroup>
 
@@ -69,7 +72,7 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
 
       <Button type="submit" className="w-full" disabled={register.isPending}>
         {register.isPending && <Spinner className="text-current" />}
-        Create account
+        {t('Create account')}
       </Button>
     </form>
   );

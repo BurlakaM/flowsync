@@ -11,7 +11,7 @@ const project: Project = {
   id: 7,
   name: 'Roadmap',
   description: 'Plans',
-  image: null,
+  hasImage: false,
   ownerId: 1,
   myRole: 'OWNER',
   tasksCount: 2,

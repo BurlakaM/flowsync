@@ -150,6 +150,28 @@ export interface paths {
         patch: operations["ProjectsController_update"];
         trace?: never;
     };
+    "/api/projects/{id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The picture of the project (the bytes of the image) for everyone who can see the project. */
+        get: operations["ProjectsController_getImage"];
+        /**
+         * Owner only. A multipart request with the picture in the `file` field: PNG, JPEG or WebP, up to 2 MB.
+         *     The type is checked on the bytes of the file, not on its name.
+         */
+        put: operations["ProjectsController_setImage"];
+        post?: never;
+        /** Owner only. */
+        delete: operations["ProjectsController_removeImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{id}/members": {
         parameters: {
             query?: never;
@@ -302,6 +324,86 @@ export interface paths {
         patch: operations["TagsController_update"];
         trace?: never;
     };
+    "/api/projects/{projectId}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ActivityController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NotificationsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["NotificationsController_unreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationsController_markAllRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["NotificationsController_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -365,13 +467,13 @@ export interface components {
         CreateProjectDto: {
             name: string;
             description?: string;
-            image?: string;
         };
         ProjectResponseDto: {
             id: number;
             name: string;
             description: string | null;
-            image: string | null;
+            /** @description Whether the project has a picture; fetch it from `GET /projects/{id}/image`. */
+            hasImage: boolean;
             ownerId: number;
             /**
              * @description The role of the current user in this project.
@@ -405,7 +507,8 @@ export interface components {
             id: number;
             name: string;
             description: string | null;
-            image: string | null;
+            /** @description Whether the project has a picture; fetch it from `GET /projects/{id}/image`. */
+            hasImage: boolean;
             ownerId: number;
             /**
              * @description The role of the current user in this project.
@@ -424,7 +527,6 @@ export interface components {
         UpdateProjectDto: {
             name?: string;
             description?: string;
-            image?: string;
         };
         AddMemberDto: {
             /**
@@ -542,6 +644,52 @@ export interface components {
         UpdateTagDto: {
             /** @description Unique inside the project. */
             name: string;
+        };
+        ActivityResponseDto: {
+            /** @description Facts about the event, e.g. the name of a task or the old and new status. */
+            data: {
+                [key: string]: unknown;
+            };
+            /** @description Null when the account of the author was deleted. */
+            actor: components["schemas"]["UserSummaryDto"] | null;
+            id: number;
+            /** @description What happened, e.g. `task.created` or `comment.deleted`. */
+            type: string;
+            entityType: string;
+            /** @description The id of the task, comment, tag, project or (for members) user it is about. */
+            entityId: number;
+            /**
+             * Format: date-time
+             * @description Format: date-time
+             */
+            createdAt: string;
+        };
+        ActivityPageDto: {
+            items: components["schemas"]["ActivityResponseDto"][];
+            meta: components["schemas"]["PageMetaDto"];
+        };
+        NotificationResponseDto: {
+            /** @description Names and ids the client needs to write the sentence and to link to the target. */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format: date-time
+             * @description Null while unread.
+             */
+            readAt: string | null;
+            id: number;
+            /** @description `task.assigned`, `comment.added` or `project.invited`. */
+            type: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        NotificationPageDto: {
+            items: components["schemas"]["NotificationResponseDto"][];
+            meta: components["schemas"]["PageMetaDto"];
+        };
+        UnreadCountDto: {
+            count: number;
         };
     };
     responses: never;
@@ -831,6 +979,74 @@ export interface operations {
             };
         };
     };
+    ProjectsController_getImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+        };
+    };
+    ProjectsController_setImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectResponseDto"];
+                };
+            };
+        };
+    };
+    ProjectsController_removeImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ProjectsController_listMembers: {
         parameters: {
             query?: never;
@@ -905,9 +1121,9 @@ export interface operations {
                 tagId?: number;
                 /** @description Only for GET /tasks (across projects); the nested route takes it from the URL. */
                 projectId?: number;
-                /** @description Matches the name or the description (case-insensitive). */
+                /** @description Full-text search over the name, the description and the comments; every word must match, as a prefix. */
                 search?: string;
-                sortBy: "createdAt" | "updatedAt" | "name";
+                sortBy: "createdAt" | "updatedAt" | "name" | "relevance";
                 order: "asc" | "desc";
                 page: number;
                 limit: number;
@@ -936,9 +1152,9 @@ export interface operations {
                 tagId?: number;
                 /** @description Only for GET /tasks (across projects); the nested route takes it from the URL. */
                 projectId?: number;
-                /** @description Matches the name or the description (case-insensitive). */
+                /** @description Full-text search over the name, the description and the comments; every word must match, as a prefix. */
                 search?: string;
-                sortBy: "createdAt" | "updatedAt" | "name";
+                sortBy: "createdAt" | "updatedAt" | "name" | "relevance";
                 order: "asc" | "desc";
                 page: number;
                 limit: number;
@@ -1231,6 +1447,109 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TagResponseDto"];
                 };
+            };
+        };
+    };
+    ActivityController_list: {
+        parameters: {
+            query: {
+                page: number;
+                limit: number;
+            };
+            header?: never;
+            path: {
+                projectId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPageDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_list: {
+        parameters: {
+            query: {
+                /** @description Only the notifications that have not been read. */
+                unread?: boolean;
+                page: number;
+                limit: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPageDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_unreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

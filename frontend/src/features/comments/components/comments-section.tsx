@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { Pagination } from '@/components/pagination';
 import { ErrorState } from '@/components/states/error-state';
@@ -23,25 +24,26 @@ export function CommentsSection({
   onChanged,
 }: CommentsSectionProps) {
   const [page, setPage] = useState(1);
+  const { t } = useTranslation();
   const comments = useComments(taskId, page);
 
   return (
     <section aria-labelledby="comments-heading" className="space-y-4">
       <h2 id="comments-heading" className="text-lg font-semibold">
-        Comments
+        {t('Comments')}
       </h2>
 
       {comments.isPending ? (
-        <LoadingState label="Loading comments" />
+        <LoadingState label={t('Loading comments')} />
       ) : comments.isError ? (
         <ErrorState
           error={comments.error}
-          what="comments"
+          title={t('Could not load comments')}
           onRetry={() => void comments.refetch()}
         />
       ) : comments.data.items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No comments yet. Start the conversation below.
+          {t('No comments yet. Start the conversation below.')}
         </p>
       ) : (
         <>

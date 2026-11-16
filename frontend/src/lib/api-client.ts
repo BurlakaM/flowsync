@@ -1,3 +1,4 @@
+import i18n from '@/i18n';
 import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
@@ -108,6 +109,8 @@ export const apiClient = {
     http.get<T>(url, config).then((response) => response.data),
   post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
     http.post<T>(url, data, config).then((response) => response.data),
+  put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    http.put<T>(url, data, config).then((response) => response.data),
   patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
     http.patch<T>(url, data, config).then((response) => response.data),
   delete: (url: string, config?: AxiosRequestConfig) =>
@@ -125,10 +128,11 @@ export function getErrorStatus(error: unknown): number | undefined {
  */
 export function getErrorMessage(
   error: unknown,
-  fallback = 'Something went wrong. Please try again.',
+  fallback = i18n.t('Something went wrong. Please try again.'),
 ): string {
   if (!axios.isAxiosError(error)) return fallback;
-  if (!error.response) return 'Cannot reach the server. Check your connection.';
+  if (!error.response)
+    return i18n.t('Cannot reach the server. Check your connection.');
 
   const message: unknown = (error.response.data as { message?: unknown })
     ?.message;
