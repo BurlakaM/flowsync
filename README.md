@@ -105,7 +105,7 @@ npm run build
 
 ## API
 
-Усі маршрути мають префікс `/api` і потребують `Authorization: Bearer <token>`, крім реєстрації, логіну, `validate-token` та `/health`.
+Усі маршрути мають префікс `/api` і потребують `Authorization: Bearer <token>`, крім реєстрації, логіну та `/health`.
 Інтерактивна документація: Swagger на `/api/docs` (лише в dev); повний опис у [backend/openapi.json](backend/openapi.json).
 
 | Ресурс | Ендпоїнти |

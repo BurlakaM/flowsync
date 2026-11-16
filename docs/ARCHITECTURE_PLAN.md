@@ -43,7 +43,7 @@
 | B13 | Два lock-файли в backend (`yarn.lock` і `package-lock.json`) | `backend/` | 1 |
 | F1 | Фронтенд на Create React App (закритий проєкт) і чистому JS; логіка fetch прямо в компонентах | `frontend/src/**` | 5 |
 | F2 | Зайві залежності: `jquery`, `react-bootstrap` + `react-bootstrap-v5`, `react-helmet` | `frontend/package.json` | 5 |
-| F3 | `ProtectedRoute` на кожен вхід викликає `POST /auth/validate-token`; токен у `localStorage` | `ProtectedRoute.js` | 6–7 |
+| F3 | `ProtectedRoute` на кожен вхід викликав `POST /auth/validate-token` (закрито у фазі 6: `GET /auth/me`); токен у `localStorage` лишається до фази 7 | `ProtectedRoute.js` | 6–7 |
 | F4 | `Dashboard` — заглушка, функціоналу задач/проєктів у UI немає | `cabinet/Dashboard.js` | 6 |
 | I1 | nginx без SPA-fallback: оновлення сторінки `/dashboard` у контейнері дає 404; API-URL вшивається при збірці з `frontend/.env` | `frontend/Dockerfile` | 1 |
 | I2 | README описує Vite, папки `back/front` та `docker-compose.override.yml`, яких немає | `README.md` | 1 |
@@ -267,12 +267,12 @@ unit-тести сервісу, e2e (401 / 400 / 404 / успіх), видале
 Порядок: **auth → каркас (layout, навігація) → projects → tasks → comments**. Для кожної фічі:
 `api/` (функції запитів, query keys, хуки), `components/`, `types/`, тести, нуль імпортів з інших фіч.
 
-- [ ] 6.1 **auth:** `useLogin`, `useRegister`, `useMe` (`GET /auth/me` замість `validate-token`), єдиний модуль `lib/auth-storage.ts`, `ProtectedRoute` на базі `useMe`
-- [ ] 6.2 Layout: шапка, навігація, обробка завантаження/помилок/порожнього стану
-- [ ] 6.3 **projects:** список, створення, редагування, видалення
-- [ ] 6.4 **tasks:** список із фільтрами в URL, створення/редагування (Dialog + форма), зміна статусу, призначення; за бажанням — канбан
-- [ ] 6.5 **comments:** потік коментарів у задачі
-- [ ] 6.6 Видалити старий код CRA (`Login.js`, `ProtectedRoute.js`, `AuthForm*.js` тощо) і `validate-token` у backend
+- [x] 6.1 **auth:** `useLogin`, `useRegister` (форма реєстрації й автовхід), `useMe` (`GET /auth/me` замість `validate-token`), єдиний модуль `lib/auth-storage.ts`, `ProtectedRoute` на базі `useMe`
+- [x] 6.2 Layout: шапка, навігація, обробка завантаження/помилок/порожнього стану
+- [x] 6.3 **projects:** список, створення, редагування, видалення
+- [x] 6.4 **tasks:** список із фільтрами в URL, створення/редагування (Dialog + форма), зміна статусу, призначення; за бажанням — канбан
+- [x] 6.5 **comments:** потік коментарів у задачі
+- [x] 6.6 Видалити старий код CRA (`Login.js`, `ProtectedRoute.js`, `AuthForm*.js` тощо) і `validate-token` у backend
 
 **Готово, коли:** користувач проходить шлях логін → проєкт → задача → коментар у UI; тести фіч зелені; старих `.js`-файлів немає.
 
@@ -322,3 +322,4 @@ CASL для тонких прав · деплой на VPS (Caddy/Traefik) · us
 | 2026-11-16 | Фаза 3 (3.1–3.4) | Нова `schema.prisma`: PascalCase-моделі з `@@map`, `createdAt`/`updatedAt`, `enum Role` і `TaskStatus`, `ProjectMember`, `TaskAssignee` зі складеним ключем, теги проєкту, неявний m:n Task–Tag, індекси на всіх FK, явні `onDelete`. Міграція `init`, `migrate deploy` у Docker, `prisma` CLI в `dependencies` і прод-образ без dev-залежностей, перевірка розбіжності схеми в CI, демо-seed (dev) замість seed ролей. Сервіси, DTO й тести переведені на нову модель. Перевірено: lint/типи, 42 unit, 27 e2e (міграції на свіжій БД), seed двічі, чиста БД, dev і прод у Docker | Не комітилось. Старі дані збережено в `flowsync_backup_phase2`. Контракт API змінився (camelCase). Продовження — фаза 4 у цій самій гілці |
 | 2026-11-16 | Фаза 4 (4.1–4.8) | Модулі auth, users, projects (з учасниками), tasks (фільтри, пагінація, сортування, виконавці, теги), comments, tags; 30 ендпоїнтів, response DTO й Swagger, нормалізація вводу, `BCRYPT_ROUNDS`, поріг покриття сервісів, `npm run openapi:export` + перевірка актуальності в CI. Перевірено: lint/типи/збірка, 101 unit, 117 e2e, мутація, живий сценарій у Docker на демо-даних і на новому потоці | Не комітилось. Контракт API змінився (frontend використовує лише `/auth/login` і `/auth/validate-token`, вони не змінені). Далі — фаза 5 (frontend) |
 | 2026-11-16 | Фаза 5 (5.1–5.9) | Старий CRA видалено; Vite 8 + React 19 + TS strict, Tailwind 4 + shadcn/ui, TanStack Query, react-router 8 (lazy-маршрути, error boundary, 404), `config/env.ts`, `api-client` (Bearer, 401 → вихід), ESLint із межами фіч, Vitest + MSW (47 тестів), Dockerfile (nginx, непривілегійований), dev-режим у compose з HMR, CI frontend із lint/typecheck/test/build. Раніше за план зроблено частину 6.1: `useLogin`, `useMe`, `ProtectedRoute`, `LoginForm`. Перевірено: format, lint, `tsc -b`, тести, `npm run build`, dev (проксі, логін демо-акаунтом у браузері, HMR) і прод (nginx :8080, SPA-fallback, `/api`, логін, користувач nginx) | Не комітилось. Відхилення: shadcn `field` замість `form`, `background.jpg` і PWA-ресурси не переносились, frontend вимагає Node ≥ 22.22 (react-router 8), MSW 3. Dependabot-PR до старого CRA `package.json` стануть неактуальними. Межі фіч не ловлять відносні імпорти (`../../x`) |
+| 2026-11-16 | Фаза 6 (6.1–6.6) | Фічі auth (реєстрація з автовходом), projects (список із пошуком і сторінками в URL, створення/редагування/видалення, учасники), tasks (фільтри, сортування й сторінка в URL, форма з виконавцями й тегами, зміна статусу, теги проєкту), comments (додати, редагувати, видалити з модерацією власника); шапка з навігацією, спільні стани loading/error/empty, діалог підтвердження, пагінація. `validate-token` видалено з backend (код, тести, `openapi.json`). Перевірено: frontend format/lint/typecheck, 104 тести; backend lint/типи, 99 unit, 116 e2e | Не комітилось. Фічі не імпортують одна одну: дані між ними (учасники проєкту → виконавці, лічильники) передає сторінка в `app/routes`. Канбан не робився (за бажанням). Поле `access_token` не перейменовано |
