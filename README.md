@@ -59,6 +59,8 @@ flowsync/
 | Swagger (лише не в production) | http://localhost:3000/api/docs |
 | Health | http://localhost:3000/api/health |
 | PostgreSQL | `localhost:5433` (користувач і пароль з `.env`, БД `flowsync`) |
+| Mailpit (фальшивий поштовий сервер: усі листи dev-режиму) | http://localhost:8025 |
+| Redis (черга) | `localhost:6380` |
 
 Backend і frontend перезбираються автоматично при зміні файлів у `backend/src` та `frontend/src`.
 Під час старту контейнера backend застосовує міграції (`prisma migrate deploy`) і наповнює БД демо-даними (seed, лише в dev):
@@ -112,6 +114,9 @@ npm run build
 
 | Ресурс | Ендпоїнти |
 |---|---|
+| notifications | `GET /notifications` (`?unread=true`), `GET /notifications/unread-count`, `POST /notifications/:id/read`, `POST /notifications/read-all` |
+| activity | `GET /projects/:id/activity` |
+| зображення проєкту | `PUT`/`DELETE`/`GET /projects/:id/image` (multipart, поле `file`) |
 | auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` |
 | users | `GET`/`PATCH /users/me`, `GET /users` (лише ADMIN: пагінація, `?search=`) |
 | projects | `GET`/`POST /projects`, `GET`/`PATCH`/`DELETE /projects/:id`, `GET`/`POST /projects/:id/members`, `DELETE /projects/:id/members/:userId` |
@@ -129,6 +134,17 @@ npm run build
 коментарі та теги; проєкт, учасників і теги змінює лише власник; задачу видаляє автор або власник; коментар редагує лише автор.
 Списки мають пагінацію `?page=&limit=`, задачі ще фільтри `status`, `assigneeId`, `tagId`, `search` і сортування `sortBy`/`order`.
 Після зміни API оновіть опис: `cd backend && npm run openapi:export` (CI перевіряє, що `openapi.json` актуальний).
+
+## Можливості, що варто знати
+
+- **Дошка.** Сторінка проєкту має перемикач «Список / Дошка». Перетягування картки між колонками змінює статус; кожна картка має й звичайний вибір статусу.
+- **Пошук задач.** Повнотекстовий (PostgreSQL): слова з назви, опису й коментарів, збіг за початком слова (`log` знайде `login`), усі слова мають збігатися. Сортування «Найкращий збіг» (`sortBy=relevance`).
+- **Права.** Усі правила «хто що може» описані в одному місці: `backend/src/common/casl/app-ability.ts`.
+- **Активність і події.** Сервіси публікують доменні події; на них підписані журнал аудиту (`GET /projects/:id/activity`), сповіщення й оновлення в реальному часі.
+- **Сповіщення.** Про призначення на задачу, коментарі до своїх задач і додавання до проєкту: у застосунку (дзвінок у шапці) і, якщо налаштовано пошту, листом через чергу.
+- **Реальний час.** Socket.IO за адресою `/api/socket.io`, авторизація токеном у handshake; клієнт чує лише проєкти, до яких має доступ, а події лише повідомляють, що саме змінилося (дані клієнт бере через API).
+- **Мови.** Інтерфейс англійською й українською (перемикач у шапці, вибір зберігається в браузері). Тексти — ключі-речення в коді, переклад — `frontend/src/i18n/uk.ts`; тест перевіряє, що перекладено все. Повідомлення API лишаються англійськими.
+- **Зображення проєкту.** Завантажується через API (тип перевіряється за вмістом, PNG/JPEG/WebP до 2 МБ), зберігається в S3-сумісному сховищі й віддається лише учасникам проєкту.
 
 ## База даних і міграції
 
@@ -158,6 +174,10 @@ npx prisma db seed                                 # демо-дані (лише
 | `backend/.env` | `LOG_LEVEL`, `PORT` | необов'язково: рівень логів (типово `info`), порт (типово `3000`) |
 | `backend/.env` | `BCRYPT_ROUNDS` | необов'язково: складність bcrypt (4-15), типово `10` |
 | `backend/.env` | `TRUST_PROXY` | необов'язково: кількість reverse-proxy перед API (у прод-compose `1`), потрібне для коректного IP у rate limit |
+| `backend/.env` | `REDIS_URL` | необов'язково: Redis для черги листів (у compose задано). Без нього листи відправляються в самому процесі API, без повторів |
+| `backend/.env` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | необов'язково: пошта. Листи вмикаються, коли задано `SMTP_HOST` і `MAIL_FROM`; без них нічого не відправляється й нічого не падає (сповіщення лишаються в застосунку). Заготовки з поясненнями — у `backend/.env.example` |
+| `backend/.env` | `APP_URL` | необов'язково: куди ведуть посилання в листах (типово `http://localhost:5173`) |
+| `backend/.env` | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | необов'язково: сховище файлів (зображення проєктів) у будь-якому S3-сумісному сервісі. Завантаження вмикається, коли задано пару ключів; без неї решта працює, а завантаження відповідає `503`. У dev-compose працює локальне сховище з тестовими ключами |
 | `backend/.env` | `TEST_DATABASE_URL` | необов'язково: БД для e2e (типово `localhost:5434/flowsync_test`) |
 | `frontend/.env` | `VITE_API_URL` | необов'язково: базова адреса API, типово `/api` (той самий origin; у прод-образі `/api`) |
 | `frontend/.env` | `VITE_PROXY_TARGET` | необов'язково: куди Vite-проксі веде `/api` у dev, типово `http://localhost:3000` (у compose `http://backend:3000`) |
