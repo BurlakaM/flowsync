@@ -8,6 +8,8 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development
+      # The API is called directly in development: there is no proxy to trust.
+      TRUST_PROXY: "0"
       # Bind mounts from Windows do not deliver file-system events, so tsc --watch must poll.
       TSC_WATCHFILE: PriorityPollingInterval
       TSC_WATCHDIRECTORY: RecursiveDirectoryUsingDynamicPriorityPolling
@@ -36,3 +38,22 @@ services:
   db:
     ports:
       - "5433:5432"
+
+  # Disposable database for the e2e tests (data lives in memory):
+  #   docker compose --profile test up -d db_test
+  db_test:
+    image: postgres:16-alpine
+    profiles: ["test"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: flowsync_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
