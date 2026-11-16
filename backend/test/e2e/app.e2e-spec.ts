@@ -1,6 +1,5 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { seedRoles } from '../../prisma/roles';
 import { PrismaService } from '../../src/database/prisma.service';
 import { createTestApp } from '../utils/create-test-app';
 import { cleanDatabase } from '../utils/db';
@@ -13,7 +12,6 @@ describe('Application foundation (e2e)', () => {
     app = await createTestApp();
     const prisma = app.get(PrismaService);
     await cleanDatabase(prisma);
-    await seedRoles(prisma);
   });
 
   afterAll(async () => {

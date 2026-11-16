@@ -4,32 +4,24 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
-const DEFAULT_ROLE_NAME = 'user';
-
 // Fields that are safe to return to clients. Never add `password` here.
 export const userSelect = {
   id: true,
   name: true,
   email: true,
-  role_id: true,
-} satisfies Prisma.userSelect;
+  role: true,
+  createdAt: true,
+} satisfies Prisma.UserSelect;
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** The role is never set here: the schema default (USER) applies. */
   async createUser(dto: CreateUserDto) {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const defaultRole = await this.prisma.role.findFirstOrThrow({
-      where: { name: DEFAULT_ROLE_NAME },
-    });
     return this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        password: hashedPassword,
-        role: { connect: { id: defaultRole.id } },
-      },
+      data: { name: dto.name, email: dto.email, password: hashedPassword },
       select: userSelect,
     });
   }

@@ -21,7 +21,6 @@ describe('UsersService', () => {
     };
 
     it('stores a bcrypt hash instead of the password', async () => {
-      prisma.role.findFirstOrThrow.mockResolvedValue({ id: 1, name: 'user' });
       prisma.user.create.mockResolvedValue({} as never);
 
       await service.createUser(dto);
@@ -33,22 +32,17 @@ describe('UsersService', () => {
       );
     });
 
-    it('always connects the new user to the default role', async () => {
-      prisma.role.findFirstOrThrow.mockResolvedValue({ id: 7, name: 'user' });
+    it('never sets a role, so the schema default (USER) applies', async () => {
       prisma.user.create.mockResolvedValue({} as never);
 
       await service.createUser(dto);
 
-      expect(prisma.role.findFirstOrThrow).toHaveBeenCalledWith({
-        where: { name: 'user' },
-      });
-      expect(prisma.user.create.mock.calls[0][0].data.role).toEqual({
-        connect: { id: 7 },
-      });
+      expect(prisma.user.create.mock.calls[0][0].data).not.toHaveProperty(
+        'role',
+      );
     });
 
     it('selects only fields that are safe to return', async () => {
-      prisma.role.findFirstOrThrow.mockResolvedValue({ id: 1, name: 'user' });
       prisma.user.create.mockResolvedValue({} as never);
 
       await service.createUser(dto);

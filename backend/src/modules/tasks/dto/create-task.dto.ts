@@ -1,13 +1,15 @@
-import { IsNumber, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 // The author is taken from the access token, not from the request body.
 export class CreateTaskDto {
   @IsString()
+  @IsNotEmpty()
   name!: string;
 
+  @IsOptional()
   @IsString()
-  description!: string;
+  description?: string;
 
-  @IsNumber()
-  project_id!: number;
+  @IsInt()
+  projectId!: number;
 }

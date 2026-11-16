@@ -7,13 +7,13 @@ export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
 
   getTasks(userId: number) {
-    return this.prisma.task.findMany({ where: { user_id: userId } });
+    return this.prisma.task.findMany({ where: { createdById: userId } });
   }
 
   async create(userId: number, dto: CreateTaskDto) {
     // Only the project owner may add tasks; someone else's project looks like a missing one.
     const project = await this.prisma.project.findFirst({
-      where: { id: dto.project_id, user_id: userId },
+      where: { id: dto.projectId, ownerId: userId },
       select: { id: true },
     });
     if (!project) throw new NotFoundException('Project not found');
@@ -22,7 +22,7 @@ export class TasksService {
       data: {
         name: dto.name,
         description: dto.description,
-        user: { connect: { id: userId } },
+        createdBy: { connect: { id: userId } },
         project: { connect: { id: project.id } },
       },
     });

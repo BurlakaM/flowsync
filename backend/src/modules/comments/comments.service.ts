@@ -10,11 +10,11 @@ export class CommentsService {
     // A user may comment only on tasks they can see: own, assigned to them, or in their project.
     const task = await this.prisma.task.findFirst({
       where: {
-        id: dto.task_id,
+        id: dto.taskId,
         OR: [
-          { user_id: userId },
-          { project: { user_id: userId } },
-          { task_assignment: { some: { user_id: userId } } },
+          { createdById: userId },
+          { project: { ownerId: userId } },
+          { assignees: { some: { userId } } },
         ],
       },
       select: { id: true },
@@ -24,7 +24,7 @@ export class CommentsService {
     return this.prisma.comment.create({
       data: {
         text: dto.text,
-        user: { connect: { id: userId } },
+        author: { connect: { id: userId } },
         task: { connect: { id: task.id } },
       },
     });

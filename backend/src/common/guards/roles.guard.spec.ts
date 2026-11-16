@@ -25,21 +25,21 @@ describe('RolesGuard', () => {
   });
 
   it('lets a user with a required role in', () => {
-    const guard = createGuard([Role.Admin]);
+    const guard = createGuard([Role.ADMIN]);
 
-    expect(guard.canActivate(createContext({ role: Role.Admin }))).toBe(true);
+    expect(guard.canActivate(createContext({ role: Role.ADMIN }))).toBe(true);
   });
 
   it('rejects a user without the required role', () => {
-    const guard = createGuard([Role.Admin]);
+    const guard = createGuard([Role.ADMIN]);
 
-    expect(() => guard.canActivate(createContext({ role: Role.User }))).toThrow(
+    expect(() => guard.canActivate(createContext({ role: Role.USER }))).toThrow(
       ForbiddenException,
     );
   });
 
   it('rejects a request without a user', () => {
-    const guard = createGuard([Role.Admin]);
+    const guard = createGuard([Role.ADMIN]);
 
     expect(() => guard.canActivate(createContext())).toThrow(
       ForbiddenException,

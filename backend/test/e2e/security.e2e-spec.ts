@@ -1,7 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
-import { seedRoles } from '../../prisma/roles';
 import { PrismaService } from '../../src/database/prisma.service';
 import { createTestApp } from '../utils/create-test-app';
 import { cleanDatabase } from '../utils/db';
@@ -18,7 +17,6 @@ describe('Security (e2e)', () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
     await cleanDatabase(prisma);
-    await seedRoles(prisma);
   });
 
   afterAll(async () => {
@@ -30,7 +28,7 @@ describe('Security (e2e)', () => {
       .post('/api/users')
       .send({ name, email: email(name), password: PASSWORD })
       .expect(201);
-    return res.body as { id: number; email: string; role_id: number };
+    return res.body as { id: number; email: string; role: string };
   }
 
   async function login(name: string): Promise<string> {
@@ -43,7 +41,7 @@ describe('Security (e2e)', () => {
 
   function createProject(ownerId: number) {
     return prisma.project.create({
-      data: { name: 'p', description: 'd', image: 'i', user_id: ownerId },
+      data: { name: 'p', description: 'd', image: 'i', ownerId },
     });
   }
 
@@ -60,14 +58,20 @@ describe('Security (e2e)', () => {
       expect(res.body).not.toHaveProperty('password');
     });
 
-    it('rejects a client-supplied role_id', async () => {
+    it('always registers a regular user', async () => {
+      const user = await register('regular');
+
+      expect(user.role).toBe('USER');
+    });
+
+    it('rejects a client-supplied role', async () => {
       await request(server())
         .post('/api/users')
         .send({
           name: 'x',
           email: email('role'),
           password: PASSWORD,
-          role_id: 2,
+          role: 'ADMIN',
         })
         .expect(400);
     });
@@ -133,7 +137,7 @@ describe('Security (e2e)', () => {
       await request(server()).get('/api/tasks').expect(401);
       await request(server())
         .post('/api/tasks')
-        .send({ name: 'n', description: 'd', project_id: 1 })
+        .send({ name: 'n', description: 'd', projectId: 1 })
         .expect(401);
     });
 
@@ -145,13 +149,13 @@ describe('Security (e2e)', () => {
       const res = await request(server())
         .post('/api/tasks')
         .set(bearer(token))
-        .send({ name: 'n', description: 'd', project_id: project.id })
+        .send({ name: 'n', description: 'd', projectId: project.id })
         .expect(201);
 
-      expect(res.body.user_id).toBe(owner.id);
+      expect(res.body.createdById).toBe(owner.id);
     });
 
-    it('rejects a user_id in the body', async () => {
+    it('rejects an author id in the body', async () => {
       const owner = await register('task-spoof');
       const token = await login('task-spoof');
       const project = await createProject(owner.id);
@@ -162,8 +166,8 @@ describe('Security (e2e)', () => {
         .send({
           name: 'n',
           description: 'd',
-          project_id: project.id,
-          user_id: 1,
+          projectId: project.id,
+          createdById: 1,
         })
         .expect(400);
     });
@@ -177,7 +181,7 @@ describe('Security (e2e)', () => {
       await request(server())
         .post('/api/tasks')
         .set(bearer(intruderToken))
-        .send({ name: 'n', description: 'd', project_id: project.id })
+        .send({ name: 'n', description: 'd', projectId: project.id })
         .expect(404);
     });
 
@@ -191,7 +195,7 @@ describe('Security (e2e)', () => {
       const created = await request(server())
         .post('/api/tasks')
         .set(bearer(aliceToken))
-        .send({ name: 'secret', description: 'd', project_id: project.id })
+        .send({ name: 'secret', description: 'd', projectId: project.id })
         .expect(201);
 
       const bobList = await request(server())
@@ -216,7 +220,7 @@ describe('Security (e2e)', () => {
     it('requires a token', async () => {
       await request(server())
         .post('/api/comments')
-        .send({ text: 't', task_id: 1 })
+        .send({ text: 't', taskId: 1 })
         .expect(401);
     });
 
@@ -227,19 +231,19 @@ describe('Security (e2e)', () => {
       const task = await request(server())
         .post('/api/tasks')
         .set(bearer(token))
-        .send({ name: 'n', description: 'd', project_id: project.id })
+        .send({ name: 'n', description: 'd', projectId: project.id })
         .expect(201);
 
       const res = await request(server())
         .post('/api/comments')
         .set(bearer(token))
-        .send({ text: 'hello', task_id: task.body.id })
+        .send({ text: 'hello', taskId: task.body.id })
         .expect(201);
 
-      expect(res.body.user_id).toBe(owner.id);
+      expect(res.body.authorId).toBe(owner.id);
     });
 
-    it('rejects a user_id in the body', async () => {
+    it('rejects an author id in the body', async () => {
       await request(server())
         .post('/api/comments')
         .set(
@@ -250,7 +254,7 @@ describe('Security (e2e)', () => {
             })(),
           ),
         )
-        .send({ text: 't', task_id: 1, user_id: 1 })
+        .send({ text: 't', taskId: 1, authorId: 1 })
         .expect(400);
     });
 
@@ -263,13 +267,13 @@ describe('Security (e2e)', () => {
       const task = await request(server())
         .post('/api/tasks')
         .set(bearer(ownerToken))
-        .send({ name: 'n', description: 'd', project_id: project.id })
+        .send({ name: 'n', description: 'd', projectId: project.id })
         .expect(201);
 
       await request(server())
         .post('/api/comments')
         .set(bearer(strangerToken))
-        .send({ text: 'hi', task_id: task.body.id })
+        .send({ text: 'hi', taskId: task.body.id })
         .expect(404);
     });
   });
