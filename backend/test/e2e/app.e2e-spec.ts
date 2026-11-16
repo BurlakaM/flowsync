@@ -39,6 +39,23 @@ describe('Application foundation (e2e)', () => {
       expect(typeof res.body.timestamp).toBe('string');
     });
 
+    it('puts the request id in the header and in the error body', async () => {
+      const res = await request(server())
+        .get('/api/nope')
+        .set('X-Request-Id', 'trace-42')
+        .expect(404);
+
+      expect(res.headers['x-request-id']).toBe('trace-42');
+      expect(res.body.requestId).toBe('trace-42');
+    });
+
+    it('generates a request id when the client sends none', async () => {
+      const res = await request(server()).get('/api/nope').expect(404);
+
+      expect(res.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+      expect(res.body.requestId).toBe(res.headers['x-request-id']);
+    });
+
     it('returns the unified body for a missing token', async () => {
       const res = await request(server()).get('/api/tasks').expect(401);
 

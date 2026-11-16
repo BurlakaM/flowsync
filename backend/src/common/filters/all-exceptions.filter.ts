@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { buildErrorBody, requestPath } from './error-response';
+import { buildErrorBody, requestIdOf, requestPath } from './error-response';
 
 /** Catch-all: HTTP exceptions keep their status, anything else becomes a logged 500. */
 @Catch()
@@ -28,7 +28,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
             exception.message);
       response
         .status(status)
-        .json(buildErrorBody(status, message, requestPath(request)));
+        .json(
+          buildErrorBody(
+            status,
+            message,
+            requestPath(request),
+            requestIdOf(request),
+          ),
+        );
       return;
     }
 
@@ -37,6 +44,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     );
     response
       .status(500)
-      .json(buildErrorBody(500, 'Internal server error', requestPath(request)));
+      .json(
+        buildErrorBody(
+          500,
+          'Internal server error',
+          requestPath(request),
+          requestIdOf(request),
+        ),
+      );
   }
 }

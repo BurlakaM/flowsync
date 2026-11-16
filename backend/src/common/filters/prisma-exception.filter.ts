@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
-import { buildErrorBody, requestPath } from './error-response';
+import { buildErrorBody, requestIdOf, requestPath } from './error-response';
 
 /** Maps known Prisma errors to HTTP statuses so that services do not have to catch them. */
 @Catch(Prisma.PrismaClientKnownRequestError)
@@ -25,7 +25,14 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     }
     response
       .status(status)
-      .json(buildErrorBody(status, message, requestPath(request)));
+      .json(
+        buildErrorBody(
+          status,
+          message,
+          requestPath(request),
+          requestIdOf(request),
+        ),
+      );
   }
 
   private map(exception: Prisma.PrismaClientKnownRequestError): {
