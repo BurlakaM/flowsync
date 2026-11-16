@@ -9,7 +9,7 @@ Backend на **NestJS**, frontend на **React**, база **PostgreSQL**, ус�
 | Шар | Зараз |
 |---|---|
 | Backend | NestJS 12, Prisma 6.19, Passport JWT, TypeScript 6, Vitest |
-| Frontend | React 18 (Create React App, JS) |
+| Frontend | React 19, Vite, TypeScript, Tailwind 4 + shadcn/ui, TanStack Query, Vitest |
 | БД | PostgreSQL 16 |
 | Runtime | Node.js 24 LTS (`.nvmrc`) |
 | Інфраструктура | Docker Compose, nginx, GitHub Actions |
@@ -54,7 +54,7 @@ flowsync/
 
 | Сервіс | Адреса |
 |---|---|
-| Frontend (dev-сервер) | http://localhost:3001 |
+| Frontend (dev-сервер Vite) | http://localhost:5173 (запити `/api` проксіюються на backend) |
 | API | http://localhost:3000/api |
 | Swagger (лише не в production) | http://localhost:3000/api/docs |
 | Health | http://localhost:3000/api/health |
@@ -95,8 +95,11 @@ npm run test:e2e        # e2e на окремій БД, спершу: docker com
 
 cd frontend
 npm ci
-npm start               # dev-сервер CRA
+npm run dev             # Vite з HMR (проксі /api → localhost:3000)
 npm run format:check
+npm run lint
+npm run typecheck
+npm test                # Vitest + Testing Library + MSW
 npm run build
 ```
 
@@ -146,7 +149,8 @@ npx prisma db seed                                 # демо-дані (лише
 | `backend/.env` | `BCRYPT_ROUNDS` | необов'язково: складність bcrypt (4-15), типово `10` |
 | `backend/.env` | `TRUST_PROXY` | необов'язково: кількість reverse-proxy перед API (у прод-compose `1`), потрібне для коректного IP у rate limit |
 | `backend/.env` | `TEST_DATABASE_URL` | необов'язково: БД для e2e (типово `localhost:5434/flowsync_test`) |
-| `frontend/.env` | `REACT_APP_API_URL` | адреса API для dev-сервера; у прод-образі збирається як `/api` |
+| `frontend/.env` | `VITE_API_URL` | необов'язково: базова адреса API, типово `/api` (той самий origin; у прод-образі `/api`) |
+| `frontend/.env` | `VITE_PROXY_TARGET` | необов'язково: куди Vite-проксі веде `/api` у dev, типово `http://localhost:3000` (у compose `http://backend:3000`) |
 
 Файли `.env` не комітяться, у репозиторії лише `.env.example`. Усі змінні backend валідує zod-схема
 (`backend/src/config/env.schema.ts`): при помилці застосунок не стартує й показує, що саме не так.
@@ -154,7 +158,7 @@ npx prisma db seed                                 # демо-дані (лише
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): на кожен PR і push у `main`. Backend: `prisma validate`, Prettier, ESLint, типи, unit та e2e
-  (на Postgres у service-контейнері), перевірка, що `schema.prisma` не розійшлась з міграціями, збірка. Frontend: Prettier, тести, збірка. Потім збірка Docker-образів.
+  (на Postgres у service-контейнері), перевірка, що `schema.prisma` не розійшлась з міграціями, збірка. Frontend: Prettier, ESLint, типи, тести, збірка. Потім збірка Docker-образів.
 - **Deploy** (`.github/workflows/deploy.yml`): після успішного CI на `main` публікує образи в Docker Hub:
   `<DOCKER_USERNAME>/flowsync-back` і `<DOCKER_USERNAME>/flowsync-front` з тегами `:<sha коміту>` та `:latest`.
   Потрібні секрети репозиторію `DOCKER_USERNAME` і `DOCKER_PASSWORD` (токен доступу Docker Hub).

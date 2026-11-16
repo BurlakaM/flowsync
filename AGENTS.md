@@ -21,7 +21,7 @@ FlowSync — пет-проєкт, трекер задач у стилі Jira: п
 |---|---|---|
 | Backend | NestJS 12, Prisma 6.19, JWT (Passport), TypeScript 6 (strict), Vitest, Node 24 LTS | + схема БД і модулі за планом (фази 3–4) |
 | БД | PostgreSQL 16, міграції `prisma migrate`, PascalCase-моделі, `enum Role` | те саме |
-| Frontend | React 18 + Create React App, JS, Bootstrap | React 19 + Vite + TypeScript + Tailwind + shadcn/ui + TanStack Query |
+| Frontend | React 19, Vite 8, TypeScript (strict), Tailwind 4 + shadcn/ui, TanStack Query, react-router 8, Vitest + MSW | + фічі за планом (фаза 6), типи з OpenAPI (фаза 7) |
 | Інфра | Docker Compose (dev-override + прод), nginx-проксі, CI з перевірками | + міграції в compose, `/api/health` |
 
 Репозиторій складається з двох незалежних npm-пакетів: `backend/` і `frontend/` (без монорепо-інструментів). Лише `npm`.
@@ -35,7 +35,7 @@ docker compose logs -f backend                       # логи
 docker compose down                                  # зупинка (дані БД зберігаються; НЕ додавай -v)
 ```
 
-Адреси в dev-режимі: фронтенд `http://localhost:3001`, API `http://localhost:3000/api`, Postgres `localhost:5433`
+Адреси в dev-режимі: фронтенд `http://localhost:5173`, API `http://localhost:3000/api`, Postgres `localhost:5433`
 (БД `flowsync`, користувач і пароль із кореневого `.env`). У прод-режимі: `http://localhost:8080` (API через `/api`).
 Секрети лежать у `.env`, `backend/.env`, `frontend/.env` (не комітяться; приклади — `.env.example`).
 Демо-акаунти dev-seed: `admin@flowsync.test` (ADMIN) і `user@flowsync.test`, пароль `password-123` (лише для розробки).
@@ -51,8 +51,8 @@ cd backend && npm run format:check   # Prettier; npm run format форматує
 cd backend && npm run typecheck      # tsc --noEmit
 cd backend && npx prisma migrate dev --name <verb_noun>   # нова міграція після зміни schema.prisma (БД на :5433)
 cd backend && npm run openapi:export  # після зміни API: оновити backend/openapi.json (CI перевіряє)
-cd frontend && npm start             # CRA (до фази 5), після неї — npm run dev
-cd frontend && npm run format:check
+cd frontend && npm run dev           # Vite з HMR
+cd frontend && npm test              # Vitest; також lint, typecheck, build, format:check
 ```
 
 ## Робочий процес

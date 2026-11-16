@@ -65,7 +65,7 @@
 | D6 | Авторизація запитів | Passport JWT; глобальний guard «закрито за замовчуванням» + `@Public()`; ролі через `@Roles()` | Окремі guard-и на кожному маршруті забувають додати (див. B4) |
 | D7 | Доступ до ресурсів | Перевірка членства в проєкті в сервісах; для чужого ресурсу повертаємо 404 | CASL — лише якщо правил стане багато |
 | D8 | Збірка фронтенду | Vite + React 19 + TypeScript (strict) | CRA закритий; Next.js не потрібен для дашборда за логіном |
-| D9 | Роутинг | `react-router` v7 (library mode, lazy-маршрути) | TanStack Router: теж добрий, але менше прикладів у проєктах із цього огляду |
+| D9 | Роутинг | `react-router` v8 (library mode, lazy-маршрути; `RouterProvider` з `react-router/dom`) | TanStack Router: теж добрий, але менше прикладів у проєктах із цього огляду |
 | D10 | Стан | Серверний стан — TanStack Query v5; клієнтський — `useState`/Context, `zustand` лише для справді глобального | Redux/Recoil: зайве |
 | D11 | UI | Tailwind CSS 4 + shadcn/ui (Radix) | Mantine (як у Docmost): швидший старт, але менше контролю; Bootstrap видаляємо |
 | D12 | Форми | `react-hook-form` + `zod` | Formik: застарів |
@@ -250,15 +250,15 @@ unit-тести сервісу, e2e (401 / 400 / 404 / успіх), видале
 
 Гілка `refactor/phase-5-frontend-foundation`. Закриває F1, F2.
 
-- [ ] 5.1 Новий проєкт Vite + React 19 + TypeScript (strict) замість CRA; перенести лише `assets/`; видалити `react-scripts`, `jquery`, `react-bootstrap*`, `react-helmet`, `web-vitals`
-- [ ] 5.2 Створити структуру з розділу 4, alias `@/`
-- [ ] 5.3 Tailwind CSS 4 + shadcn/ui; базові компоненти (Button, Input, Label, Card, Dialog, Form)
-- [ ] 5.4 `config/env.ts` (zod над `import.meta.env`), `VITE_API_URL=/api`; dev-proxy Vite `/api` → `http://localhost:3000`
-- [ ] 5.5 `lib/api-client.ts` (axios: baseURL, Authorization з `auth-storage`, 401 → вихід), `lib/query-client.ts`
-- [ ] 5.6 `app/router.tsx` на `react-router` v7: lazy-маршрути, захищена гілка, error boundary, 404
-- [ ] 5.7 ESLint (typescript-eslint, react-hooks, jsx-a11y) + правило `no-restricted-paths` для меж між фічами; Prettier
-- [ ] 5.8 Vitest + Testing Library + MSW; `test-utils.tsx` з провайдерами
-- [ ] 5.9 Dockerfile (збірка → nginx) і dev-режим у compose
+- [x] 5.1 Новий проєкт Vite + React 19 + TypeScript (strict) замість CRA; перенесено лише логотип; видалено `react-scripts`, `jquery`, `react-bootstrap*`, `react-helmet`, `web-vitals`
+- [x] 5.2 Створити структуру з розділу 4, alias `@/`
+- [x] 5.3 Tailwind CSS 4 + shadcn/ui; базові компоненти (Button, Input, Label, Card, Dialog, Field замість Form)
+- [x] 5.4 `config/env.ts` (zod над `import.meta.env`), `VITE_API_URL=/api`; dev-proxy Vite `/api` → backend
+- [x] 5.5 `lib/api-client.ts` (axios: baseURL, Authorization з `auth-storage`, 401 → вихід), `lib/query-client.ts`
+- [x] 5.6 `app/router.tsx` на `react-router` v8: lazy-маршрути, захищена гілка, error boundary, 404
+- [x] 5.7 ESLint (typescript-eslint, react-hooks, jsx-a11y) + правило `no-restricted-imports` для меж між фічами; Prettier
+- [x] 5.8 Vitest + Testing Library + MSW; `test-utils.tsx` з провайдерами
+- [x] 5.9 Dockerfile (збірка → nginx) і dev-режим у compose; CI frontend: format, lint, typecheck, test, build (без `CI=false`)
 
 **Готово, коли:** `npm run dev` (і в compose) дає HMR; `npm run build`, `lint`, `test` зелені; сторінка логіну працює через проксі.
 
@@ -321,3 +321,4 @@ CASL для тонких прав · деплой на VPS (Caddy/Traefik) · us
 | 2026-11-16 | Фаза 2 (2.1–2.8) | Nest 10 → 11 → 12.5, TypeScript 6.0, Prisma 6.19, Vitest 5 + SWC замість Jest, `tsx` для seed. Структура `config/ database/ common/ health/ modules/`; zod-валідація env (`SECRET_KEY` → `JWT_SECRET`, у production ≥ 32 символів); глобальні `JwtAuthGuard` (`@Public`), `RolesGuard` (`@Roles`), throttler; `AllExceptionsFilter` + `PrismaExceptionFilter` з єдиним тілом помилки; пагінація; Swagger `/api/docs`; `helmet`; `nestjs-pino`; `/api/health` (його ж тепер використовує Docker healthcheck); `strict: true`; окрема тестова БД (`db_test`, профіль `test`). Перевірено: lint/типи/збірка, 42 unit, 26 e2e, dev- і прод-режим у Docker (проксі, 404 на Swagger у prod, rate limit, fail-fast на короткому секреті) | Не комітилось. Потрібно: `JWT_SECRET` ≥ 32 символів для прод-режиму (у локальному `.env` зараз 19). Хостовий Node 22.22.0 нижче вимоги `@nestjs/schematics` (≥ 22.22.3 / 24.15): у Docker і CI Node 24 |
 | 2026-11-16 | Фаза 3 (3.1–3.4) | Нова `schema.prisma`: PascalCase-моделі з `@@map`, `createdAt`/`updatedAt`, `enum Role` і `TaskStatus`, `ProjectMember`, `TaskAssignee` зі складеним ключем, теги проєкту, неявний m:n Task–Tag, індекси на всіх FK, явні `onDelete`. Міграція `init`, `migrate deploy` у Docker, `prisma` CLI в `dependencies` і прод-образ без dev-залежностей, перевірка розбіжності схеми в CI, демо-seed (dev) замість seed ролей. Сервіси, DTO й тести переведені на нову модель. Перевірено: lint/типи, 42 unit, 27 e2e (міграції на свіжій БД), seed двічі, чиста БД, dev і прод у Docker | Не комітилось. Старі дані збережено в `flowsync_backup_phase2`. Контракт API змінився (camelCase). Продовження — фаза 4 у цій самій гілці |
 | 2026-11-16 | Фаза 4 (4.1–4.8) | Модулі auth, users, projects (з учасниками), tasks (фільтри, пагінація, сортування, виконавці, теги), comments, tags; 30 ендпоїнтів, response DTO й Swagger, нормалізація вводу, `BCRYPT_ROUNDS`, поріг покриття сервісів, `npm run openapi:export` + перевірка актуальності в CI. Перевірено: lint/типи/збірка, 101 unit, 117 e2e, мутація, живий сценарій у Docker на демо-даних і на новому потоці | Не комітилось. Контракт API змінився (frontend використовує лише `/auth/login` і `/auth/validate-token`, вони не змінені). Далі — фаза 5 (frontend) |
+| 2026-11-16 | Фаза 5 (5.1–5.9) | Старий CRA видалено; Vite 8 + React 19 + TS strict, Tailwind 4 + shadcn/ui, TanStack Query, react-router 8 (lazy-маршрути, error boundary, 404), `config/env.ts`, `api-client` (Bearer, 401 → вихід), ESLint із межами фіч, Vitest + MSW (47 тестів), Dockerfile (nginx, непривілегійований), dev-режим у compose з HMR, CI frontend із lint/typecheck/test/build. Раніше за план зроблено частину 6.1: `useLogin`, `useMe`, `ProtectedRoute`, `LoginForm`. Перевірено: format, lint, `tsc -b`, тести, `npm run build`, dev (проксі, логін демо-акаунтом у браузері, HMR) і прод (nginx :8080, SPA-fallback, `/api`, логін, користувач nginx) | Не комітилось. Відхилення: shadcn `field` замість `form`, `background.jpg` і PWA-ресурси не переносились, frontend вимагає Node ≥ 22.22 (react-router 8), MSW 3. Dependabot-PR до старого CRA `package.json` стануть неактуальними. Межі фіч не ловлять відносні імпорти (`../../x`) |

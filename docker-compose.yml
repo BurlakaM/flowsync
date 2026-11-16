@@ -34,7 +34,7 @@ services:
       context: ./frontend
       target: prod
       args:
-        REACT_APP_API_URL: /api
+        VITE_API_URL: /api
     image: flowsync-frontend
     container_name: flowsync-frontend
     restart: unless-stopped
