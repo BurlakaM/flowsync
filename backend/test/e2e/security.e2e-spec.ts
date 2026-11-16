@@ -7,7 +7,7 @@ import { Api, createApi } from '../utils/api';
 
 type Route = [method: 'get' | 'post' | 'patch' | 'delete', path: string];
 
-// Every endpoint except the public ones (register, login, validate-token, health).
+// Every endpoint except the public ones (register, login, health).
 const PROTECTED_ROUTES: Route[] = [
   ['get', '/api/auth/me'],
   ['get', '/api/users/me'],

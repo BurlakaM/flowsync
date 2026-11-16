@@ -38,13 +38,4 @@ export class AuthService {
     const payload = { email: user.email, sub: user.id };
     return { access_token: this.jwtService.sign(payload) };
   }
-
-  /** Deprecated: the frontend uses it until plan phase 6 replaces it with GET /auth/me. */
-  validateToken(token: string): boolean {
-    try {
-      return !!this.jwtService.verify(token);
-    } catch {
-      return false;
-    }
-  }
 }

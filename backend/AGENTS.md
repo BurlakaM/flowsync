@@ -2,8 +2,8 @@
 
 Спільні правила: `../AGENTS.md`. План і поточна фаза: `../docs/ARCHITECTURE_PLAN.md`.
 Структура, схема БД і доменні модулі нижче реальні (фази 2–4).
-Готові модулі: auth, users, projects, tasks, comments, tags. Frontend поки користується лише `/auth/login` та
-`/auth/validate-token`, тож їх контракт (зокрема поле `access_token`) стабільний до фази 6.
+Готові модулі: auth, users, projects, tasks, comments, tags. Frontend використовує їх усі; відповідь логіну
+(поле `access_token`) лишається незмінною, щоб не ламати клієнта.
 
 ## Структура
 
@@ -129,7 +129,7 @@ async list(userId: number, query: PaginationQueryDto) {
 
 **Автентифікація й доступ**
 - Усі маршрути закриті глобальним `JwtAuthGuard`. Публічним маршрут робить лише `@Public()` і коментар про причину
-  (зараз: реєстрація, логін, `validate-token`, health).
+  (зараз: реєстрація, логін, health).
 - Обмеження за роллю — `@Roles(Role.Admin)` (перевіряє глобальний `RolesGuard`).
 - Користувач у запиті — `AuthenticatedUser { id; email; role }`, дістається через `@CurrentUser()`. Ніяких `req.user.sub`.
   `JwtStrategy` читає користувача з БД на кожен запит, тож токен видаленого користувача одразу недійсний.

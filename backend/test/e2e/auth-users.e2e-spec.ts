@@ -124,20 +124,6 @@ describe('Auth and users (e2e)', () => {
 
       expect(wrongPassword.body.message).toBe(unknownEmail.body.message);
     });
-
-    it('keeps the deprecated validate-token endpoint working', async () => {
-      const user = await api.signUp('validator');
-
-      const valid = await api
-        .post('/api/auth/validate-token', undefined, { token: user.token })
-        .expect(201);
-      const invalid = await api
-        .post('/api/auth/validate-token', undefined, { token: 'garbage' })
-        .expect(201);
-
-      expect(valid.body).toEqual({ valid: true });
-      expect(invalid.body).toEqual({ valid: false });
-    });
   });
 
   describe('current user', () => {
