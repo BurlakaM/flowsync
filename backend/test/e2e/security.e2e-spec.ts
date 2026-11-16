@@ -79,7 +79,12 @@ describe('Security (e2e)', () => {
     it('rejects a client-supplied role_id', async () => {
       await request(server())
         .post('/api/users')
-        .send({ name: 'x', email: email('role'), password: PASSWORD, role_id: 2 })
+        .send({
+          name: 'x',
+          email: email('role'),
+          password: PASSWORD,
+          role_id: 2,
+        })
         .expect(400);
     });
 
@@ -105,7 +110,9 @@ describe('Security (e2e)', () => {
 
   describe('users', () => {
     it('no longer exposes users by email', async () => {
-      await request(server()).get(`/api/users/${email('reg')}`).expect(404);
+      await request(server())
+        .get(`/api/users/${email('reg')}`)
+        .expect(404);
     });
 
     it('requires a token for GET /users/me', async () => {
@@ -168,11 +175,16 @@ describe('Security (e2e)', () => {
       await request(server())
         .post('/api/tasks')
         .set(bearer(token))
-        .send({ name: 'n', description: 'd', project_id: project.id, user_id: 1 })
+        .send({
+          name: 'n',
+          description: 'd',
+          project_id: project.id,
+          user_id: 1,
+        })
         .expect(400);
     });
 
-    it('returns 404 when creating a task in someone else\'s project', async () => {
+    it("returns 404 when creating a task in someone else's project", async () => {
       const owner = await register('proj-owner');
       await register('intruder');
       const intruderToken = await login('intruder');
@@ -207,8 +219,12 @@ describe('Security (e2e)', () => {
         .set(bearer(aliceToken))
         .expect(200);
 
-      expect(bobList.body.map((t: { id: number }) => t.id)).not.toContain(created.body.id);
-      expect(aliceList.body.map((t: { id: number }) => t.id)).toContain(created.body.id);
+      expect(bobList.body.map((t: { id: number }) => t.id)).not.toContain(
+        created.body.id,
+      );
+      expect(aliceList.body.map((t: { id: number }) => t.id)).toContain(
+        created.body.id,
+      );
     });
   });
 
@@ -242,7 +258,14 @@ describe('Security (e2e)', () => {
     it('rejects a user_id in the body', async () => {
       await request(server())
         .post('/api/comments')
-        .set(bearer(await (async () => { await register('c-spoof'); return login('c-spoof'); })()))
+        .set(
+          bearer(
+            await (async () => {
+              await register('c-spoof');
+              return login('c-spoof');
+            })(),
+          ),
+        )
         .send({ text: 't', task_id: 1, user_id: 1 })
         .expect(400);
     });
@@ -283,7 +306,9 @@ describe('Security (e2e)', () => {
         .set('Origin', 'http://localhost:8080')
         .set('Access-Control-Request-Method', 'GET');
 
-      expect(res.headers['access-control-allow-origin']).toBe('http://localhost:8080');
+      expect(res.headers['access-control-allow-origin']).toBe(
+        'http://localhost:8080',
+      );
     });
   });
 });
