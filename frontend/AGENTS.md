@@ -1,0 +1,123 @@
+# Frontend (React) — правила
+
+Спільні правила: `../AGENTS.md`. План і поточна фаза: `../docs/ARCHITECTURE_PLAN.md`.
+Цей файл описує **цільову** архітектуру (Vite + React 19 + TypeScript).
+
+> **Поки фаза 5 не завершена**, у `src/` лежить старий CRA-код на JS (`App.js`, `auth/`, `cabinet/`, `components/`).
+> Його **не розширюй**: лише виправлення багів. Нові функції чекають на нову структуру.
+
+## Стек (ціль)
+
+Vite · React 19 · TypeScript strict · `react-router` v7 · TanStack Query v5 · `react-hook-form` + `zod` ·
+Tailwind CSS 4 + shadcn/ui · axios · Vitest + Testing Library + MSW · Playwright (e2e).
+Не додавай Redux, Bootstrap, jQuery, styled-components; нову бібліотеку спершу запропонуй власнику.
+
+## Структура
+
+```
+src/
+├─ app/         main.tsx, app.tsx, provider.tsx, router.tsx, routes/
+├─ assets/
+├─ components/  ui/ (shadcn), layouts/, errors/
+├─ config/      env.ts
+├─ features/<feature>/
+│  ├─ api/         функції запитів + query keys + useQuery/useMutation хуки
+│  ├─ components/  UI цієї фічі
+│  ├─ hooks/       (якщо потрібні)
+│  ├─ types/
+│  └─ index.ts     публічний API фічі
+├─ hooks/       спільні хуки
+├─ lib/         api-client.ts, query-client.ts, auth-storage.ts, utils.ts
+├─ testing/     setup.ts, test-utils.tsx, mocks/
+└─ types/
+```
+
+**Напрямок імпортів:** `components, hooks, lib, config, types` → `features` → `app`.
+Фіча **не імпортує іншу фічу** (правило ESLint `no-restricted-paths`): їх складають разом на рівні `app/routes`.
+Із фічі назовні експортується лише те, що перелічено в її `index.ts`; з інших місць не імпортуй її внутрішні файли.
+
+## Шаблони
+
+API-шар фічі (запит + ключі + хук в одному місці; `api-client` повертає `response.data`):
+
+```ts
+// features/tasks/api/get-tasks.ts
+export const tasksKeys = {
+  all: ['tasks'] as const,
+  list: (projectId: number) => [...tasksKeys.all, 'list', projectId] as const,
+};
+
+export const getTasks = (projectId: number): Promise<Task[]> =>
+  api.get(`/projects/${projectId}/tasks`);
+
+export const useTasks = (projectId: number) =>
+  useQuery({ queryKey: tasksKeys.list(projectId), queryFn: () => getTasks(projectId) });
+```
+
+Мутація з інвалідацією кешу:
+
+```ts
+export const useCreateTask = (projectId: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateTaskInput) => createTask(projectId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tasksKeys.list(projectId) }),
+  });
+};
+```
+
+Форма (схема `zod` — єдине джерело правди для типів і валідації):
+
+```tsx
+const schema = z.object({
+  name: z.string().min(1, 'Required').max(200),
+  description: z.string().max(5000).optional(),
+});
+type Values = z.infer<typeof schema>;
+
+const form = useForm<Values>({ resolver: zodResolver(schema) });
+```
+
+## Правила
+
+**Дані й стан**
+- Запити до API — лише через `lib/api-client.ts` і хуки TanStack Query в `features/*/api`. Жодного `fetch`/`axios` у компонентах і жодного `useEffect` для завантаження даних.
+- Серверний стан живе в TanStack Query й не дублюється в `useState`/`zustand`. Фільтри, сторінка, сортування — в URL (search params).
+- Токен читається й пишеться лише в `lib/auth-storage.ts`; прямий `localStorage` у решті коду заборонений.
+- Змінні середовища — лише `VITE_*`, читаються через `config/env.ts`. У фронтенді секретів не буває.
+
+**Компоненти**
+- Функціональні компоненти, іменований експорт (default лише для lazy-сторінок у `app/routes`). Один компонент на файл.
+- Файли kebab-case (`create-task-dialog.tsx`), компоненти PascalCase, хуки `use-*.ts`, типи пропсів — `interface XProps`.
+- Кожен екран обробляє три стани: завантаження, помилка, порожньо. Не показуй порожню таблицю замість помилки.
+- Складність розв'язуй композицією (children, slots), а не десятком булевих пропсів; prop drilling глибше 2 рівнів → Context або композиція.
+- Не додавай `useMemo`/`useCallback`/`memo` без виміряної проблеми.
+- `key` у списках — стабільний id, не індекс.
+
+**Стилі та UI**
+- Tailwind-класи й токени теми; без inline-стилів і власних CSS-файлів, крім `index.css` із темою.
+- Компоненти shadcn додаємо в `components/ui` командою CLI й не переписуємо без потреби.
+
+**Типи**
+- Без `any` і `@ts-ignore`; типи відповідей API лежать у `features/*/types` (після фази 7 — генеруються з OpenAPI, тоді не дублюй їх вручну).
+
+**Доступність**
+- Кожне поле має `<label>`; кнопки — `<button>`, посилання — `<a>/<Link>`, не `div` з `onClick`.
+- Діалоги й меню — через shadcn/Radix (фокус і клавіатура готові). Іконка-кнопка має `aria-label`.
+
+## Тести
+
+- Vitest + Testing Library: шукай елементи за роллю й підписом (`getByRole`, `getByLabelText`), а не за класами чи `data-testid`.
+- Мережу мокай через MSW (`testing/mocks`), а не мокай `axios` чи хуки.
+- Покривай: хуки/мутації фіч, форми (валідація, успіх, помилка сервера), захищений маршрут.
+- Рендер у тестах — через `testing/test-utils.tsx` (QueryClient, Router).
+
+## Чекліст нової фічі
+
+1. `features/<name>/` зі структурою вище; публічний API в `index.ts`.
+2. `api/`: функції, query keys, хуки; типи.
+3. Компоненти з трьома станами (loading / error / empty).
+4. Маршрут у `app/routes`, lazy-завантаження.
+5. Тести (компонент/хук + MSW).
+6. Жодного імпорту з інших фіч; lint проходить.
+7. Видалено старий код; відмічено пункт у плані.
