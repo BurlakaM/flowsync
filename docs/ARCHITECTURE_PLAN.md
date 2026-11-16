@@ -43,7 +43,7 @@
 | B13 | Два lock-файли в backend (`yarn.lock` і `package-lock.json`) | `backend/` | 1 |
 | F1 | Фронтенд на Create React App (закритий проєкт) і чистому JS; логіка fetch прямо в компонентах | `frontend/src/**` | 5 |
 | F2 | Зайві залежності: `jquery`, `react-bootstrap` + `react-bootstrap-v5`, `react-helmet` | `frontend/package.json` | 5 |
-| F3 | `ProtectedRoute` на кожен вхід викликав `POST /auth/validate-token` (закрито у фазі 6: `GET /auth/me`); токен у `localStorage` лишається до фази 7 | `ProtectedRoute.js` | 6–7 |
+| F3 | `ProtectedRoute` на кожен вхід викликав `POST /auth/validate-token` (закрито у фазі 6: `GET /auth/me`); токен у `localStorage` (закрито у фазі 7: токен у пам'яті + refresh-cookie) | `ProtectedRoute.js` | 6–7 |
 | F4 | `Dashboard` — заглушка, функціоналу задач/проєктів у UI немає | `cabinet/Dashboard.js` | 6 |
 | I1 | nginx без SPA-fallback: оновлення сторінки `/dashboard` у контейнері дає 404; API-URL вшивається при збірці з `frontend/.env` | `frontend/Dockerfile` | 1 |
 | I2 | README описує Vite, папки `back/front` та `docker-compose.override.yml`, яких немає | `README.md` | 1 |
@@ -81,6 +81,10 @@
 | D22 | Модель доступу | Власник проєкту — `Project.ownerId`; додаткові учасники — `ProjectMember`; перевірка доступу в сервісах. Ролі користувача — `enum Role` | Власник у `ProjectMember` теж: дублює дані |
 | D23 | Міграції | `prisma migrate` (SQL у репозиторії), у Docker `migrate deploy` на старті; CI перевіряє розбіжність схеми й міграцій | `db push`: не лишає історії й небезпечний для даних |
 | D24 | Права доступу | Єдине джерело правди «хто бачить проєкт» — `ProjectsService` (власник або учасник); сторонній → 404, учасник без права → 403; ADMIN не обходить доступ до проєктів | Глобальний обхід для ADMIN: розширює поверхню атаки; CASL: зайве, правил поки мало |
+| D25 | Типи API на frontend | `openapi-typescript` генерує `src/types/api.generated.ts` із `backend/openapi.json`; у `features/*/types` лише аліаси; CI перевіряє актуальність. Для пакета потрібен `overrides` на peer `typescript` (він заявляє `^5`, у проєкті TS 6) | Типи вручну: розходяться з API без попередження |
+| D26 | Сесія | Access-JWT 15 хв у пам'яті + refresh-токен в `httpOnly` cookie (`SameSite=Strict`, `Path=/api/auth`), ротація, відкликання родини при повторному використанні, у БД лише SHA-256 хеш; `COOKIE_SECURE` для HTTPS | JWT у `localStorage` (XSS краде токен); довгий access-токен |
+| D27 | Request id | `X-Request-Id` через `genReqId` у `nestjs-pino` (вхідний заголовок, якщо схожий на id, інакше UUID) і поле `requestId` у тілі помилки | `nestjs-cls`: окрема залежність без користі, поки id потрібен лише логам і відповіді |
+| D28 | E2E та доступність | Playwright у `frontend/e2e` проти прод-подібного стеку (локально встановлений Chrome, у CI Chromium); `vitest-axe` у тестах сторінок | Cypress: важчий; окремий пакет `e2e/`: ще один `package.json` |
 
 ## 4. Цільова архітектура
 
@@ -278,12 +282,12 @@ unit-тести сервісу, e2e (401 / 400 / 404 / успіх), видале
 
 ### Фаза 7 — Контракт, якість, безпека · розмір M–L
 
-- [ ] 7.1 Генерація TS-типів із `openapi.json` (`openapi-typescript`); CI перевіряє актуальність згенерованого
-- [ ] 7.2 Посилення авторизації: короткий access-токен (15 хв) у пам'яті + refresh-токен в `httpOnly` cookie з ротацією й відкликанням (`RefreshToken` у БД)
-- [ ] 7.3 Playwright e2e (логін → проєкт → задача) у CI поверх compose
-- [ ] 7.4 Спостережуваність: request id (`nestjs-cls`), структуровані логи, за бажанням Sentry
-- [ ] 7.5 Безпека: CSP та заголовки в nginx, `npm audit` у CI, перевірка залежностей Dependabot
-- [ ] 7.6 Доступність: `axe` у тестах ключових сторінок
+- [x] 7.1 Генерація TS-типів із `openapi.json` (`openapi-typescript`); CI перевіряє актуальність згенерованого (`npm run api:types`)
+- [x] 7.2 Посилення авторизації: короткий access-токен (15 хв) у пам'яті + refresh-токен в `httpOnly` cookie з ротацією й відкликанням (`RefreshToken` у БД)
+- [x] 7.3 Playwright e2e (реєстрація → проєкт → задача → коментар → перезавантаження → вихід) у CI поверх compose
+- [x] 7.4 Спостережуваність: request id (`X-Request-Id`, у логах і тілі помилки; без `nestjs-cls`, див. D27), структуровані логи (pino); Sentry не додавався
+- [x] 7.5 Безпека: CSP та заголовки в nginx, `npm audit` у CI, перевірка залежностей Dependabot
+- [x] 7.6 Доступність: `axe` у тестах ключових сторінок
 
 ### Фаза 8 — Беклог (за бажанням, без порядку)
 
@@ -323,3 +327,4 @@ CASL для тонких прав · деплой на VPS (Caddy/Traefik) · us
 | 2026-11-16 | Фаза 4 (4.1–4.8) | Модулі auth, users, projects (з учасниками), tasks (фільтри, пагінація, сортування, виконавці, теги), comments, tags; 30 ендпоїнтів, response DTO й Swagger, нормалізація вводу, `BCRYPT_ROUNDS`, поріг покриття сервісів, `npm run openapi:export` + перевірка актуальності в CI. Перевірено: lint/типи/збірка, 101 unit, 117 e2e, мутація, живий сценарій у Docker на демо-даних і на новому потоці | Не комітилось. Контракт API змінився (frontend використовує лише `/auth/login` і `/auth/validate-token`, вони не змінені). Далі — фаза 5 (frontend) |
 | 2026-11-16 | Фаза 5 (5.1–5.9) | Старий CRA видалено; Vite 8 + React 19 + TS strict, Tailwind 4 + shadcn/ui, TanStack Query, react-router 8 (lazy-маршрути, error boundary, 404), `config/env.ts`, `api-client` (Bearer, 401 → вихід), ESLint із межами фіч, Vitest + MSW (47 тестів), Dockerfile (nginx, непривілегійований), dev-режим у compose з HMR, CI frontend із lint/typecheck/test/build. Раніше за план зроблено частину 6.1: `useLogin`, `useMe`, `ProtectedRoute`, `LoginForm`. Перевірено: format, lint, `tsc -b`, тести, `npm run build`, dev (проксі, логін демо-акаунтом у браузері, HMR) і прод (nginx :8080, SPA-fallback, `/api`, логін, користувач nginx) | Не комітилось. Відхилення: shadcn `field` замість `form`, `background.jpg` і PWA-ресурси не переносились, frontend вимагає Node ≥ 22.22 (react-router 8), MSW 3. Dependabot-PR до старого CRA `package.json` стануть неактуальними. Межі фіч не ловлять відносні імпорти (`../../x`) |
 | 2026-11-16 | Фаза 6 (6.1–6.6) | Фічі auth (реєстрація з автовходом), projects (список із пошуком і сторінками в URL, створення/редагування/видалення, учасники), tasks (фільтри, сортування й сторінка в URL, форма з виконавцями й тегами, зміна статусу, теги проєкту), comments (додати, редагувати, видалити з модерацією власника); шапка з навігацією, спільні стани loading/error/empty, діалог підтвердження, пагінація. `validate-token` видалено з backend (код, тести, `openapi.json`). Перевірено: frontend format/lint/typecheck, 104 тести; backend lint/типи, 99 unit, 116 e2e | Не комітилось. Фічі не імпортують одна одну: дані між ними (учасники проєкту → виконавці, лічильники) передає сторінка в `app/routes`. Канбан не робився (за бажанням). Поле `access_token` не перейменовано |
+| 2026-11-16 | Фаза 7 (7.1–7.6) | Типи frontend генеруються з `openapi.json` (CI перевіряє), додано `LoginResponseDto`. Сесія: access-токен 15 хв у пам'яті, refresh-токен в `httpOnly` cookie з ротацією, відкликанням родини при повторному використанні й хешем у БД (міграція `add_refresh_tokens`), `POST /auth/refresh` і `/auth/logout`; frontend відновлює сесію після перезавантаження й оновлює токен на 401 одним спільним запитом. `X-Request-Id` у логах, заголовку й тілі помилки. nginx: CSP, Permissions-Policy, кеш `/assets/` (раніше був застарілий `/static/`), `npm audit` у CI. Playwright e2e (джоба `e2e` у CI), axe у тестах 5 сторінок і 2 діалогів. Перевірено: frontend format/lint/typecheck, 115+ тестів, build; backend lint/типи, 119 unit, 134 e2e; Playwright проти прод-стеку на :8080; сесія, перезавантаження й вихід у браузері (dev) | Не комітилось. Відхилення: без `nestjs-cls` (D27). Відомо: `prisma` CLI 6.x має high-вразливість (виправлення лише в Prisma 7), тому CI блокує лише critical у backend; зміна пароля поки не відкликає refresh-токени; усі користувачі мусять увійти заново (токени в `localStorage` більше не діють) |

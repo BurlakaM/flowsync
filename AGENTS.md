@@ -21,7 +21,7 @@ FlowSync — пет-проєкт, трекер задач у стилі Jira: п
 |---|---|---|
 | Backend | NestJS 12, Prisma 6.19, JWT (Passport), TypeScript 6 (strict), Vitest, Node 24 LTS | + схема БД і модулі за планом (фази 3–4) |
 | БД | PostgreSQL 16, міграції `prisma migrate`, PascalCase-моделі, `enum Role` | те саме |
-| Frontend | React 19, Vite 8, TypeScript (strict), Tailwind 4 + shadcn/ui, TanStack Query, react-router 8, Vitest + MSW | + фічі за планом (фаза 6), типи з OpenAPI (фаза 7) |
+| Frontend | React 19, Vite 8, TypeScript (strict), Tailwind 4 + shadcn/ui, TanStack Query, react-router 8, Vitest + MSW | те саме; типи генеруються з OpenAPI, e2e на Playwright |
 | Інфра | Docker Compose (dev-override + прод), nginx-проксі, CI з перевірками | + міграції в compose, `/api/health` |
 
 Репозиторій складається з двох незалежних npm-пакетів: `backend/` і `frontend/` (без монорепо-інструментів). Лише `npm`.
@@ -53,6 +53,8 @@ cd backend && npx prisma migrate dev --name <verb_noun>   # нова мігра�
 cd backend && npm run openapi:export  # після зміни API: оновити backend/openapi.json (CI перевіряє)
 cd frontend && npm run dev           # Vite з HMR
 cd frontend && npm test              # Vitest; також lint, typecheck, build, format:check
+cd frontend && npm run api:types     # після зміни API (і openapi.json): оновити src/types/api.generated.ts (CI перевіряє)
+cd frontend && npm run test:e2e      # Playwright проти прод-подібного стеку на :8080 (спершу docker compose -f docker-compose.yml up -d --build)
 ```
 
 ## Робочий процес
