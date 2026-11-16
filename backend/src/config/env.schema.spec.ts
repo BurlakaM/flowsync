@@ -84,3 +84,76 @@ describe('validateEnv', () => {
     );
   });
 });
+
+describe('validateEnv: email and queue', () => {
+  const base = { DATABASE_URL: 'postgresql://u:p@h/db', JWT_SECRET: 'secret' };
+
+  it('needs none of the email settings', () => {
+    const env = validateEnv(base);
+
+    expect(env.SMTP_HOST).toBeUndefined();
+    expect(env.MAIL_FROM).toBeUndefined();
+    expect(env.REDIS_URL).toBeUndefined();
+    expect(env).toMatchObject({
+      SMTP_PORT: 587,
+      SMTP_SECURE: false,
+      APP_URL: 'http://localhost:5173',
+    });
+  });
+
+  it('treats empty values in .env as not set', () => {
+    const env = validateEnv({
+      ...base,
+      SMTP_HOST: '',
+      SMTP_PORT: '',
+      SMTP_SECURE: '',
+      SMTP_USER: '',
+      MAIL_FROM: '',
+      REDIS_URL: '',
+      APP_URL: '',
+    });
+
+    expect(env.SMTP_HOST).toBeUndefined();
+    expect(env.SMTP_USER).toBeUndefined();
+    expect(env.REDIS_URL).toBeUndefined();
+    expect(env.SMTP_PORT).toBe(587);
+    expect(env.APP_URL).toBe('http://localhost:5173');
+  });
+
+  it('reads a complete configuration', () => {
+    const env = validateEnv({
+      ...base,
+      SMTP_HOST: 'smtp.example.test',
+      SMTP_PORT: '465',
+      SMTP_SECURE: 'true',
+      SMTP_USER: 'user',
+      SMTP_PASSWORD: 'secret',
+      MAIL_FROM: 'FlowSync <noreply@example.test>',
+      REDIS_URL: 'redis://redis:6379',
+      APP_URL: 'https://flowsync.example.test',
+    });
+
+    expect(env).toMatchObject({
+      SMTP_HOST: 'smtp.example.test',
+      SMTP_PORT: 465,
+      SMTP_SECURE: true,
+      MAIL_FROM: 'FlowSync <noreply@example.test>',
+      REDIS_URL: 'redis://redis:6379',
+    });
+  });
+
+  it('rejects values that cannot work', () => {
+    expect(() => validateEnv({ ...base, REDIS_URL: 'localhost:6379' })).toThrow(
+      /REDIS_URL/,
+    );
+    expect(() => validateEnv({ ...base, SMTP_PORT: '99999' })).toThrow(
+      /SMTP_PORT/,
+    );
+    expect(() => validateEnv({ ...base, SMTP_SECURE: 'yes' })).toThrow(
+      /SMTP_SECURE/,
+    );
+    expect(() => validateEnv({ ...base, APP_URL: 'not a url' })).toThrow(
+      /APP_URL/,
+    );
+  });
+});

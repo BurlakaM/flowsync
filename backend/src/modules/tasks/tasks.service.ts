@@ -1,17 +1,20 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { subject } from '@casl/ability';
 import { Prisma } from '@prisma/client';
+import { authorize } from '../../common/casl/authorize';
 import {
   paginationArgs,
   toPage,
   type Page,
 } from '../../common/pagination/paginate';
+import { DomainEventsService } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
+import { TasksSearchService } from './tasks-search.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { QueryTasksDto } from './dto/query-tasks.dto';
 import { TaskDetailsDto, TaskResponseDto } from './dto/task-response.dto';
@@ -64,6 +67,8 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
+    private readonly search: TasksSearchService,
+    private readonly events: DomainEventsService,
   ) {}
 
   /**
@@ -90,16 +95,24 @@ export class TasksService {
       ...(query.tagId !== undefined && {
         tags: { some: { id: query.tagId } },
       }),
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { description: { contains: query.search, mode: 'insensitive' } },
-        ],
-      }),
     };
-    // sortBy is validated against TASK_SORT_FIELDS, so the computed key is always a real column.
+
+    // The search runs first and narrows the list to the matching ids; access and the other
+    // filters still apply to them, so a search can never reveal a task of a foreign project.
+    const rankedIds = query.search
+      ? await this.search.rankedIds(query.search, scopeProjectId)
+      : undefined;
+    if (rankedIds) where.id = { in: rankedIds };
+
+    if (rankedIds && query.sortBy === 'relevance') {
+      return this.listByRelevance(where, rankedIds, query);
+    }
+
+    // Without a search there is nothing to rank: "relevance" then means the default order.
+    const sortField = query.sortBy === 'relevance' ? 'createdAt' : query.sortBy;
+    // sortField is validated against TASK_SORT_FIELDS, so the computed key is always a real column.
     const sort = {
-      [query.sortBy]: query.order,
+      [sortField]: query.order,
     } as Prisma.TaskOrderByWithRelationInput;
 
     const [tasks, total] = await Promise.all([
@@ -112,6 +125,33 @@ export class TasksService {
       this.prisma.task.count({ where }),
     ]);
     return toPage(tasks.map(toResponse), total, query);
+  }
+
+  /** Best match first: the order comes from the search, so the page is cut from the ranked ids. */
+  private async listByRelevance(
+    where: Prisma.TaskWhereInput,
+    rankedIds: number[],
+    query: QueryTasksDto,
+  ): Promise<Page<TaskResponseDto>> {
+    const visible = await this.prisma.task.findMany({
+      where,
+      select: { id: true },
+    });
+    const visibleIds = new Set(visible.map((task) => task.id));
+    const ordered = rankedIds.filter((id) => visibleIds.has(id));
+    const { skip, take } = paginationArgs(query);
+    const pageIds = ordered.slice(skip, skip + take);
+
+    const rows = await this.prisma.task.findMany({
+      where: { id: { in: pageIds } },
+      select: taskSelect,
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const items = pageIds.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [toResponse(row)] : [];
+    });
+    return toPage(items, ordered.length, query);
   }
 
   async create(
@@ -143,6 +183,18 @@ export class TasksService {
       },
       select: taskDetailsSelect,
     });
+    await this.events.publish({
+      type: 'task.created',
+      actorId: userId,
+      projectId,
+      entityType: 'Task',
+      entityId: task.id,
+      data: {
+        name: task.name,
+        status: task.status,
+        assigneeIds: task.assignees.map((assignee) => assignee.user.id),
+      },
+    });
     return toDetails(task);
   }
 
@@ -160,7 +212,8 @@ export class TasksService {
     id: number,
     dto: UpdateTaskDto,
   ): Promise<TaskDetailsDto> {
-    const { projectId } = await this.assertTaskAccess(userId, id);
+    const before = await this.assertTaskAccess(userId, id);
+    const { projectId } = before;
     await this.assertAssigneesAreMembers(projectId, dto.assigneeIds);
     await this.assertTagsBelongToProject(projectId, dto.tagIds);
 
@@ -185,18 +238,73 @@ export class TasksService {
       },
       select: taskDetailsSelect,
     });
+    await this.publishUpdate(userId, before, task);
     return toDetails(task);
   }
 
   /** Only the author or the project owner may delete a task. */
   async remove(userId: number, id: number): Promise<void> {
     const task = await this.assertTaskAccess(userId, id);
-    if (task.createdById !== userId && task.project.ownerId !== userId) {
-      throw new ForbiddenException(
-        'Only the author or the project owner can delete a task',
-      );
-    }
+    authorize(
+      userId,
+      task.project,
+      'delete',
+      subject('Task', { createdById: task.createdById }),
+      'Only the author or the project owner can delete a task',
+    );
     await this.prisma.task.delete({ where: { id } });
+    await this.events.publish({
+      type: 'task.deleted',
+      actorId: userId,
+      projectId: task.projectId,
+      entityType: 'Task',
+      entityId: id,
+      data: { name: task.name },
+    });
+  }
+
+  /** Describes what an update changed: the feed shows it and notifications use the new assignees. */
+  private async publishUpdate(
+    userId: number,
+    before: Awaited<ReturnType<TasksService['assertTaskAccess']>>,
+    after: TaskDetailsRow,
+  ): Promise<void> {
+    const beforeAssignees = before.assignees.map((assignee) => assignee.userId);
+    const afterAssignees = after.assignees.map((assignee) => assignee.user.id);
+    const assigneesAdded = afterAssignees.filter(
+      (assigneeId) => !beforeAssignees.includes(assigneeId),
+    );
+    const ids = (list: { id: number }[]) =>
+      list
+        .map((item) => item.id)
+        .sort((a, b) => a - b)
+        .join(',');
+
+    const changed = [
+      before.name !== after.name && 'name',
+      before.description !== after.description && 'description',
+      before.status !== after.status && 'status',
+      (assigneesAdded.length > 0 ||
+        beforeAssignees.length !== afterAssignees.length) &&
+        'assignees',
+      ids(before.tags) !== ids(after.tags) && 'tags',
+    ].filter(Boolean);
+
+    await this.events.publish({
+      type: 'task.updated',
+      actorId: userId,
+      projectId: after.projectId,
+      entityType: 'Task',
+      entityId: after.id,
+      data: {
+        name: after.name,
+        changed,
+        ...(before.status !== after.status && {
+          status: { from: before.status, to: after.status },
+        }),
+        assigneesAdded,
+      },
+    });
   }
 
   /** For other modules (comments): the task, when the user can see its project. */
@@ -205,8 +313,13 @@ export class TasksService {
       where: { id, project: this.projects.accessFilter(userId) },
       select: {
         id: true,
+        name: true,
+        description: true,
+        status: true,
         projectId: true,
         createdById: true,
+        assignees: { select: { userId: true } },
+        tags: { select: { id: true } },
         project: { select: { ownerId: true } },
       },
     });

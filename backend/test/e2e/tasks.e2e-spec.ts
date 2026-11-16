@@ -221,8 +221,8 @@ describe('Tasks (e2e)', () => {
       ]);
     });
 
-    it('searches the name and the description case-insensitively', async () => {
-      expect(names(await list('search=ELT').expect(200))).toEqual(['Delta']);
+    it('searches the name and the description case-insensitively, by the beginning of a word', async () => {
+      expect(names(await list('search=DEL').expect(200))).toEqual(['Delta']);
       expect(names(await list('search=LOGIN').expect(200))).toEqual(['Delta']);
     });
 
@@ -354,6 +354,120 @@ describe('Tasks (e2e)', () => {
       await api.del(`/api/tasks/${task.id}`, member).expect(403);
       await api.del(`/api/tasks/${task.id}`, outsider).expect(404);
       await api.get(`/api/tasks/${task.id}`, owner).expect(200);
+    });
+  });
+
+  describe('full-text search', () => {
+    let searchProject: number;
+    let foreignProject: number;
+
+    const search = (term: string, extra = '', user = owner) =>
+      api.get(
+        `/api/projects/${searchProject}/tasks?search=${encodeURIComponent(term)}${extra}`,
+        user,
+      );
+
+    beforeAll(async () => {
+      searchProject = (
+        await api.post('/api/projects', owner, { name: 'Search' }).expect(201)
+      ).body.id;
+      foreignProject = (
+        await api
+          .post('/api/projects', outsider, { name: 'Foreign' })
+          .expect(201)
+      ).body.id;
+
+      await createTask(owner, { name: 'Deploy checklist' }, searchProject);
+      await createTask(
+        owner,
+        { name: 'Docs', description: 'Describe the deploy steps' },
+        searchProject,
+      );
+      const commented = await createTask(
+        owner,
+        { name: 'Unrelated title' },
+        searchProject,
+      );
+      await api
+        .post(`/api/tasks/${commented.id}/comments`, owner, {
+          text: 'Blocked until the zeppelin arrives',
+        })
+        .expect(201);
+      await createTask(
+        outsider,
+        { name: 'Deploy secrets', description: 'zeppelin' },
+        foreignProject,
+      );
+    });
+
+    it('finds words in the name, the description and the comments', async () => {
+      expect(names(await search('checklist').expect(200))).toEqual([
+        'Deploy checklist',
+      ]);
+      expect(names(await search('steps').expect(200))).toEqual(['Docs']);
+      expect(names(await search('zeppelin').expect(200))).toEqual([
+        'Unrelated title',
+      ]);
+    });
+
+    it('requires every word and accepts the beginning of a word', async () => {
+      expect(names(await search('deploy chec').expect(200))).toEqual([
+        'Deploy checklist',
+      ]);
+      expect(names(await search('deploy zeppelin').expect(200))).toEqual([]);
+    });
+
+    it('puts the best match first when asked for relevance', async () => {
+      const res = await search('deploy', '&sortBy=relevance').expect(200);
+
+      // A hit in the name outweighs a hit in the description.
+      expect(names(res)).toEqual(['Deploy checklist', 'Docs']);
+      expect(res.body.meta.total).toBe(2);
+    });
+
+    it('pages the relevance order', async () => {
+      const first = await search('deploy', '&sortBy=relevance&limit=1').expect(
+        200,
+      );
+      const second = await search(
+        'deploy',
+        '&sortBy=relevance&limit=1&page=2',
+      ).expect(200);
+
+      expect(names(first)).toEqual(['Deploy checklist']);
+      expect(names(second)).toEqual(['Docs']);
+      expect(second.body.meta).toMatchObject({ total: 2, totalPages: 2 });
+    });
+
+    it('never finds tasks of projects the user cannot see', async () => {
+      // "Deploy secrets" and its description exist, but in a foreign project.
+      const all = await api
+        .get('/api/tasks?search=zeppelin', owner)
+        .expect(200);
+      expect(names(all)).toEqual(['Unrelated title']);
+
+      const relevance = await api
+        .get('/api/tasks?search=secrets&sortBy=relevance', owner)
+        .expect(200);
+      expect(names(relevance)).toEqual([]);
+      await search('secrets', '', outsider).expect(404);
+    });
+
+    it('treats operators and quotes as plain text instead of failing', async () => {
+      for (const term of ["'; DROP TABLE tasks; --", '!(deploy) | &', 'a:*b']) {
+        await search(term).expect(200);
+      }
+      expect(names(await search('!!!').expect(200))).toEqual([]);
+      await api.get(`/api/projects/${searchProject}/tasks`, owner).expect(200);
+    });
+
+    it('keeps combining the search with the other filters', async () => {
+      expect(names(await search('deploy', '&status=DONE').expect(200))).toEqual(
+        [],
+      );
+      expect(
+        names(await search('deploy', '&status=TODO').expect(200)),
+      ).toHaveLength(2);
     });
   });
 });

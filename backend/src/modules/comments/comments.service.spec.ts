@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DeepMockProxy, mockDeep } from 'vitest-mock-extended';
+import { DomainEventsService } from '../../common/events/domain-events.service';
 import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -8,6 +9,8 @@ import { CommentsService } from './comments.service';
 
 const query = Object.assign(new PaginationQueryDto(), { page: 1, limit: 20 });
 
+const publish = vi.fn();
+
 describe('CommentsService', () => {
   let prisma: DeepMockProxy<PrismaService>;
   const assertTaskAccess = vi.fn();
@@ -15,6 +18,7 @@ describe('CommentsService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>();
+    publish.mockReset();
     assertTaskAccess.mockReset().mockResolvedValue({ id: 7 });
     service = new CommentsService(
       prisma,
@@ -22,6 +26,7 @@ describe('CommentsService', () => {
         accessFilter: vi.fn().mockReturnValue({}),
       } as unknown as ProjectsService,
       { assertTaskAccess } as unknown as TasksService,
+      { publish } as unknown as DomainEventsService,
     );
   });
 
@@ -52,7 +57,7 @@ describe('CommentsService', () => {
     });
 
     it('takes the author from the caller, never from the input', async () => {
-      prisma.comment.create.mockResolvedValue({ id: 1 } as never);
+      prisma.comment.create.mockResolvedValue({ id: 1, text: 'hi' } as never);
 
       await service.create(4, 7, { text: 'hi' });
 
@@ -64,12 +69,31 @@ describe('CommentsService', () => {
     });
   });
 
+  it('publishes the new comment with a short excerpt', async () => {
+    assertTaskAccess.mockResolvedValue({ id: 7, projectId: 3, name: 'Task' });
+    prisma.comment.create.mockResolvedValue({
+      id: 9,
+      text: 'x'.repeat(200),
+    } as never);
+
+    await service.create(4, 7, { text: 'x'.repeat(200) });
+
+    expect(publish).toHaveBeenCalledWith({
+      type: 'comment.created',
+      actorId: 4,
+      projectId: 3,
+      entityType: 'Comment',
+      entityId: 9,
+      data: { taskId: 7, taskName: 'Task', excerpt: `${'x'.repeat(140)}…` },
+    });
+  });
+
   describe('update and remove', () => {
     const existing = (authorId: number | null, ownerId: number) =>
       prisma.comment.findFirst.mockResolvedValue({
         id: 1,
         authorId,
-        task: { project: { ownerId } },
+        task: { id: 7, name: 'Task', projectId: 3, project: { ownerId } },
       } as never);
 
     it('treats an invisible comment as missing', async () => {

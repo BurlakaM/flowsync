@@ -10,9 +10,14 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { AppConfigService } from './config/app-config.service';
 import { AppConfigModule } from './config/config.module';
 import { PrismaModule } from './database/prisma.module';
+import { EventsModule } from './common/events/events.module';
+import { StorageModule } from './common/storage/storage.module';
 import { HealthModule } from './health/health.module';
+import { ActivityModule } from './modules/activity/activity.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CommentsModule } from './modules/comments/comments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { TasksModule } from './modules/tasks/tasks.module';
@@ -51,12 +56,17 @@ import { UsersModule } from './modules/users/users.module';
       }),
     }),
     PrismaModule,
+    EventsModule,
+    StorageModule,
     AuthModule,
     UsersModule,
     ProjectsModule,
     TasksModule,
     CommentsModule,
     TagsModule,
+    ActivityModule,
+    NotificationsModule,
+    RealtimeModule,
     HealthModule,
   ],
   providers: [
