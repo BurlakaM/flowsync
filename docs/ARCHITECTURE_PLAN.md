@@ -35,11 +35,11 @@
 | B5 | Створення задачі не перевіряє доступ до `project_id` (можна писати в чужий проєкт) | `tasks.service.ts:17` | 0 |
 | B6 | Немає глобального `ValidationPipe`: `POST /users`, `POST /auth/login` не валідуються; у `main.ts` `enableCors()` для всіх origin | `main.ts` | 0 |
 | B7 | Два конкуруючі механізми JWT: кастомний `canActivate` кладе в `request.user` payload (`sub`), а `JwtStrategy.validate` повертає `{userId, username}` і ніколи не використовується | `conception/jwt.auth.guard.ts`, `auth/jwt.strategy.ts` | 0 |
-| B8 | Немає валідації env; `SECRET_KEY` може бути `undefined`; паролі БД захардкоджені в compose | `app.module.ts`, `docker-compose.yml` | 1–2 |
+| B8 | Немає валідації env; `SECRET_KEY` може бути `undefined`; паролі БД захардкоджені в compose | `app.module.ts`, `docker-compose.yml` | 1–2 ✓ |
 | B9 | `prisma db push` при старті контейнера замість міграцій | `docker-compose.yml` | 3 |
 | B10 | Схема БД: помилка `creared_at`, моделі в `snake_case`, дубль зв'язку task↔tag (`tags` і `task_tags`), немає `updatedAt`, немає індексів на FK, обов'язкові `description`/`image` | `schema.prisma` | 3 |
-| B11 | `strictNullChecks` і `noImplicitAny` вимкнені, `any` у сервісах | `tsconfig.json` | 2, 4 |
-| B12 | Nest 10 (актуальна гілка вже 12); Node 20 досяг end-of-life у квітні 2026 | `package.json`, Dockerfile | 1–2 |
+| B11 | `strictNullChecks` і `noImplicitAny` вимкнені, `any` у сервісах | `tsconfig.json` | 2 ✓ |
+| B12 | Nest 10 (актуальна гілка вже 12); Node 20 досяг end-of-life у квітні 2026 | `package.json`, Dockerfile | 1–2 ✓ |
 | B13 | Два lock-файли в backend (`yarn.lock` і `package-lock.json`) | `backend/` | 1 |
 | F1 | Фронтенд на Create React App (закритий проєкт) і чистому JS; логіка fetch прямо в компонентах | `frontend/src/**` | 5 |
 | F2 | Зайві залежності: `jquery`, `react-bootstrap` + `react-bootstrap-v5`, `react-helmet` | `frontend/package.json` | 5 |
@@ -72,10 +72,12 @@
 | D13 | Структура фронтенду | Feature-папки за bulletproof-react; заборона імпортів між фічами (ESLint) | Плоска структура CRA |
 | D14 | Контракт front↔back | OpenAPI → згенерований TS-клієнт (`openapi-typescript`), фаза 7 | Спільний пакет типів: потребує монорепо-інструментів |
 | D15 | Репозиторій | Два незалежні пакети, лише `npm`, без Nx/Turborepo | Монорепо-інструменти окупаються з 3+ пакетами |
-| D16 | Тести | Backend: Jest + supertest; frontend: Vitest + Testing Library + MSW; e2e: Playwright | — |
+| D16 | Тести | Backend і frontend: Vitest (+ supertest, Testing Library, MSW); e2e: Playwright. Backend на Vitest + SWC, бо пакети Nest 12 стали ESM (`import.meta`) і Jest їх не завантажує | Jest: несумісний із Nest 12 |
 | D17 | CI | PR-перевірки (lint, типи, тести, збірка) → деплой лише з `main` після успіху; теги образів `:<sha>` і `:latest` | — |
 | D18 | Compose | `docker-compose.yml` (прод) + `docker-compose.override.yml` (dev, hot-reload); секрети в `.env`, не в репозиторії | — |
-| D19 | Runtime | Node 24 LTS (або 22, якщо залежність не підтримує 24) | Node 20 — EOL. Node 26 уже LTS (з листопада 2026), але Nest 10, Prisma 6.0 і CRA на ній не перевірені: повернутися після фази 2 |
+| D19 | Runtime | Node 24 LTS (або 22, якщо залежність не підтримує 24) | Node 20 — EOL. Node 26 уже LTS (з листопада 2026), але CRA на ній не перевірений (backend уже на Nest 12 / Prisma 6.19): повернутися після фази 5 |
+| D20 | TypeScript | `~6.0` зі `strict: true`: `@nestjs/schematics@12` вимагає ≥ 6, а `typescript-eslint` ще не підтримує ≥ 6.1 | TS 5.9 несумісний із Nest 12; TS 7 (нативний) поки не підтримують `typescript-eslint` та частина інструментів |
+| D21 | Логування й захист API | `nestjs-pino` (JSON у production, pretty у dev, токени редагуються), `helmet`, `@nestjs/throttler` (100/хв глобально, 5/хв для логіну й реєстрації), `TRUST_PROXY` за nginx | Власний логер/middleware: дублює готове |
 
 ## 4. Цільова архітектура
 
@@ -170,19 +172,28 @@ frontend/src/
 
 ### Фаза 2 — Фундамент backend · розмір L
 
-Гілка `refactor/phase-2-backend-foundation`. Закриває B8, B11 (частково), B12.
+Гілка `refactor/phase-2-backend-foundation`. Закриває B8, B11, B12. **Статус: виконано 2026-11-16** (не закомічено).
 
-- [ ] 2.1 Оновити Nest послідовно по одній major-версії (10 → 11 → 12) за офіційними migration guide; Prisma — до актуальної 6.x (мінімум 6.2 заради `omit`); перехід на Prisma 7 — окремим кроком за їхнім гайдом. Після кожного кроку: тести зелені
-- [ ] 2.2 Реструктуризація каталогів: `conception/` → `common/*`; `prisma.service.ts` → `database/` (глобальний `PrismaModule`); фічі → `modules/*`; видалити власний `ParseIntPipe` на користь вбудованого
-- [ ] 2.3 `config/`: zod-схема env (`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGINS`, `PORT`, `NODE_ENV`); застосунок падає на старті при помилці; типізований `AppConfigService`; `SECRET_KEY` → `JWT_SECRET` (оновити `.env.example` і compose)
-- [ ] 2.4 `common/`: `@CurrentUser()`, `@Public()`, `@Roles()`, глобальний `JwtAuthGuard` (APP_GUARD) і `RolesGuard`; `AllExceptionsFilter` з єдиним форматом помилок; `PrismaExceptionFilter` (P2002 → 409, P2025 → 404, P2003 → 409); `PaginationQueryDto` і `paginate()`
-- [ ] 2.5 Swagger на `/api/docs` (не в production) із Nest CLI plugin
-- [ ] 2.6 `helmet`, `@nestjs/throttler` (жорсткіше для `/auth/*`), `enableShutdownHooks()`, `/api/health` (`@nestjs/terminus`), логування через `nestjs-pino` (JSON)
-- [ ] 2.7 TypeScript: увімкнути `strictNullChecks`, потім `noImplicitAny`; виправити помилки
-- [ ] 2.8 Тестова інфраструктура: окрема БД для e2e (сервіс у compose під profile `test`), helper очищення БД, `jest-mock-extended` для unit-тестів сервісів
+- [x] 2.1 Оновити Nest послідовно по одній major-версії (10 → 11 → 12) за офіційними migration guide; Prisma — до актуальної 6.x (мінімум 6.2 заради `omit`); перехід на Prisma 7 — окремим кроком за їхнім гайдом. Після кожного кроку: тести зелені
+- [x] 2.2 Реструктуризація каталогів: `conception/` → `common/*`; `prisma.service.ts` → `database/` (глобальний `PrismaModule`); фічі → `modules/*`; видалити власний `ParseIntPipe` на користь вбудованого
+- [x] 2.3 `config/`: zod-схема env (`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGINS`, `PORT`, `NODE_ENV`); застосунок падає на старті при помилці; типізований `AppConfigService`; `SECRET_KEY` → `JWT_SECRET` (оновити `.env.example` і compose)
+- [x] 2.4 `common/`: `@CurrentUser()`, `@Public()`, `@Roles()`, глобальний `JwtAuthGuard` (APP_GUARD) і `RolesGuard`; `AllExceptionsFilter` з єдиним форматом помилок; `PrismaExceptionFilter` (P2002 → 409, P2025 → 404, P2003 → 409); `PaginationQueryDto` і `paginate()`
+- [x] 2.5 Swagger на `/api/docs` (не в production) із Nest CLI plugin
+- [x] 2.6 `helmet`, `@nestjs/throttler` (жорсткіше для `/auth/*`), `enableShutdownHooks()`, `/api/health` (`@nestjs/terminus`), логування через `nestjs-pino` (JSON)
+- [x] 2.7 TypeScript: одразу повний `strict: true` (у TS 6 він увімкнений за замовчуванням); виправити помилки
+- [x] 2.8 Тестова інфраструктура: окрема БД для e2e (сервіс у compose під profile `test`), helper очищення БД, `jest-mock-extended` для unit-тестів сервісів
 
 **Готово, коли:** застосунок не стартує з некоректним env; `GET /api/health` → 200; Swagger відкривається;
 помилки Prisma повертають осмислені коди; `npm run lint && npm test && npm run test:e2e` зелені.
+
+**Що вийшло інакше, ніж планувалось:**
+- Nest 10 → 11 → 12 пройдено двома кроками з тестами між ними. `@nestjs/schematics@12` вимагає **TypeScript ≥ 6**, тож TS піднято до 6.0 (D20); TS 6 змінив дефолти (`strict`, `types`, `rootDir`, `baseUrl`), конфіги відкориговано.
+- Пакети Nest 12 — ESM (`import.meta`), **Jest їх не завантажує**, тож backend-тести переведено на **Vitest + SWC** (D16); `jest`, `ts-jest`, `ts-node` прибрано, seed запускається через `tsx`.
+- `@eslint/js` закріплено на 9.x (10.x вимагає ESLint 10): це була прихована помилка фази 1.
+- `JwtStrategy` читає користувача з БД на кожен запит (потрібна роль для `RolesGuard` і відсікання токенів видалених користувачів). Ролі поки рядки таблиці `role` (`common/types/role.type.ts`), у фазі 3 стануть enum.
+- Помилка `path` у тілі 404 виправлена через `originalUrl` (знайдено e2e-тестом).
+- Rate limit у `NODE_ENV=test` вимкнений; його поведінку перевірено вручну (5 спроб/хв, підміна `X-Forwarded-For` не обходить ліміт).
+- Не зроблено в межах фази: `pino` request id (`nestjs-cls`) і Sentry (фаза 7), міграція на Prisma 7.
 
 ### Фаза 3 — Модель даних і міграції · розмір M
 
@@ -207,7 +218,7 @@ unit-тести сервісу, e2e (401 / 400 / 404 / успіх), видале
 - [ ] 4.4 **tasks:** `GET/POST /projects/:projectId/tasks`, `GET/PATCH/DELETE /tasks/:id`; фільтри (статус, виконавець, тег), пагінація, сортування; призначення виконавців
 - [ ] 4.5 **comments:** список/створення у задачі; редагування й видалення лише автором
 - [ ] 4.6 **tags:** CRUD у межах проєкту
-- [ ] 4.7 Увімкнути `strict: true`; поріг покриття сервісів тестами ≥ 70%
+- [ ] 4.7 Поріг покриття сервісів тестами ≥ 70% (`strict: true` уже ввімкнено у фазі 2)
 - [ ] 4.8 Експортувати `openapi.json` скриптом `npm run openapi:export`
 
 **Готово, коли:** немає жодного ендпоїнта без guard (крім `@Public()`); жодна відповідь не містить `password`; у коді немає `any`; усі e2e зелені.
@@ -284,3 +295,4 @@ CASL для тонких прав · деплой на VPS (Caddy/Traefik) · us
 | 2026-11-16 | Підготовка | Docker на D:, перехід MySQL → PostgreSQL, seed ролей, `.dockerignore`, цей план | Безпекові дірки B1–B7 були відкриті |
 | 2026-11-16 | Фаза 0 (0.1–0.9) | Закрито B1–B7: немає `password` у відповідях, роль не приймається, `/users/me` замість `/users/:email`, guard і токен-автор у tasks/comments, перевірка доступу, глобальний `ValidationPipe`, один механізм JWT (`AuthGuard('jwt')`), CORS за списком, `JwtModule.registerAsync`. 20 e2e-тестів зелені (`test/e2e/security.e2e-spec.ts`), живі перевірки в Docker | Додано `src/common/` (`@CurrentUser`, `AuthenticatedUser`) і `src/app.setup.ts`. Видалено зламаний шаблонний `test/app.e2e-spec.ts`. `validate-token` лишається до фази 6 |
 | 2026-11-16 | Фаза 1 (1.1–1.9, 1.11) | npm-only і назви пакетів, Node 24, `.env.example` ×3, БД `jira` → `flowsync` (`ALTER DATABASE`, дані збережено), compose dev/прод + `Dockerfile` з цілями `dev`/`build`/`prod`, nginx (SPA-fallback, проксі `/api`, заголовки безпеки), непривілегійовані користувачі, healthcheck-и, ESLint 9 + Prettier, CI (`ci.yml`) і деплой після CI (`deploy.yml`), Dependabot, новий README. Перевірено: lint/typecheck, 20 e2e, dev-режим із hot reload, прод-режим (200 на `/dashboard`, 401 через проксі, порти API/БД закриті) | Не комітилось. Видалено зламаний `App.test.js` (шаблон CRA). У CI frontend-збірка з `CI=false`. 1.10 (Husky) відкладено. Для `deploy.yml` (`workflow_run`) файл має бути в `main` |
+| 2026-11-16 | Фаза 2 (2.1–2.8) | Nest 10 → 11 → 12.5, TypeScript 6.0, Prisma 6.19, Vitest 5 + SWC замість Jest, `tsx` для seed. Структура `config/ database/ common/ health/ modules/`; zod-валідація env (`SECRET_KEY` → `JWT_SECRET`, у production ≥ 32 символів); глобальні `JwtAuthGuard` (`@Public`), `RolesGuard` (`@Roles`), throttler; `AllExceptionsFilter` + `PrismaExceptionFilter` з єдиним тілом помилки; пагінація; Swagger `/api/docs`; `helmet`; `nestjs-pino`; `/api/health` (його ж тепер використовує Docker healthcheck); `strict: true`; окрема тестова БД (`db_test`, профіль `test`). Перевірено: lint/типи/збірка, 42 unit, 26 e2e, dev- і прод-режим у Docker (проксі, 404 на Swagger у prod, rate limit, fail-fast на короткому секреті) | Не комітилось. Потрібно: `JWT_SECRET` ≥ 32 символів для прод-режиму (у локальному `.env` зараз 19). Хостовий Node 22.22.0 нижче вимоги `@nestjs/schematics` (≥ 22.22.3 / 24.15): у Docker і CI Node 24 |

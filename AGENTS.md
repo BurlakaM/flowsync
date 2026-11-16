@@ -19,7 +19,7 @@ FlowSync — пет-проєкт, трекер задач у стилі Jira: п
 
 | Шар | Поточний стан | Ціль (після плану) |
 |---|---|---|
-| Backend | NestJS 10, Prisma 6, JWT (Passport), Node 24 LTS | NestJS поточної major, Prisma, Node 24 LTS |
+| Backend | NestJS 12, Prisma 6.19, JWT (Passport), TypeScript 6 (strict), Vitest, Node 24 LTS | + схема БД і модулі за планом (фази 3–4) |
 | БД | PostgreSQL 16 | те саме, міграції через `prisma migrate` |
 | Frontend | React 18 + Create React App, JS, Bootstrap | React 19 + Vite + TypeScript + Tailwind + shadcn/ui + TanStack Query |
 | Інфра | Docker Compose (dev-override + прод), nginx-проксі, CI з перевірками | + міграції в compose, `/api/health` |
@@ -44,7 +44,7 @@ docker compose down                                  # зупинка (дані 
 ```bash
 cd backend && npm run start:dev      # API з watch
 cd backend && npm test               # unit
-cd backend && npm run test:e2e       # e2e
+cd backend && npm run test:e2e       # e2e (спершу: docker compose --profile test up -d db_test)
 cd backend && npm run lint           # ESLint 9; lint:fix виправляє
 cd backend && npm run format:check   # Prettier; npm run format форматує
 cd backend && npm run typecheck      # tsc --noEmit
@@ -80,7 +80,8 @@ cd frontend && npm run format:check
 
 - Ніколи не повертай у відповідях API `password` чи інші секретні поля.
 - Ніколи не довіряй ідентифікатору користувача з тіла запиту, лише з токена.
-- Кожен ендпоїнт закритий за замовчуванням; публічність — тільки явно й з коментарем причини.
+- Кожен ендпоїнт закритий за замовчуванням (глобальний `JwtAuthGuard`); публічність — лише `@Public()` і коментар причини.
+- Усі змінні середовища проходять через zod-схему `backend/src/config/env.schema.ts`; читати лише через `AppConfigService`.
 - Усі вхідні дані валідуються DTO; ніяких секретів у коді й комітах; `.env` ніколи не комітиться.
 - Перевірка доступу до ресурсу: чужий ресурс → `404`, а не `403`.
 

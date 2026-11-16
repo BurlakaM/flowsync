@@ -8,7 +8,7 @@ Backend на **NestJS**, frontend на **React**, база **PostgreSQL**, ус�
 
 | Шар | Зараз |
 |---|---|
-| Backend | NestJS 10, Prisma 6, Passport JWT |
+| Backend | NestJS 12, Prisma 6.19, Passport JWT, TypeScript 6, Vitest |
 | Frontend | React 18 (Create React App, JS) |
 | БД | PostgreSQL 16 |
 | Runtime | Node.js 24 LTS (`.nvmrc`) |
@@ -43,7 +43,7 @@ flowsync/
    cp frontend/.env.example frontend/.env
    ```
 
-   Заповніть `POSTGRES_PASSWORD` у `.env` та `SECRET_KEY` у `backend/.env`. Паролі мають бути URL-безпечними:
+   Заповніть `POSTGRES_PASSWORD` у `.env` та `JWT_SECRET` у `backend/.env`. Паролі мають бути URL-безпечними:
    пароль БД підставляється в `DATABASE_URL`. У `backend/.env` пароль у `DATABASE_URL` має збігатися з `POSTGRES_PASSWORD`.
 
 3. Запустіть стек:
@@ -56,6 +56,8 @@ flowsync/
 |---|---|
 | Frontend (dev-сервер) | http://localhost:3001 |
 | API | http://localhost:3000/api |
+| Swagger (лише не в production) | http://localhost:3000/api/docs |
+| Health | http://localhost:3000/api/health |
 | PostgreSQL | `localhost:5433` (користувач і пароль з `.env`, БД `flowsync`) |
 
 Backend і frontend перезбираються автоматично при зміні файлів у `backend/src` та `frontend/src`.
@@ -70,7 +72,10 @@ docker compose -f docker-compose.yml up -d --build
 ```
 
 Назовні опубліковано лише frontend: http://localhost:8080. nginx віддає збірку React і проксіює `/api/` на backend,
-тому CORS не потрібен. Порти backend і БД на хост не виставляються.
+тому CORS не потрібен. Порти backend і БД на хост не виставляються. Swagger у цьому режимі вимкнений.
+
+У production-режимі `JWT_SECRET` має бути **не коротшим за 32 символи**, інакше backend не стартує. Згенерувати:
+`node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
 
 ## Команди без Docker
 
@@ -83,8 +88,8 @@ npm run start:dev       # API з watch
 npm run lint            # ESLint 9
 npm run format:check    # Prettier
 npm run typecheck       # tsc --noEmit
-npm test                # unit
-npm run test:e2e        # e2e на БД з backend/.env
+npm test                # unit (Vitest)
+npm run test:e2e        # e2e на окремій БД, спершу: docker compose --profile test up -d db_test
 
 cd frontend
 npm ci
@@ -98,12 +103,17 @@ npm run build
 | Файл | Змінна | Призначення |
 |---|---|---|
 | `.env` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | БД у Docker і `DATABASE_URL` backend у compose |
-| `backend/.env` | `SECRET_KEY` | секрет підпису JWT (застосунок не стартує без нього) |
+| `backend/.env` | `JWT_SECRET` | секрет підпису JWT; у production ≥ 32 символів. Застосунок не стартує без нього |
 | `backend/.env` | `DATABASE_URL` | БД для запуску на хості; у compose перекривається |
+| `backend/.env` | `JWT_EXPIRES_IN` | необов'язково: час життя токена (`15m`, `1h`, `7d`), типово `1h` |
 | `backend/.env` | `CORS_ORIGINS` | необов'язково: дозволені origin через кому |
+| `backend/.env` | `LOG_LEVEL`, `PORT` | необов'язково: рівень логів (типово `info`), порт (типово `3000`) |
+| `backend/.env` | `TRUST_PROXY` | необов'язково: кількість reverse-proxy перед API (у прод-compose `1`), потрібне для коректного IP у rate limit |
+| `backend/.env` | `TEST_DATABASE_URL` | необов'язково: БД для e2e (типово `localhost:5434/flowsync_test`) |
 | `frontend/.env` | `REACT_APP_API_URL` | адреса API для dev-сервера; у прод-образі збирається як `/api` |
 
-Файли `.env` не комітяться, у репозиторії лише `.env.example`.
+Файли `.env` не комітяться, у репозиторії лише `.env.example`. Усі змінні backend валідує zod-схема
+(`backend/src/config/env.schema.ts`): при помилці застосунок не стартує й показує, що саме не так.
 
 ## CI/CD
 
