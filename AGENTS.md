@@ -50,6 +50,7 @@ cd backend && npm run lint           # ESLint 9; lint:fix виправляє
 cd backend && npm run format:check   # Prettier; npm run format форматує
 cd backend && npm run typecheck      # tsc --noEmit
 cd backend && npx prisma migrate dev --name <verb_noun>   # нова міграція після зміни schema.prisma (БД на :5433)
+cd backend && npm run openapi:export  # після зміни API: оновити backend/openapi.json (CI перевіряє)
 cd frontend && npm start             # CRA (до фази 5), після неї — npm run dev
 cd frontend && npm run format:check
 ```

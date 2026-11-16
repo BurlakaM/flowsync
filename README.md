@@ -100,6 +100,25 @@ npm run format:check
 npm run build
 ```
 
+## API
+
+Усі маршрути мають префікс `/api` і потребують `Authorization: Bearer <token>`, крім реєстрації, логіну, `validate-token` та `/health`.
+Інтерактивна документація: Swagger на `/api/docs` (лише в dev); повний опис у [backend/openapi.json](backend/openapi.json).
+
+| Ресурс | Ендпоїнти |
+|---|---|
+| auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
+| users | `GET`/`PATCH /users/me`, `GET /users` (лише ADMIN: пагінація, `?search=`) |
+| projects | `GET`/`POST /projects`, `GET`/`PATCH`/`DELETE /projects/:id`, `GET`/`POST /projects/:id/members`, `DELETE /projects/:id/members/:userId` |
+| tasks | `GET /tasks`, `GET`/`POST /projects/:id/tasks`, `GET`/`PATCH`/`DELETE /tasks/:id` |
+| comments | `GET`/`POST /tasks/:id/comments`, `PATCH`/`DELETE /comments/:id` |
+| tags | `GET`/`POST /projects/:id/tags`, `PATCH`/`DELETE /tags/:id` |
+
+Правила: проєкт бачать його власник і учасники (стороннім він здається неіснуючим, `404`). Учасники створюють і редагують задачі,
+коментарі та теги; проєкт, учасників і теги змінює лише власник; задачу видаляє автор або власник; коментар редагує лише автор.
+Списки мають пагінацію `?page=&limit=`, задачі ще фільтри `status`, `assigneeId`, `tagId`, `search` і сортування `sortBy`/`order`.
+Після зміни API оновіть опис: `cd backend && npm run openapi:export` (CI перевіряє, що `openapi.json` актуальний).
+
 ## База даних і міграції
 
 Схема описана в `backend/prisma/schema.prisma` (моделі PascalCase, у БД таблиці й колонки в `snake_case`). Зміни схеми йдуть лише через міграції:
@@ -124,6 +143,7 @@ npx prisma db seed                                 # демо-дані (лише
 | `backend/.env` | `JWT_EXPIRES_IN` | необов'язково: час життя токена (`15m`, `1h`, `7d`), типово `1h` |
 | `backend/.env` | `CORS_ORIGINS` | необов'язково: дозволені origin через кому |
 | `backend/.env` | `LOG_LEVEL`, `PORT` | необов'язково: рівень логів (типово `info`), порт (типово `3000`) |
+| `backend/.env` | `BCRYPT_ROUNDS` | необов'язково: складність bcrypt (4-15), типово `10` |
 | `backend/.env` | `TRUST_PROXY` | необов'язково: кількість reverse-proxy перед API (у прод-compose `1`), потрібне для коректного IP у rate limit |
 | `backend/.env` | `TEST_DATABASE_URL` | необов'язково: БД для e2e (типово `localhost:5434/flowsync_test`) |
 | `frontend/.env` | `REACT_APP_API_URL` | адреса API для dev-сервера; у прод-образі збирається як `/api` |
