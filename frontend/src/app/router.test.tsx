@@ -14,9 +14,17 @@ const ann = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
+const emptyPage = {
+  items: [],
+  meta: { page: 1, limit: 12, total: 0, totalPages: 0 },
+};
+
 const signedInAs = (user = ann) => {
   authStorage.setToken('jwt-token');
-  server.use(http.get('*/api/auth/me', () => HttpResponse.json(user)));
+  server.use(
+    http.get('*/api/auth/me', () => HttpResponse.json(user)),
+    http.get('*/api/projects', () => HttpResponse.json(emptyPage)),
+  );
 };
 
 describe('application routes', () => {
@@ -34,14 +42,15 @@ describe('application routes', () => {
     );
   });
 
-  it('shows the dashboard to a signed-in user', async () => {
+  it('shows the projects to a signed-in user', async () => {
     signedInAs();
     renderApp('/');
 
     expect(
-      await screen.findByRole('heading', { name: 'Welcome, Ann' }),
+      await screen.findByRole('heading', { name: 'Projects' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/ann@example.test/)).toBeInTheDocument();
+    expect(screen.getByText('Ann')).toBeInTheDocument();
+    expect(await screen.findByText('No projects yet')).toBeInTheDocument();
   });
 
   it('signs in through the login page and lands on the requested page', async () => {
@@ -59,9 +68,9 @@ describe('application routes', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     expect(
-      await screen.findByRole('heading', { name: 'Welcome, Ann' }),
+      await screen.findByRole('heading', { name: 'Projects' }),
     ).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/');
+    expect(router.state.location.pathname).toBe('/projects');
   });
 
   it('ignores a redirect target that points to another site', async () => {
@@ -70,8 +79,8 @@ describe('application routes', () => {
       `/login?redirectTo=${encodeURIComponent('https://evil.example')}`,
     );
 
-    await screen.findByRole('heading', { name: 'Welcome, Ann' });
-    expect(router.state.location.pathname).toBe('/');
+    await screen.findByRole('heading', { name: 'Projects' });
+    expect(router.state.location.pathname).toBe('/projects');
   });
 
   it('signs the user out', async () => {
@@ -140,7 +149,7 @@ describe('application routes', () => {
       await screen.findByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /back to the dashboard/i }),
+      screen.getByRole('link', { name: /back to projects/i }),
     ).toHaveAttribute('href', '/');
   });
 });

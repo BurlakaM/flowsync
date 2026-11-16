@@ -1,4 +1,4 @@
-import { createBrowserRouter, type RouteObject } from 'react-router';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { RouteError } from '@/components/errors/route-error';
 import { FullPageSpinner } from '@/components/spinner';
 import { ProtectedRoute } from '@/features/auth';
@@ -17,6 +17,12 @@ export const routes: RouteObject[] = [
         }),
       },
       {
+        path: '/register',
+        lazy: async () => ({
+          Component: (await import('./routes/register')).default,
+        }),
+      },
+      {
         // Everything inside requires a signed-in user.
         Component: ProtectedRoute,
         children: [
@@ -25,10 +31,23 @@ export const routes: RouteObject[] = [
               Component: (await import('./routes/app-shell')).default,
             }),
             children: [
+              { index: true, element: <Navigate to="/projects" replace /> },
               {
-                index: true,
+                path: 'projects',
                 lazy: async () => ({
-                  Component: (await import('./routes/dashboard')).default,
+                  Component: (await import('./routes/projects')).default,
+                }),
+              },
+              {
+                path: 'tasks/:taskId',
+                lazy: async () => ({
+                  Component: (await import('./routes/task')).default,
+                }),
+              },
+              {
+                path: 'projects/:projectId',
+                lazy: async () => ({
+                  Component: (await import('./routes/project')).default,
                 }),
               },
             ],
