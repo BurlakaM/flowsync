@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
+import { authStorage } from '@/lib/auth-storage';
 import { queryClient } from '@/lib/query-client';
 import { server } from './mocks/server';
+
+// Lazy routes are transformed on first use, which can take more than the default second on a cold start.
+configure({ asyncUtilTimeout: 3000 });
 
 // jsdom has no ResizeObserver, which Radix components (checkbox) use to measure themselves.
 globalThis.ResizeObserver ??= class {
@@ -17,6 +21,7 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   localStorage.clear();
+  authStorage.clear();
   queryClient.clear();
 });
 

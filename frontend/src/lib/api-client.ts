@@ -1,4 +1,7 @@
-import axios, { type AxiosRequestConfig } from 'axios';
+import axios, {
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from 'axios';
 import { env } from '@/config/env';
 import { authStorage } from '@/lib/auth-storage';
 import { queryClient } from '@/lib/query-client';
@@ -34,18 +37,68 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+/** Endpoints that take part in signing in or out: a 401 from them is an answer, not an expired token. */
+const AUTH_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/logout',
+];
+const isAuthEndpoint = (url?: string) =>
+  AUTH_ENDPOINTS.some((endpoint) => url?.startsWith(endpoint));
+
+// Without interceptors: the refresh request itself must never trigger another refresh.
+const bare = axios.create({
+  baseURL: env.VITE_API_URL,
+  headers: { Accept: 'application/json' },
+});
+
+let refreshing: Promise<string> | null = null;
+
+/**
+ * Exchanges the httpOnly refresh cookie for a new access token and keeps it in memory.
+ * A refresh token works once, so parallel callers must share one request.
+ */
+export function refreshSession(): Promise<string> {
+  refreshing ??= bare
+    .post<{ access_token: string }>('/auth/refresh')
+    .then((response) => {
+      authStorage.setToken(response.data.access_token);
+      return response.data.access_token;
+    })
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
+
 http.interceptors.response.use(
   (response) => response,
-  (error: unknown) => {
-    // A 401 without a stored token is just a failed login, not an expired session.
-    if (
-      axios.isAxiosError(error) &&
-      error.response?.status === 401 &&
-      authStorage.hasToken()
-    ) {
-      onUnauthorized();
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+    const config = error.config as RetriableConfig | undefined;
+    if (!config || config._retried || isAuthEndpoint(config.url)) {
+      return Promise.reject(error);
+    }
+
+    // The access token is short-lived: renew it once and repeat the request.
+    const hadToken = authStorage.hasToken();
+    try {
+      await refreshSession();
+    } catch {
+      // The session is over. A 401 without a stored token is not an "expired session" event.
+      if (hadToken) {
+        authStorage.clear();
+        onUnauthorized();
+      }
+      return Promise.reject(error);
+    }
+    config._retried = true;
+    return http.request(config);
   },
 );
 

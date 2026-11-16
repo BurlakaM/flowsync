@@ -2,6 +2,7 @@
 export { useMe } from './api/get-me';
 export { useLogin } from './api/login';
 export { useLogout } from './api/logout';
+export { useRestoreSession } from './api/restore-session';
 export { useRegister } from './api/register';
 export { LoginForm } from './components/login-form';
 export { RegisterForm } from './components/register-form';
