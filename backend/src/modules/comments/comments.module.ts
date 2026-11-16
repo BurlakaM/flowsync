@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
+import { ProjectsModule } from '../projects/projects.module';
+import { TasksModule } from '../tasks/tasks.module';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
 
 @Module({
+  imports: [ProjectsModule, TasksModule],
   controllers: [CommentsController],
   providers: [CommentsService],
 })
