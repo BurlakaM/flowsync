@@ -75,12 +75,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run format:check
-      - run: npm test -- --watchAll=false --passWithNoTests
-      # CRA turns ESLint warnings into errors when CI=true; the legacy code still has warnings.
-      # Remove CI=false when the frontend is rewritten (plan phase 5).
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      # `npm run build` type-checks again and produces the same bundle as the Docker image.
       - run: npm run build
-        env:
-          CI: "false"
 
   docker:
     runs-on: ubuntu-latest

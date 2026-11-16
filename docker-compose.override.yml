@@ -23,17 +23,18 @@ services:
     build:
       target: dev
     ports: !override
-      - "3001:3000"
+      - "5173:5173"
     environment:
-      REACT_APP_API_URL: http://localhost:3000/api
-      CHOKIDAR_USEPOLLING: "true"
-      WATCHPACK_POLLING: "true"
-      WDS_SOCKET_PORT: "3001"
+      # The browser calls the same-origin /api; the Vite dev server forwards it to the backend.
+      VITE_PROXY_TARGET: http://backend:3000
+      # Bind mounts from Windows do not deliver file-system events, so Vite must poll.
+      VITE_USE_POLLING: "true"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5173/"]
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
 
   db:
     ports:
