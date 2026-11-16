@@ -82,22 +82,6 @@
         ]
       }
     },
-    "/api/auth/validate-token": {
-      "post": {
-        "deprecated": true,
-        "operationId": "AuthController_validateToken",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "",
-        "tags": [
-          "auth"
-        ]
-      }
-    },
     "/api/users/me": {
       "get": {
         "operationId": "UsersController_getMe",

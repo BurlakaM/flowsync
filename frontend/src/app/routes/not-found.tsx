@@ -10,7 +10,7 @@ export default function NotFoundRoute() {
         The page you are looking for does not exist or has moved.
       </p>
       <Button asChild>
-        <Link to="/">Back to the dashboard</Link>
+        <Link to="/">Back to projects</Link>
       </Button>
     </main>
   );

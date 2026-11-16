@@ -9,7 +9,6 @@ import {
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
-  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -36,7 +35,7 @@ export class AuthController {
   }
 
   // Public: this is how a user gets a token. Limited to 5 attempts per minute per IP.
-  // The response field is `access_token`: the current frontend reads it (renamed in plan phase 6).
+  // The response field is `access_token` (the frontend reads it; kept as is to avoid a breaking change).
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
@@ -53,13 +52,5 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.me(user.id);
-  }
-
-  // Public: the token itself is the credential. Deprecated: use GET /auth/me (plan phase 6).
-  @Public()
-  @ApiOperation({ deprecated: true })
-  @Post('validate-token')
-  validateToken(@Body('token') token: string) {
-    return { valid: this.authService.validateToken(token) };
   }
 }

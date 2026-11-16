@@ -8,14 +8,13 @@ describe('AuthService', () => {
   const createUser = vi.fn();
   const getProfile = vi.fn();
   const sign = vi.fn();
-  const verify = vi.fn();
   let service: AuthService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     service = new AuthService(
       { findByEmailForAuth, createUser, getProfile } as unknown as UsersService,
-      { sign, verify } as unknown as JwtService,
+      { sign } as unknown as JwtService,
     );
   });
 
@@ -78,21 +77,5 @@ describe('AuthService', () => {
 
     expect(await service.me(5)).toEqual({ id: 5 });
     expect(getProfile).toHaveBeenCalledWith(5);
-  });
-
-  describe('validateToken', () => {
-    it('is true for a token that verifies', () => {
-      verify.mockReturnValue({ sub: 1 });
-
-      expect(service.validateToken('t')).toBe(true);
-    });
-
-    it('is false when verification throws', () => {
-      verify.mockImplementation(() => {
-        throw new Error('invalid');
-      });
-
-      expect(service.validateToken('t')).toBe(false);
-    });
   });
 });
