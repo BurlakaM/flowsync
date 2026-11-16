@@ -20,7 +20,7 @@ FlowSync — пет-проєкт, трекер задач у стилі Jira: п
 | Шар | Поточний стан | Ціль (після плану) |
 |---|---|---|
 | Backend | NestJS 12, Prisma 6.19, JWT (Passport), TypeScript 6 (strict), Vitest, Node 24 LTS | + схема БД і модулі за планом (фази 3–4) |
-| БД | PostgreSQL 16 | те саме, міграції через `prisma migrate` |
+| БД | PostgreSQL 16, міграції `prisma migrate`, PascalCase-моделі, `enum Role` | те саме |
 | Frontend | React 18 + Create React App, JS, Bootstrap | React 19 + Vite + TypeScript + Tailwind + shadcn/ui + TanStack Query |
 | Інфра | Docker Compose (dev-override + прод), nginx-проксі, CI з перевірками | + міграції в compose, `/api/health` |
 
@@ -38,6 +38,7 @@ docker compose down                                  # зупинка (дані 
 Адреси в dev-режимі: фронтенд `http://localhost:3001`, API `http://localhost:3000/api`, Postgres `localhost:5433`
 (БД `flowsync`, користувач і пароль із кореневого `.env`). У прод-режимі: `http://localhost:8080` (API через `/api`).
 Секрети лежать у `.env`, `backend/.env`, `frontend/.env` (не комітяться; приклади — `.env.example`).
+Демо-акаунти dev-seed: `admin@flowsync.test` (ADMIN) і `user@flowsync.test`, пароль `password-123` (лише для розробки).
 
 Локально без Docker (БД має працювати в Docker):
 
@@ -48,6 +49,7 @@ cd backend && npm run test:e2e       # e2e (спершу: docker compose --profi
 cd backend && npm run lint           # ESLint 9; lint:fix виправляє
 cd backend && npm run format:check   # Prettier; npm run format форматує
 cd backend && npm run typecheck      # tsc --noEmit
+cd backend && npx prisma migrate dev --name <verb_noun>   # нова міграція після зміни schema.prisma (БД на :5433)
 cd frontend && npm start             # CRA (до фази 5), після неї — npm run dev
 cd frontend && npm run format:check
 ```

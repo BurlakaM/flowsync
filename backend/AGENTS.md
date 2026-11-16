@@ -1,8 +1,8 @@
 # Backend (NestJS) — правила
 
 Спільні правила: `../AGENTS.md`. План і поточна фаза: `../docs/ARCHITECTURE_PLAN.md`.
-Структура нижче вже реальна (фаза 2). Ще не змінено лише схему БД і доменні модулі: вони мігрують у фазах 3–4
-(поки що поля й таблиці в `snake_case`, ролі в таблиці `role`).
+Структура й схема БД нижче реальні (фази 2–3). Доменні модулі (проєкти, задачі, коментарі, теги) переписуються у фазі 4,
+тому поточні сервіси tasks/comments спрощені й працюють лише за правилом «власник проєкту».
 
 ## Структура
 
@@ -22,7 +22,7 @@ src/
    ├─ x.service.ts
    ├─ x.service.spec.ts       unit-тест поруч із сервісом
    └─ x.module.ts
-prisma/                     schema.prisma, seed.ts, roles.ts
+prisma/                     schema.prisma, migrations/, seed.ts (демо-дані, лише dev)
 test/                       e2e/*.e2e-spec.ts, utils/ (createTestApp, cleanDatabase), setup-env.ts, global-setup.ts
 ```
 
@@ -126,7 +126,8 @@ async list(userId: number, query: PaginationQueryDto) {
 - Обмеження за роллю — `@Roles(Role.Admin)` (перевіряє глобальний `RolesGuard`).
 - Користувач у запиті — `AuthenticatedUser { id; email; role }`, дістається через `@CurrentUser()`. Ніяких `req.user.sub`.
   `JwtStrategy` читає користувача з БД на кожен запит, тож токен видаленого користувача одразу недійсний.
-- Реєстрація завжди створює роль `user`; роль у тілі запиту заборонена (400).
+- Реєстрація завжди створює роль `USER` (значення за замовчуванням у схемі); роль у тілі запиту заборонена (400).
+  Роль — це `enum Role` з Prisma (`USER`, `ADMIN`), імпортується з `common/types/role.type.ts`.
 - Доступ до ресурсу перевіряє сервіс (членство в проєкті), а не контролер; чужий ресурс → `NotFoundException`.
 - Обмеження частоти: глобально 100 запитів/хв з IP, для логіну й реєстрації `@Throttle` 5/хв. У `NODE_ENV=test` вимкнено.
 
@@ -138,11 +139,15 @@ async list(userId: number, query: PaginationQueryDto) {
 **Дані**
 - Prisma лише в сервісах/репозиторіях, ніколи в контролерах. Raw SQL — лише з обґрунтуванням у коментарі.
 - Схема змінюється через `npx prisma migrate dev --name <verb_noun>`; **вже закомічену міграцію не редагуй**.
-  До фази 3 діє тимчасовий `prisma db push`.
+  Нову міграцію комітимо разом зі змінами `schema.prisma`; CI падає, якщо схема розійшлась з міграціями. `prisma db push` не використовуємо.
+  `prisma migrate reset` лише на dev-базі й лише з дозволу власника.
 - Перевірка деструктивних міграцій (drop, rename з даними) — лише з дозволу власника.
 - Кілька записів, що мають бути атомарними, — `prisma.$transaction`.
 - Для списків не допускай N+1: `include`/`select` у одному запиті.
-- Seed: `prisma/seed.ts` ідемпотентний і запускається через `tsx`; спільна логіка (ролі) в `prisma/roles.ts`.
+- Схема: моделі PascalCase, поля camelCase, у БД snake_case (`@@map`/`@map`); кожен зовнішній ключ має індекс; `onDelete` указується явно.
+  Доступ до проєкту: власник = `Project.ownerId`, решта учасників у `ProjectMember`; задачі й коментарі зберігаються після видалення автора (`SetNull`).
+- Seed: `prisma/seed.ts` наповнює лише dev демо-даними (ідемпотентний, у production пропускається), запускається через `tsx`.
+  Ролей у БД сидити не потрібно: це enum.
 
 **Код**
 - Файли kebab-case із суфіксом ролі (`tasks.service.ts`, `create-task.dto.ts`); один клас на файл; класи PascalCase.
@@ -159,7 +164,7 @@ async list(userId: number, query: PaginationQueryDto) {
   `vitest-mock-extended` (`mockDeep<PrismaService>()`); глобали `describe/it/vi/expect` доступні без імпорту.
 - **E2E** (`test/e2e/*.e2e-spec.ts`, `npm run test:e2e`): кожен ендпоїнт — мінімум 401 без токена, 400 на некоректне тіло,
   404 на чужий ресурс, успішний сценарій. Застосунок створює `createTestApp()` (справжній `AppModule` + `configureApp`),
-  у `beforeAll` викликай `cleanDatabase(prisma)` і `seedRoles(prisma)`.
+  у `beforeAll` викликай `cleanDatabase(prisma)`. Схему до тестової БД застосовує `global-setup` (`prisma migrate deploy`).
 - Тести йдуть на **окрему БД** `flowsync_test`: `docker compose --profile test up -d db_test` (порт 5434, дані в пам'яті).
   `cleanDatabase` і `globalSetup` відмовляються працювати з БД, назва якої не містить `test` (у CI дозволено).
   **Ніколи не вказуй `TEST_DATABASE_URL` на робочу БД.**
