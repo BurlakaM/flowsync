@@ -15,7 +15,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-flowsync}
       # nginx is the only proxy in front of the API: trust it to get the real client IP.
       TRUST_PROXY: "1"
-    command: sh -c "npx prisma db push --skip-generate && npx prisma db seed && node dist/main"
+    # Applies the committed migrations, then starts the API. The demo seed never runs here.
+    command: sh -c "npx prisma migrate deploy && node dist/main"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 10s
