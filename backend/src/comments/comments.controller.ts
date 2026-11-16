@@ -1,15 +1,17 @@
-import {Body, Controller, Post, UsePipes, ValidationPipe} from '@nestjs/common';
+import {Body, Controller, Post, UseGuards} from '@nestjs/common';
 import { CommentsService } from './comments.service';
 import {CommentsDto} from "./comments.dto";
-import {PrismaService} from "../prisma.service";
+import {JwtAuthGuard} from "../conception/jwt.auth.guard";
+import {CurrentUser} from "../common/decorators/current-user.decorator";
+import {AuthenticatedUser} from "../common/types/authenticated-user.type";
 
 @Controller('comments')
+@UseGuards(JwtAuthGuard)
 export class CommentsController {
-  constructor(private readonly commentsService: CommentsService, private readonly prismaService: PrismaService) {}
+  constructor(private readonly commentsService: CommentsService) {}
 
   @Post()
-  @UsePipes(ValidationPipe)
-  createTask(@Body() dto: CommentsDto) {
-    return this.commentsService.create(dto);
+  createComment(@CurrentUser() user: AuthenticatedUser, @Body() dto: CommentsDto) {
+    return this.commentsService.create(user.id, dto);
   }
 }

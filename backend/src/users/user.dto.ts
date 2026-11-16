@@ -1,14 +1,12 @@
-import {IsString, IsEmail, MinLength, IsNumber} from 'class-validator';
+import {IsString, IsEmail, MinLength} from 'class-validator';
 
+// The role is never accepted from the client: new users always get the default role.
 export class UserDto {
     @IsString()
     name: string;
 
     @IsEmail()
     email: string;
-
-    @IsNumber()
-    role_id: number;
 
     @IsString()
     @MinLength(8)
