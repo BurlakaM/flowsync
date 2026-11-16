@@ -1,0 +1,38 @@
+# Development mode, applied automatically by `docker compose up`:
+# hot reload, source bind-mounts and the ports needed to work from the host.
+services:
+  backend:
+    build:
+      target: dev
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      # Bind mounts from Windows do not deliver file-system events, so tsc --watch must poll.
+      TSC_WATCHFILE: PriorityPollingInterval
+      TSC_WATCHDIRECTORY: RecursiveDirectoryUsingDynamicPriorityPolling
+    command: sh -c "npx prisma db push && npx prisma db seed && npm run start:dev"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+      - ./backend/test:/app/test
+
+  frontend:
+    build:
+      target: dev
+    ports: !override
+      - "3001:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:3000/api
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      WDS_SOCKET_PORT: "3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+
+  db:
+    ports:
+      - "5433:5432"

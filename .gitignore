@@ -56,10 +56,10 @@ Desktop.ini
 # Docker
 # ========================
 
-**/docker-compose.override.yml
+# docker-compose.override.yml is the committed development configuration (see README),
+# so only the other local variants are ignored.
 **/docker-compose.dev.yml
 **/docker-compose.local.yml
-docker-compose.override.yml
 docker-compose.dev.yml
 docker-compose.local.yml
 

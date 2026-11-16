@@ -19,23 +19,25 @@ FlowSync — пет-проєкт, трекер задач у стилі Jira: п
 
 | Шар | Поточний стан | Ціль (після плану) |
 |---|---|---|
-| Backend | NestJS 10, Prisma 6, JWT (Passport), Node 20 | NestJS поточної major, Prisma, Node 24 LTS |
+| Backend | NestJS 10, Prisma 6, JWT (Passport), Node 24 LTS | NestJS поточної major, Prisma, Node 24 LTS |
 | БД | PostgreSQL 16 | те саме, міграції через `prisma migrate` |
 | Frontend | React 18 + Create React App, JS, Bootstrap | React 19 + Vite + TypeScript + Tailwind + shadcn/ui + TanStack Query |
-| Інфра | Docker Compose, GitHub Actions | + dev-override, PR-перевірки, nginx-проксі |
+| Інфра | Docker Compose (dev-override + прод), nginx-проксі, CI з перевірками | + міграції в compose, `/api/health` |
 
 Репозиторій складається з двох незалежних npm-пакетів: `backend/` і `frontend/` (без монорепо-інструментів). Лише `npm`.
 
 ## Команди
 
 ```bash
-docker compose up -d --build     # увесь стек
-docker compose logs -f backend   # логи
-docker compose down              # зупинка (дані БД зберігаються; НЕ додавай -v)
+docker compose up -d --build                         # увесь стек, dev-режим (override, hot reload)
+docker compose -f docker-compose.yml up -d --build   # прод-подібний режим (лише :8080, nginx проксіює /api)
+docker compose logs -f backend                       # логи
+docker compose down                                  # зупинка (дані БД зберігаються; НЕ додавай -v)
 ```
 
-Адреси: фронтенд `http://localhost:8080`, API `http://localhost:3000/api`, Postgres `localhost:5433`
-(`postgres` / `postgres`, БД `jira` — буде перейменовано на `flowsync` у фазі 1).
+Адреси в dev-режимі: фронтенд `http://localhost:3001`, API `http://localhost:3000/api`, Postgres `localhost:5433`
+(БД `flowsync`, користувач і пароль із кореневого `.env`). У прод-режимі: `http://localhost:8080` (API через `/api`).
+Секрети лежать у `.env`, `backend/.env`, `frontend/.env` (не комітяться; приклади — `.env.example`).
 
 Локально без Docker (БД має працювати в Docker):
 
@@ -43,8 +45,11 @@ docker compose down              # зупинка (дані БД зберіга�
 cd backend && npm run start:dev      # API з watch
 cd backend && npm test               # unit
 cd backend && npm run test:e2e       # e2e
-cd backend && npm run lint
+cd backend && npm run lint           # ESLint 9; lint:fix виправляє
+cd backend && npm run format:check   # Prettier; npm run format форматує
+cd backend && npm run typecheck      # tsc --noEmit
 cd frontend && npm start             # CRA (до фази 5), після неї — npm run dev
+cd frontend && npm run format:check
 ```
 
 ## Робочий процес

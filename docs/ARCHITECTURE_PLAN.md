@@ -75,7 +75,7 @@
 | D16 | Тести | Backend: Jest + supertest; frontend: Vitest + Testing Library + MSW; e2e: Playwright | — |
 | D17 | CI | PR-перевірки (lint, типи, тести, збірка) → деплой лише з `main` після успіху; теги образів `:<sha>` і `:latest` | — |
 | D18 | Compose | `docker-compose.yml` (прод) + `docker-compose.override.yml` (dev, hot-reload); секрети в `.env`, не в репозиторії | — |
-| D19 | Runtime | Node 24 LTS (або 22, якщо залежність не підтримує 24) | Node 20 — EOL |
+| D19 | Runtime | Node 24 LTS (або 22, якщо залежність не підтримує 24) | Node 20 — EOL. Node 26 уже LTS (з листопада 2026), але Nest 10, Prisma 6.0 і CRA на ній не перевірені: повернутися після фази 2 |
 
 ## 4. Цільова архітектура
 
@@ -151,19 +151,19 @@ frontend/src/
 
 ### Фаза 1 — Репозиторій, інфраструктура, CI · розмір M
 
-Гілка `refactor/phase-1-infra`. Закриває B8, B12 (частково), B13, I1–I4.
+Гілка `refactor/phase-1-infra`. Закриває B8, B12 (частково), B13, I1–I4. **Статус: виконано 2026-11-16** (не закомічено), крім необов'язкового 1.10.
 
-- [ ] 1.1 Лише npm: видалити `backend/yarn.lock`; перейменувати пакети на `flowsync-backend` / `flowsync-frontend`
-- [ ] 1.2 Node 24 LTS (або 22) у Dockerfile, CI та `.nvmrc`; `engines` у `package.json`
-- [ ] 1.3 `.env.example` у корені, `backend/`, `frontend/`; секрети compose — через `${POSTGRES_PASSWORD}` з кореневого `.env`; БД перейменувати з `jira` на `flowsync`
-- [ ] 1.4 Compose: `docker-compose.yml` (прод) + `docker-compose.override.yml` (dev: bind mounts, `nest start --watch`, dev-сервер фронтенду); `Dockerfile` з цілями `dev`/`build`/`prod`; прибрати суфікс `_prod` з імен контейнерів
-- [ ] 1.5 `frontend/nginx.conf`: SPA-fallback `try_files $uri /index.html` і проксі `/api/` → `backend:3000`; frontend звертається до `/api` (same-origin, без CORS)
-- [ ] 1.6 Docker: запуск від непривілегійованого користувача; healthcheck backend (після фази 2 — `/api/health`)
-- [ ] 1.7 ESLint 9 (flat config) + Prettier в обох пакетах; скрипти `lint`, `format:check`
-- [ ] 1.8 CI `ci.yml` (PR і push): backend — install, lint, typecheck, test, build, `prisma validate`; frontend — lint, test, build; `docker build` обох образів. Окремий `deploy.yml` лише для `main` після успіху CI; теги `:<sha>` + `:latest`; `actions/*@v4`; кеш Buildx
-- [ ] 1.9 Dependabot (npm, docker, github-actions)
-- [ ] 1.10 Husky + lint-staged (pre-commit: prettier + eslint для змінених файлів) — необов'язково
-- [ ] 1.11 Оновити `README.md`: реальні папки, команди, порти (`5433` для Postgres), змінні середовища
+- [x] 1.1 Лише npm: видалити `backend/yarn.lock`; перейменувати пакети на `flowsync-backend` / `flowsync-frontend`
+- [x] 1.2 Node 24 LTS (або 22) у Dockerfile, CI та `.nvmrc`; `engines` (`>=22`) у `package.json`. Додано `.gitattributes` (`eol=lf`)
+- [x] 1.3 `.env.example` у корені, `backend/`, `frontend/`; секрети compose — через `${POSTGRES_PASSWORD}` з кореневого `.env`; БД перейменувати з `jira` на `flowsync`
+- [x] 1.4 Compose: `docker-compose.yml` (прод) + `docker-compose.override.yml` (dev: bind mounts, `nest start --watch`, dev-сервер фронтенду); `Dockerfile` з цілями `dev`/`build`/`prod`; прибрати суфікс `_prod` з імен контейнерів
+- [x] 1.5 `frontend/nginx.conf`: SPA-fallback `try_files $uri /index.html` і проксі `/api/` → `backend:3000`; frontend звертається до `/api` (same-origin, без CORS)
+- [x] 1.6 Docker: запуск від непривілегійованого користувача (`node`, `nginx-unprivileged`); healthcheck backend поки TCP-перевіркою порту (після фази 2 — `/api/health`). У прод-образі backend лишаються dev-залежності, бо старт виконує `prisma db push` і seed; фаза 3 це прибере
+- [x] 1.7 ESLint 9 (flat config) + Prettier у backend; у frontend поки лише Prettier (`react-scripts` прив'язаний до ESLint 8, flat-конфіг додається в 5.7). Скрипти `lint`, `format:check`; старий код відформатовано, 3 попередження про `any` лишаються до фази 4
+- [x] 1.8 CI `ci.yml` (PR і push; backend ще й e2e на Postgres-сервісі; для збірки CRA виставлено `CI=false`, бо старий код має попередження, прибрати в 5.x): backend — install, lint, typecheck, test, build, `prisma validate`; frontend — lint, test, build; `docker build` обох образів. Окремий `deploy.yml` лише для `main` після успіху CI; теги `:<sha>` + `:latest`; актуальні major-версії дій на листопад 2026 (checkout v7, setup-node v7, buildx v4, login v4, build-push v7); кеш Buildx
+- [x] 1.9 Dependabot (npm, docker, github-actions)
+- [ ] 1.10 Husky + lint-staged (pre-commit: prettier + eslint для змінених файлів) — необов'язково; відкладено: потрібен кореневий `package.json`, а CI уже ловить те саме
+- [x] 1.11 Оновити `README.md`: реальні папки, команди, порти (`5433` для Postgres), змінні середовища
 
 **Готово, коли:** `docker compose up --build` запускає прод-подібний стек; `docker compose up` з override дає hot-reload;
 оновлення `/dashboard` у браузері не дає 404; CI зелений на PR.
@@ -283,3 +283,4 @@ CASL для тонких прав · деплой на VPS (Caddy/Traefik) · us
 |---|---|---|---|
 | 2026-11-16 | Підготовка | Docker на D:, перехід MySQL → PostgreSQL, seed ролей, `.dockerignore`, цей план | Безпекові дірки B1–B7 були відкриті |
 | 2026-11-16 | Фаза 0 (0.1–0.9) | Закрито B1–B7: немає `password` у відповідях, роль не приймається, `/users/me` замість `/users/:email`, guard і токен-автор у tasks/comments, перевірка доступу, глобальний `ValidationPipe`, один механізм JWT (`AuthGuard('jwt')`), CORS за списком, `JwtModule.registerAsync`. 20 e2e-тестів зелені (`test/e2e/security.e2e-spec.ts`), живі перевірки в Docker | Додано `src/common/` (`@CurrentUser`, `AuthenticatedUser`) і `src/app.setup.ts`. Видалено зламаний шаблонний `test/app.e2e-spec.ts`. `validate-token` лишається до фази 6 |
+| 2026-11-16 | Фаза 1 (1.1–1.9, 1.11) | npm-only і назви пакетів, Node 24, `.env.example` ×3, БД `jira` → `flowsync` (`ALTER DATABASE`, дані збережено), compose dev/прод + `Dockerfile` з цілями `dev`/`build`/`prod`, nginx (SPA-fallback, проксі `/api`, заголовки безпеки), непривілегійовані користувачі, healthcheck-и, ESLint 9 + Prettier, CI (`ci.yml`) і деплой після CI (`deploy.yml`), Dependabot, новий README. Перевірено: lint/typecheck, 20 e2e, dev-режим із hot reload, прод-режим (200 на `/dashboard`, 401 через проксі, порти API/БД закриті) | Не комітилось. Видалено зламаний `App.test.js` (шаблон CRA). У CI frontend-збірка з `CI=false`. 1.10 (Husky) відкладено. Для `deploy.yml` (`workflow_run`) файл має бути в `main` |

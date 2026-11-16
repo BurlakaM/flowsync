@@ -1,9 +1,9 @@
-import {Body, Controller, Get, Post, UseGuards} from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { TasksService } from './tasks.service';
-import {TasksDto} from "./tasks.dto";
-import {JwtAuthGuard} from "../conception/jwt.auth.guard";
-import {CurrentUser} from "../common/decorators/current-user.decorator";
-import {AuthenticatedUser} from "../common/types/authenticated-user.type";
+import { TasksDto } from './tasks.dto';
+import { JwtAuthGuard } from '../conception/jwt.auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../common/types/authenticated-user.type';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard)

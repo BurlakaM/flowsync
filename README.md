@@ -1,142 +1,125 @@
 # FlowSync
 
-**FlowSync** is a personal pet project with a **Nest.js** backend, **React/Vite** frontend, **PostgreSQL** database, and **Docker** support for local development and production deployment.  
-The project also has **CI/CD** configured via GitHub Actions.
+Пет-проєкт: трекер задач у стилі Jira (проєкти, задачі, коментарі, теги, виконавці).
+Backend на **NestJS**, frontend на **React**, база **PostgreSQL**, усе запускається через **Docker Compose**.
+Проєкт поступово переходить на нову архітектуру, план і статус: [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md).
 
----
+## Технології
 
-## Table of Contents
+| Шар | Зараз |
+|---|---|
+| Backend | NestJS 10, Prisma 6, Passport JWT |
+| Frontend | React 18 (Create React App, JS) |
+| БД | PostgreSQL 16 |
+| Runtime | Node.js 24 LTS (`.nvmrc`) |
+| Інфраструктура | Docker Compose, nginx, GitHub Actions |
 
-1. [Features](#features)
-2. [Technologies](#technologies)
-3. [Project Structure](#project-structure)
-4. [Local Development](#local-development)
-5. [Production Deployment](#production-deployment)
-6. [CI/CD](#cicd)
-7. [Docker Images](#docker-images)
-8. [Environment Configuration](#environment-configuration)
-9. [Contributing](#contributing)
-10. [License](#license)
+## Структура
 
----
-
-## Features
-
-- **Backend:** Nest.js with TypeScript
-- **Frontend:** React + Vite
-- **Database:** PostgreSQL
-- **Docker:** for local development and production
-- Easy switching between **dev** and **prod** environments
-- **CI/CD:** GitHub Actions for building and pushing Docker images
-
----
-
-## Technologies
-
-- Node.js 20
-- Nest.js 10
-- React 18 + Vite 5
-- PostgreSQL 16
-- Docker / Docker Compose
-- GitHub Actions
-
----
-
-## Project Structure
+```
 flowsync/
-├─ back/ # Nest.js backend
-│ ├─ src/
-│ ├─ package.json
-│ ├─ Dockerfile
-│ └─ Dockerfile.dev
-├─ front/ # React/Vite frontend
-│ ├─ src/
-│ ├─ package.json
-│ ├─ Dockerfile
-│ └─ Dockerfile.dev
-├─ docker-compose.yml
-├─ docker-compose.override.yml
-└─ .github/workflows/ci-cd.yml
----
+├─ backend/                  NestJS API (префікс /api)
+│  ├─ prisma/                схема Prisma і seed
+│  ├─ src/, test/
+│  └─ Dockerfile             цілі: dev, build, prod
+├─ frontend/                 React SPA
+│  ├─ nginx.conf             SPA-fallback і проксі /api → backend
+│  └─ Dockerfile             цілі: dev, build, prod
+├─ docker-compose.yml        прод-подібний стек
+├─ docker-compose.override.yml   режим розробки (підхоплюється автоматично)
+├─ docs/ARCHITECTURE_PLAN.md план переходу на нову архітектуру
+├─ AGENTS.md                 правила для AI-агентів
+└─ .github/                  CI, деплой, Dependabot
+```
 
-## Local Development
+## Швидкий старт (розробка)
 
-1. Make sure **Docker** and **Docker Compose** are installed.
-2. Clone the repository:
+1. Встановіть Docker (Docker Desktop з WSL2 на Windows).
+2. Створіть файли оточення з прикладів:
 
+   ```bash
+   cp .env.example .env
+   cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env
+   ```
 
-git clone https://github.com/BurlakaM/flowsync
-cd flowsync
+   Заповніть `POSTGRES_PASSWORD` у `.env` та `SECRET_KEY` у `backend/.env`. Паролі мають бути URL-безпечними:
+   пароль БД підставляється в `DATABASE_URL`. У `backend/.env` пароль у `DATABASE_URL` має збігатися з `POSTGRES_PASSWORD`.
 
-Start the local development environment:
+3. Запустіть стек:
 
-docker compose up --build
+   ```bash
+   docker compose up -d --build
+   ```
 
-React: http://localhost:5173
+| Сервіс | Адреса |
+|---|---|
+| Frontend (dev-сервер) | http://localhost:3001 |
+| API | http://localhost:3000/api |
+| PostgreSQL | `localhost:5433` (користувач і пароль з `.env`, БД `flowsync`) |
 
-Nest.js API: http://localhost:3000
+Backend і frontend перезбираються автоматично при зміні файлів у `backend/src` та `frontend/src`.
+Під час старту контейнера backend виконує `prisma db push` і seed ролей (поки немає міграцій, див. план, фаза 3).
 
-PostgreSQL: localhost:5433 (user: postgres, password: postgres)
+Зупинка: `docker compose down`. **Не додавайте `-v`**: це видалить дані БД.
 
-Production Deployment
-Build production images:
+## Прод-подібний запуск
 
-docker compose -f docker-compose.yml up --build -d
-Access services:
+```bash
+docker compose -f docker-compose.yml up -d --build
+```
 
-React: http://localhost:8080
+Назовні опубліковано лише frontend: http://localhost:8080. nginx віддає збірку React і проксіює `/api/` на backend,
+тому CORS не потрібен. Порти backend і БД на хост не виставляються.
 
-Nest.js API: http://localhost:3000
+## Команди без Docker
 
-PostgreSQL: localhost:5433
+БД при цьому має працювати в Docker (`docker compose up -d db`). Потрібен Node 22+ (рекомендовано 24).
 
-Environment variables are loaded from .env files. Switch between dev/prod by using different docker-compose files.
+```bash
+cd backend
+npm ci
+npm run start:dev       # API з watch
+npm run lint            # ESLint 9
+npm run format:check    # Prettier
+npm run typecheck       # tsc --noEmit
+npm test                # unit
+npm run test:e2e        # e2e на БД з backend/.env
 
-CI/CD
-On push to main, GitHub Actions workflow builds and pushes Docker images to Docker Hub.
+cd frontend
+npm ci
+npm start               # dev-сервер CRA
+npm run format:check
+npm run build
+```
 
-Requires GitHub secrets:
+## Змінні середовища
 
-DOCKER_USERNAME — your Docker Hub username
+| Файл | Змінна | Призначення |
+|---|---|---|
+| `.env` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | БД у Docker і `DATABASE_URL` backend у compose |
+| `backend/.env` | `SECRET_KEY` | секрет підпису JWT (застосунок не стартує без нього) |
+| `backend/.env` | `DATABASE_URL` | БД для запуску на хості; у compose перекривається |
+| `backend/.env` | `CORS_ORIGINS` | необов'язково: дозволені origin через кому |
+| `frontend/.env` | `REACT_APP_API_URL` | адреса API для dev-сервера; у прод-образі збирається як `/api` |
 
-DOCKER_PASSWORD — your Docker Hub password or access token
+Файли `.env` не комітяться, у репозиторії лише `.env.example`.
 
-Workflow builds:
+## CI/CD
 
-Backend image → ${DOCKER_USERNAME}/flowsync-back:latest
+- **CI** (`.github/workflows/ci.yml`): на кожен PR і push у `main`. Backend: `prisma validate`, Prettier, ESLint, типи, unit та e2e
+  (на Postgres у service-контейнері), збірка. Frontend: Prettier, тести, збірка. Потім збірка Docker-образів.
+- **Deploy** (`.github/workflows/deploy.yml`): після успішного CI на `main` публікує образи в Docker Hub:
+  `<DOCKER_USERNAME>/flowsync-back` і `<DOCKER_USERNAME>/flowsync-front` з тегами `:<sha коміту>` та `:latest`.
+  Потрібні секрети репозиторію `DOCKER_USERNAME` і `DOCKER_PASSWORD` (токен доступу Docker Hub).
+- **Dependabot** щотижня пропонує оновлення npm, Docker і GitHub Actions.
 
-Frontend image → ${DOCKER_USERNAME}/flowsync-front:latest
+## Внесок
 
-Docker Images
-Backend: Nest.js
+1. Форк, гілка `feat/<назва>` або `fix/<назва>`.
+2. Коміти за Conventional Commits (`feat(tasks): ...`), англійською.
+3. Перед PR локально пройдіть `lint`, `format:check`, `typecheck` і тести.
 
-Frontend: React/Vite
+## Ліцензія
 
-Database: PostgreSQL 16
-
-Local volumes are used for persistent PostgreSQL data
-
-Environment Configuration
-Backend .env:
-
-DATABASE_URL="postgresql://postgres:postgres@db:5432/jira"
-SECRET_KEY=YOUR_SECRET_KEY
-Frontend .env:
-
-
-VITE_API_URL=http://localhost:3000
-Use different .env files for dev/prod if needed.
-
-Contributing
-Fork the repository
-
-Create a feature branch (git checkout -b feature/my-feature)
-
-Commit your changes (git commit -m 'Add new feature')
-
-Push to branch (git push origin feature/my-feature)
-
-Create a Pull Request
-
-License
-This project is licensed under the MIT License.
+MIT.
