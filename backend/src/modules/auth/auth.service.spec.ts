@@ -5,6 +5,8 @@ import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   const findByEmailForAuth = vi.fn();
+  const createUser = vi.fn();
+  const getProfile = vi.fn();
   const sign = vi.fn();
   const verify = vi.fn();
   let service: AuthService;
@@ -12,7 +14,7 @@ describe('AuthService', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     service = new AuthService(
-      { findByEmailForAuth } as unknown as UsersService,
+      { findByEmailForAuth, createUser, getProfile } as unknown as UsersService,
       { sign, verify } as unknown as JwtService,
     );
   });
@@ -61,6 +63,21 @@ describe('AuthService', () => {
       access_token: 'signed-token',
     });
     expect(sign).toHaveBeenCalledWith({ email: 'a@b.co', sub: 9 });
+  });
+
+  it('registers through the users service', async () => {
+    const dto = { name: 'A', email: 'a@b.co', password: 'password-123' };
+    createUser.mockResolvedValue({ id: 1 });
+
+    expect(await service.register(dto)).toEqual({ id: 1 });
+    expect(createUser).toHaveBeenCalledWith(dto);
+  });
+
+  it('returns the profile of the current user', async () => {
+    getProfile.mockResolvedValue({ id: 5 });
+
+    expect(await service.me(5)).toEqual({ id: 5 });
+    expect(getProfile).toHaveBeenCalledWith(5);
   });
 
   describe('validateToken', () => {

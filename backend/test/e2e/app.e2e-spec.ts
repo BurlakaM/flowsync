@@ -66,10 +66,10 @@ describe('Application foundation (e2e)', () => {
         email: 'dup@example.test',
         password: 'password-123',
       };
-      await request(server()).post('/api/users').send(user).expect(201);
+      await request(server()).post('/api/auth/register').send(user).expect(201);
 
       const res = await request(server())
-        .post('/api/users')
+        .post('/api/auth/register')
         .send(user)
         .expect(409);
 
