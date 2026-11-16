@@ -72,6 +72,56 @@ export class AppConfigService {
     return this.config.get('LOG_LEVEL', { infer: true });
   }
 
+  /** Undefined means "no Redis": jobs then run inside the API process. */
+  get redisUrl(): string | undefined {
+    return this.config.get('REDIS_URL', { infer: true });
+  }
+
+  get appUrl(): string {
+    return this.config.get('APP_URL', { infer: true }).replace(/\/$/, '');
+  }
+
+  /** Email needs a server and a sender; with only one of them it stays off. */
+  get mailEnabled(): boolean {
+    return Boolean(
+      this.config.get('SMTP_HOST', { infer: true }) &&
+      this.config.get('MAIL_FROM', { infer: true }),
+    );
+  }
+
+  get mailFrom(): string | undefined {
+    return this.config.get('MAIL_FROM', { infer: true });
+  }
+
+  get smtp() {
+    return {
+      host: this.config.get('SMTP_HOST', { infer: true }),
+      port: this.config.get('SMTP_PORT', { infer: true }),
+      secure: this.config.get('SMTP_SECURE', { infer: true }),
+      user: this.config.get('SMTP_USER', { infer: true }),
+      password: this.config.get('SMTP_PASSWORD', { infer: true }),
+    };
+  }
+
+  /** Uploads work only with a key pair; the rest of the storage settings have defaults. */
+  get storageEnabled(): boolean {
+    return Boolean(
+      this.config.get('S3_ACCESS_KEY', { infer: true }) &&
+      this.config.get('S3_SECRET_KEY', { infer: true }),
+    );
+  }
+
+  get storage() {
+    return {
+      endpoint: this.config.get('S3_ENDPOINT', { infer: true }),
+      bucket: this.config.get('S3_BUCKET', { infer: true }),
+      region: this.config.get('S3_REGION', { infer: true }),
+      accessKey: this.config.get('S3_ACCESS_KEY', { infer: true }),
+      secretKey: this.config.get('S3_SECRET_KEY', { infer: true }),
+      forcePathStyle: this.config.get('S3_FORCE_PATH_STYLE', { infer: true }),
+    };
+  }
+
   get bcryptRounds(): number {
     return this.config.get('BCRYPT_ROUNDS', { infer: true });
   }

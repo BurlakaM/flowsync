@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { Badge } from '@/components/ui/badge';
 import type { Task } from '../types';
@@ -9,6 +10,7 @@ interface TaskListProps {
 }
 
 export function TaskList({ tasks, onChanged }: TaskListProps) {
+  const { t } = useTranslation();
   return (
     <ul className="divide-y rounded-lg border">
       {tasks.map((task) => (
@@ -36,8 +38,7 @@ export function TaskList({ tasks, onChanged }: TaskListProps) {
               ))}
               {task.commentsCount > 0 && (
                 <span>
-                  {task.commentsCount}{' '}
-                  {task.commentsCount === 1 ? 'comment' : 'comments'}
+                  {t('comments_count', { count: task.commentsCount })}
                 </span>
               )}
             </div>

@@ -10,6 +10,11 @@ const LOG_LEVELS = [
   'silent',
 ] as const;
 
+/** `SMTP_HOST=` (an empty value in .env) means "not set", not "set to nothing". */
+const blankIsUnset = (value: unknown) => (value === '' ? undefined : value);
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess(blankIsUnset, schema.optional());
+
 export const envSchema = z
   .object({
     NODE_ENV: z
@@ -38,6 +43,57 @@ export const envSchema = z
     LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
     /** bcrypt cost: higher is slower and safer. Tests use the minimum. */
     BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(10),
+    /** Redis for the job queue. Without it jobs run inside the API process: no retries, lost on restart. */
+    REDIS_URL: optional(
+      z.string().regex(/^rediss?:\/\//, 'must be a Redis URL (redis://...)'),
+    ),
+    /** Public address of the frontend: the links in emails point there. */
+    APP_URL: z.preprocess(
+      blankIsUnset,
+      z.url().default('http://localhost:5173'),
+    ),
+    /**
+     * Email is switched on by SMTP_HOST and MAIL_FROM together. Without them nothing is ever sent,
+     * and nothing fails: notifications still appear in the application.
+     */
+    SMTP_HOST: optional(z.string().min(1)),
+    SMTP_PORT: z.preprocess(
+      blankIsUnset,
+      z.coerce.number().int().min(1).max(65535).default(587),
+    ),
+    /** true = TLS from the first byte (usually port 465); false = plain or STARTTLS (587, 25, 1025). */
+    SMTP_SECURE: z.preprocess(
+      blankIsUnset,
+      z
+        .enum(['true', 'false'])
+        .default('false')
+        .transform((value) => value === 'true'),
+    ),
+    SMTP_USER: optional(z.string()),
+    SMTP_PASSWORD: optional(z.string()),
+    /** The sender, e.g. `FlowSync <noreply@example.com>`. */
+    MAIL_FROM: optional(z.string().min(3)),
+    /**
+     * File storage (project pictures) on any S3-compatible service: AWS S3, MinIO, Cloudflare R2 and so on.
+     * Uploads are switched on by S3_ACCESS_KEY and S3_SECRET_KEY together; without them the rest of the
+     * application works and uploading answers 503.
+     */
+    S3_ENDPOINT: optional(z.url()),
+    S3_BUCKET: z.preprocess(
+      blankIsUnset,
+      z.string().min(3).default('flowsync'),
+    ),
+    S3_REGION: z.preprocess(blankIsUnset, z.string().default('us-east-1')),
+    S3_ACCESS_KEY: optional(z.string().min(1)),
+    S3_SECRET_KEY: optional(z.string().min(1)),
+    /** MinIO and most self-hosted servers need path-style addresses (host/bucket/key); AWS accepts both. */
+    S3_FORCE_PATH_STYLE: z.preprocess(
+      blankIsUnset,
+      z
+        .enum(['true', 'false'])
+        .default('true')
+        .transform((value) => value === 'true'),
+    ),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.JWT_SECRET.length < 32) {

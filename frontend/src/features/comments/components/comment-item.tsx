@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { formatDateTime } from '@/lib/format-date';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Spinner } from '@/components/spinner';
@@ -16,12 +18,6 @@ interface CommentItemProps {
   onDeleted: () => void;
 }
 
-const formatDateTime = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-
 export function CommentItem({
   comment,
   canEdit,
@@ -29,6 +25,7 @@ export function CommentItem({
   onDeleted,
 }: CommentItemProps) {
   const [editing, setEditing] = useState(false);
+  const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState(comment.text);
   const update = useUpdateComment(comment.id);
@@ -41,11 +38,11 @@ export function CommentItem({
     <li className="space-y-2 py-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="font-medium">
-          {comment.author?.name ?? 'Deleted user'}
+          {comment.author?.name ?? t('Deleted user')}
         </span>
         <span className="text-muted-foreground">
           {formatDateTime(comment.createdAt)}
-          {edited && ' (edited)'}
+          {edited && ` (${t('edited')})`}
         </span>
       </div>
 
@@ -59,7 +56,7 @@ export function CommentItem({
           }}
         >
           <Textarea
-            aria-label="Edit comment"
+            aria-label={t('Edit comment')}
             rows={3}
             value={draft}
             maxLength={5000}
@@ -77,7 +74,7 @@ export function CommentItem({
               disabled={update.isPending || !trimmed}
             >
               {update.isPending && <Spinner className="text-current" />}
-              Save
+              {t('Save')}
             </Button>
             <Button
               type="button"
@@ -89,7 +86,7 @@ export function CommentItem({
                 update.reset();
               }}
             >
-              Cancel
+              {t('Cancel')}
             </Button>
           </div>
         </form>
@@ -103,20 +100,24 @@ export function CommentItem({
             <Button
               variant="ghost"
               size="sm"
-              aria-label={`Edit comment by ${comment.author?.name ?? 'deleted user'}`}
+              aria-label={t('Edit comment by {{name}}', {
+                name: comment.author?.name ?? t('deleted user'),
+              })}
               onClick={() => setEditing(true)}
             >
-              Edit
+              {t('Edit')}
             </Button>
           )}
           {canDelete && (
             <Button
               variant="ghost"
               size="sm"
-              aria-label={`Delete comment by ${comment.author?.name ?? 'deleted user'}`}
+              aria-label={t('Delete comment by {{name}}', {
+                name: comment.author?.name ?? t('deleted user'),
+              })}
               onClick={() => setConfirming(true)}
             >
-              Delete
+              {t('Delete')}
             </Button>
           )}
         </div>
@@ -128,9 +129,9 @@ export function CommentItem({
           if (!next) remove.reset();
           setConfirming(next);
         }}
-        title="Delete this comment?"
-        description="This cannot be undone."
-        confirmLabel="Delete comment"
+        title={t('Delete this comment?')}
+        description={t('This cannot be undone.')}
+        confirmLabel={t('Delete comment')}
         isPending={remove.isPending}
         error={remove.isError ? getErrorMessage(remove.error) : null}
         onConfirm={() =>

@@ -40,6 +40,8 @@ model User {
   assignments   TaskAssignee[]
   comments      Comment[]
   refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -48,16 +50,18 @@ model Project {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
+  /// Key of the project picture in the file storage (not a URL); the API never exposes it, only `hasImage`.
   image       String?
   ownerId     Int      @map("owner_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // A user who owns projects cannot be deleted until the projects are moved or removed.
-  owner   User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  members ProjectMember[]
-  tasks   Task[]
-  tags    Tag[]
+  owner     User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members   ProjectMember[]
+  tasks     Task[]
+  tags      Tag[]
+  auditLogs AuditLog[]
 
   @@index([ownerId])
   @@map("projects")
@@ -158,4 +162,41 @@ model RefreshToken {
   @@index([userId])
   @@index([familyId])
   @@map("refresh_tokens")
+}
+
+/// The activity feed of a project: one row per domain event (who did what to which entity).
+/// Rows go away with their project; they stay (without an actor) when the author's account is deleted.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  projectId  Int      @map("project_id")
+  actorId    Int?     @map("actor_id")
+  type       String
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  data       Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+/// An in-application notification for one user ("you were assigned", "new comment"). The text is built
+/// by the client from `type` and `data`, so it can be translated.
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  type      String
+  data      Json
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '@/components/language-switcher';
 import type { ReactNode } from 'react';
 import { Link, NavLink } from 'react-router';
 import logoMark from '@/assets/logo-mark.svg';
@@ -8,6 +10,8 @@ interface AppLayoutProps {
   /** Shown in the header when known. */
   userName?: string;
   onLogout: () => void;
+  /** Extra items of the main navigation, supplied by the app (for example the notifications bell). */
+  navExtra?: ReactNode;
   children: ReactNode;
 }
 
@@ -18,7 +22,13 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 /** The frame of every signed-in page: header with the brand, navigation and the account menu, then the content. */
-export function AppLayout({ userName, onLogout, children }: AppLayoutProps) {
+export function AppLayout({
+  userName,
+  onLogout,
+  navExtra,
+  children,
+}: AppLayoutProps) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b">
@@ -28,18 +38,20 @@ export function AppLayout({ userName, onLogout, children }: AppLayoutProps) {
               <img src={logoMark} alt="" className="size-6 dark:invert" />
               FlowSync
             </Link>
-            <nav aria-label="Main">
+            <nav aria-label={t('Main')} className="flex items-center gap-1">
               <NavLink to="/projects" className={navLinkClass}>
-                Projects
+                {t('Projects')}
               </NavLink>
+              {navExtra}
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             {userName && (
               <span className="text-sm text-muted-foreground">{userName}</span>
             )}
             <Button variant="outline" size="sm" onClick={onLogout}>
-              Sign out
+              {t('Sign out')}
             </Button>
           </div>
         </div>

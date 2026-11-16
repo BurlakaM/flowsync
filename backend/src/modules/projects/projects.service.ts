@@ -1,16 +1,22 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { subject } from '@casl/ability';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+import { authorize } from '../../common/casl/authorize';
 import {
   paginationArgs,
   toPage,
   type Page,
 } from '../../common/pagination/paginate';
+import { DomainEventsService } from '../../common/events/domain-events.service';
+import { StorageService } from '../../common/storage/storage.service';
+import { detectImageType } from '../../common/storage/image-type';
+import type { StoredObject } from '../../common/storage/object-store';
 import { PrismaService } from '../../database/prisma.service';
 import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -42,9 +48,11 @@ const memberSelect = {
 } satisfies Prisma.ProjectMemberSelect;
 
 function toResponse(project: ProjectRow, userId: number): ProjectResponseDto {
-  const { _count, ...fields } = project;
+  // The storage key stays inside the server.
+  const { _count, image, ...fields } = project;
   return {
     ...fields,
+    hasImage: image !== null,
     myRole: project.ownerId === userId ? ProjectRole.OWNER : ProjectRole.MEMBER,
     tasksCount: _count.tasks,
   };
@@ -52,7 +60,11 @@ function toResponse(project: ProjectRow, userId: number): ProjectResponseDto {
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: DomainEventsService,
+    private readonly storage: StorageService,
+  ) {}
 
   /** Prisma filter for "projects the user may see": the user owns them or is a member. */
   accessFilter(userId: number): Prisma.ProjectWhereInput {
@@ -65,20 +77,12 @@ export class ProjectsService {
   async assertAccess(
     userId: number,
     projectId: number,
-  ): Promise<{ id: number; ownerId: number }> {
+  ): Promise<{ id: number; ownerId: number; name: string }> {
     const project = await this.prisma.project.findFirst({
       where: { id: projectId, ...this.accessFilter(userId) },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, name: true },
     });
     if (!project) throw new NotFoundException('Project not found');
-    return project;
-  }
-
-  async assertOwner(userId: number, projectId: number) {
-    const project = await this.assertAccess(userId, projectId);
-    if (project.ownerId !== userId) {
-      throw new ForbiddenException('Only the project owner can do this');
-    }
     return project;
   }
 
@@ -89,6 +93,14 @@ export class ProjectsService {
     const project = await this.prisma.project.create({
       data: { ...dto, ownerId: userId },
       select: projectSelect,
+    });
+    await this.events.publish({
+      type: 'project.created',
+      actorId: userId,
+      projectId: project.id,
+      entityType: 'Project',
+      entityId: project.id,
+      data: { name: project.name },
     });
     return toResponse(project, userId);
   }
@@ -159,19 +171,148 @@ export class ProjectsService {
     id: number,
     dto: UpdateProjectDto,
   ): Promise<ProjectResponseDto> {
-    await this.assertOwner(userId, id);
+    const current = await this.assertAccess(userId, id);
+    authorize(
+      userId,
+      current,
+      'update',
+      'Project',
+      'Only the project owner can do this',
+    );
     const project = await this.prisma.project.update({
       where: { id },
       data: dto,
       select: projectSelect,
+    });
+    await this.events.publish({
+      type: 'project.updated',
+      actorId: userId,
+      projectId: id,
+      entityType: 'Project',
+      entityId: id,
+      data: {
+        name: project.name,
+        renamedFrom: current.name !== project.name ? current.name : undefined,
+      },
     });
     return toResponse(project, userId);
   }
 
   /** Deletes the project together with its tasks, comments and tags. */
   async remove(userId: number, id: number): Promise<void> {
-    await this.assertOwner(userId, id);
+    const project = await this.assertAccess(userId, id);
+    authorize(
+      userId,
+      project,
+      'delete',
+      'Project',
+      'Only the project owner can do this',
+    );
+    const stored = await this.prisma.project.findUnique({
+      where: { id },
+      select: { image: true },
+    });
     await this.prisma.project.delete({ where: { id } });
+    // The row is gone; a picture that cannot be removed is only a leftover.
+    if (stored?.image) await this.storage.remove(stored.image);
+    await this.events.publish({
+      type: 'project.deleted',
+      actorId: userId,
+      projectId: id,
+      entityType: 'Project',
+      entityId: id,
+      data: {},
+    });
+  }
+
+  /** Owner only. Replaces the picture; the old one is deleted from the storage. */
+  async setImage(
+    userId: number,
+    projectId: number,
+    file: { buffer: Buffer },
+  ): Promise<ProjectResponseDto> {
+    const current = await this.assertAccess(userId, projectId);
+    authorize(
+      userId,
+      current,
+      'update',
+      'Project',
+      'Only the project owner can do this',
+    );
+    // The bytes decide, not the name or the Content-Type that the client claims.
+    const type = detectImageType(file.buffer);
+    if (!type) {
+      throw new BadRequestException(
+        'The file must be a PNG, JPEG or WebP image',
+      );
+    }
+
+    const key = `projects/${projectId}/${randomUUID()}.${type.extension}`;
+    await this.storage.put(key, file.buffer, type.mime);
+
+    const previous = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { image: true },
+    });
+    const project = await this.prisma.project.update({
+      where: { id: projectId },
+      data: { image: key },
+      select: projectSelect,
+    });
+    if (previous?.image) await this.storage.remove(previous.image);
+
+    await this.events.publish({
+      type: 'project.updated',
+      actorId: userId,
+      projectId,
+      entityType: 'Project',
+      entityId: projectId,
+      data: { name: project.name, image: 'changed' },
+    });
+    return toResponse(project, userId);
+  }
+
+  /** Owner only. Removing a picture that is not there is not an error. */
+  async removeImage(userId: number, projectId: number): Promise<void> {
+    const current = await this.assertAccess(userId, projectId);
+    authorize(
+      userId,
+      current,
+      'update',
+      'Project',
+      'Only the project owner can do this',
+    );
+    const stored = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { image: true },
+    });
+    if (!stored?.image) return;
+
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: { image: null },
+    });
+    await this.storage.remove(stored.image);
+    await this.events.publish({
+      type: 'project.updated',
+      actorId: userId,
+      projectId,
+      entityType: 'Project',
+      entityId: projectId,
+      data: { name: current.name, image: 'removed' },
+    });
+  }
+
+  /** Anyone who can see the project can see its picture; everyone else gets the usual 404. */
+  async getImage(userId: number, projectId: number): Promise<StoredObject> {
+    await this.assertAccess(userId, projectId);
+    const stored = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { image: true },
+    });
+    const object = stored?.image ? await this.storage.get(stored.image) : null;
+    if (!object) throw new NotFoundException('The project has no picture');
+    return object;
   }
 
   async listMembers(
@@ -186,7 +327,14 @@ export class ProjectsService {
     projectId: number,
     dto: AddMemberDto,
   ): Promise<MemberResponseDto> {
-    const project = await this.assertOwner(userId, projectId);
+    const project = await this.assertAccess(userId, projectId);
+    authorize(
+      userId,
+      project,
+      'create',
+      'Member',
+      'Only the project owner can do this',
+    );
 
     const target = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -205,6 +353,14 @@ export class ProjectsService {
     const member = await this.prisma.projectMember.create({
       data: { projectId, userId: target.id },
       select: { createdAt: true },
+    });
+    await this.events.publish({
+      type: 'member.added',
+      actorId: userId,
+      projectId,
+      entityType: 'Member',
+      entityId: target.id,
+      data: { name: target.name },
     });
     return {
       userId: target.id,
@@ -225,13 +381,29 @@ export class ProjectsService {
     if (targetUserId === project.ownerId) {
       throw new BadRequestException('The owner cannot be removed');
     }
-    if (userId !== project.ownerId && userId !== targetUserId) {
-      throw new ForbiddenException('Only the project owner can remove others');
-    }
+    authorize(
+      userId,
+      project,
+      'delete',
+      subject('Member', { userId: targetUserId }),
+      'Only the project owner can remove others',
+    );
 
+    const removed = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { name: true },
+    });
     const { count } = await this.prisma.projectMember.deleteMany({
       where: { projectId, userId: targetUserId },
     });
     if (count === 0) throw new NotFoundException('Member not found');
+    await this.events.publish({
+      type: 'member.removed',
+      actorId: userId,
+      projectId,
+      entityType: 'Member',
+      entityId: targetUserId,
+      data: { name: removed?.name },
+    });
   }
 }

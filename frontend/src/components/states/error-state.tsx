@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getErrorMessage, getErrorStatus } from '@/lib/api-client';
@@ -6,12 +7,13 @@ interface ErrorStateProps {
   error: unknown;
   /** Shown as a "Try again" button when the request can simply be repeated. */
   onRetry?: () => void;
-  /** What was being loaded, for the title: "Could not load projects". */
-  what?: string;
+  /** The title of the failure, e.g. "Could not load projects" (already translated by the caller). */
+  title?: string;
 }
 
 /** The error of a screen: never an empty list in place of a failure. */
-export function ErrorState({ error, onRetry, what = 'data' }: ErrorStateProps) {
+export function ErrorState({ error, onRetry, title }: ErrorStateProps) {
+  const { t } = useTranslation();
   const status = getErrorStatus(error);
   const notFound = status === 404;
 
@@ -23,17 +25,17 @@ export function ErrorState({ error, onRetry, what = 'data' }: ErrorStateProps) {
       <TriangleAlert aria-hidden="true" className="size-8 text-destructive" />
       <div className="space-y-1">
         <p className="font-medium">
-          {notFound ? 'Not found' : `Could not load ${what}`}
+          {notFound ? t('Not found') : (title ?? t('Could not load the data'))}
         </p>
         <p className="text-sm text-muted-foreground">
           {notFound
-            ? 'It does not exist or you do not have access to it.'
+            ? t('It does not exist or you do not have access to it.')
             : getErrorMessage(error)}
         </p>
       </div>
       {onRetry && !notFound && (
         <Button variant="outline" size="sm" onClick={onRetry}>
-          Try again
+          {t('Try again')}
         </Button>
       )}
     </div>

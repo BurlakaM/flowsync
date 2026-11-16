@@ -106,6 +106,16 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
 - Кожне поле має `<label>`; кнопки — `<button>`, посилання — `<a>/<Link>`, не `div` з `onClick`.
 - Діалоги й меню — через shadcn/Radix (фокус і клавіатура готові). Іконка-кнопка має `aria-label`.
 
+## Мови (i18n)
+
+- Усі тексти інтерфейсу — `t('English sentence')` (`useTranslation`); текст і є ключем. Поза компонентами (схеми zod, константи) — `tKey('…')`, переклад відбувається під час показу (`FormFieldError`, `t(STATUS_LABELS[…])`).
+- Новий текст = рядок у `src/i18n/uk.ts` у тому ж коміті: тест `translations.test.ts` падає, якщо щось не перекладено або словник містить зайве. Множини — ключі з `_one/_few/_many/_other` (`tasks_count`).
+- Дати форматуй через `lib/format-date.ts`, не `toLocale…(undefined)`. Повідомлення API не перекладаємо.
+
+## Реальний час
+
+- `app/realtime/use-realtime-sync.ts` слухає сокет і скидає кеш TanStack Query за картою `query-keys-for.ts` (фічі одна одну не знають, мапу тримає `app`). Сокет — покращення, не вимога: застосунок працює й без нього. У тестах сокет підмінено (`testing/fake-socket.ts`).
+
 ## Тести
 
 - Vitest + Testing Library: шукай елементи за роллю й підписом (`getByRole`, `getByLabelText`), а не за класами чи `data-testid`.

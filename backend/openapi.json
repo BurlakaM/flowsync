@@ -440,6 +440,123 @@
         ]
       }
     },
+    "/api/projects/{id}/image": {
+      "put": {
+        "operationId": "ProjectsController_setImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Owner only. A multipart request with the picture in the `file` field: PNG, JPEG or WebP, up to 2 MB.\nThe type is checked on the bytes of the file, not on its name.",
+        "tags": [
+          "projects"
+        ]
+      },
+      "delete": {
+        "operationId": "ProjectsController_removeImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Owner only.",
+        "tags": [
+          "projects"
+        ]
+      },
+      "get": {
+        "operationId": "ProjectsController_getImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The picture of the project (the bytes of the image) for everyone who can see the project.",
+        "tags": [
+          "projects"
+        ]
+      }
+    },
     "/api/projects/{id}/members": {
       "get": {
         "operationId": "ProjectsController_listMembers",
@@ -605,7 +722,7 @@
             "name": "search",
             "required": false,
             "in": "query",
-            "description": "Matches the name or the description (case-insensitive).",
+            "description": "Full-text search over the name, the description and the comments; every word must match, as a prefix.",
             "schema": {
               "maxLength": 100,
               "type": "string"
@@ -621,7 +738,8 @@
               "enum": [
                 "createdAt",
                 "updatedAt",
-                "name"
+                "name",
+                "relevance"
               ]
             }
           },
@@ -737,7 +855,7 @@
             "name": "search",
             "required": false,
             "in": "query",
-            "description": "Matches the name or the description (case-insensitive).",
+            "description": "Full-text search over the name, the description and the comments; every word must match, as a prefix.",
             "schema": {
               "maxLength": 100,
               "type": "string"
@@ -753,7 +871,8 @@
               "enum": [
                 "createdAt",
                 "updatedAt",
-                "name"
+                "name",
+                "relevance"
               ]
             }
           },
@@ -1288,6 +1407,192 @@
         ]
       }
     },
+    "/api/projects/{projectId}/activity": {
+      "get": {
+        "operationId": "ActivityController_list",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "activity"
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "unread",
+            "required": false,
+            "in": "query",
+            "description": "Only the notifications that have not been read.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPageDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCountDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/read-all": {
+      "post": {
+        "operationId": "NotificationsController_markAllRead",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "post": {
+        "operationId": "NotificationsController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -1696,10 +2001,6 @@
           "description": {
             "type": "string",
             "maxLength": 2000
-          },
-          "image": {
-            "type": "string",
-            "maxLength": 500
           }
         },
         "required": [
@@ -1719,9 +2020,9 @@
             "type": "string",
             "nullable": true
           },
-          "image": {
-            "type": "string",
-            "nullable": true
+          "hasImage": {
+            "type": "boolean",
+            "description": "Whether the project has a picture; fetch it from `GET /projects/{id}/image`."
           },
           "ownerId": {
             "type": "number"
@@ -1750,7 +2051,7 @@
           "id",
           "name",
           "description",
-          "image",
+          "hasImage",
           "ownerId",
           "myRole",
           "tasksCount",
@@ -1836,9 +2137,9 @@
             "type": "string",
             "nullable": true
           },
-          "image": {
-            "type": "string",
-            "nullable": true
+          "hasImage": {
+            "type": "boolean",
+            "description": "Whether the project has a picture; fetch it from `GET /projects/{id}/image`."
           },
           "ownerId": {
             "type": "number"
@@ -1877,7 +2178,7 @@
           "id",
           "name",
           "description",
-          "image",
+          "hasImage",
           "ownerId",
           "myRole",
           "tasksCount",
@@ -1897,10 +2198,6 @@
           "description": {
             "type": "string",
             "maxLength": 2000
-          },
-          "image": {
-            "type": "string",
-            "maxLength": 500
           }
         }
       },
@@ -2327,6 +2624,135 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "ActivityResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Facts about the event, e.g. the name of a task or the old and new status."
+          },
+          "actor": {
+            "nullable": true,
+            "description": "Null when the account of the author was deleted.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserSummaryDto"
+              }
+            ]
+          },
+          "id": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "description": "What happened, e.g. `task.created` or `comment.deleted`."
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "number",
+            "description": "The id of the task, comment, tag, project or (for members) user it is about."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Format: date-time"
+          }
+        },
+        "required": [
+          "data",
+          "actor",
+          "id",
+          "type",
+          "entityType",
+          "entityId",
+          "createdAt"
+        ]
+      },
+      "ActivityPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "NotificationResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Names and ids the client needs to write the sentence and to link to the target."
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null while unread.",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "description": "`task.assigned`, `comment.added` or `project.invited`."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "readAt",
+          "id",
+          "type",
+          "createdAt"
+        ]
+      },
+      "NotificationPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "UnreadCountDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count"
         ]
       }
     }

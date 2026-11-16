@@ -6,7 +6,8 @@ export class ProjectResponseDto {
   id!: number;
   name!: string;
   description!: string | null;
-  image!: string | null;
+  /** Whether the project has a picture; fetch it from `GET /projects/{id}/image`. */
+  hasImage!: boolean;
   ownerId!: number;
   /** The role of the current user in this project. */
   myRole!: ProjectRole;

@@ -19,7 +19,7 @@ const project = {
   id: 7,
   name: 'Roadmap',
   description: 'Plans for the year',
-  image: null,
+  hasImage: false,
   ownerId: 1,
   myRole: 'OWNER',
   tasksCount: 1,
@@ -75,7 +75,38 @@ beforeEach(() => {
         { id: 5, name: 'bug', projectId: 7, createdAt: stamp },
       ]),
     ),
+    http.get('*/api/notifications', () =>
+      HttpResponse.json(
+        page([
+          {
+            id: 1,
+            type: 'task.assigned',
+            data: { actorName: 'Bob', taskId: 9, taskName: 'Fix login' },
+            readAt: null,
+            createdAt: stamp,
+          },
+        ]),
+      ),
+    ),
+    http.get('*/api/notifications/unread-count', () =>
+      HttpResponse.json({ count: 1 }),
+    ),
     http.get('*/api/projects/7/tasks', () => HttpResponse.json(page([task]))),
+    http.get('*/api/projects/7/activity', () =>
+      HttpResponse.json(
+        page([
+          {
+            id: 1,
+            type: 'task.created',
+            entityType: 'Task',
+            entityId: 9,
+            data: { name: 'Fix login' },
+            actor: { id: 1, name: 'Ann' },
+            createdAt: stamp,
+          },
+        ]),
+      ),
+    ),
     http.get('*/api/tasks/9', () =>
       HttpResponse.json({
         ...task,
@@ -129,6 +160,21 @@ describe('accessibility (axe)', () => {
       renderApp('/projects/7');
       await screen.findByRole('link', { name: 'Fix login' });
       await screen.findByRole('button', { name: 'Delete tag bug' });
+      await screen.findByText(/created the task/);
+
+      await expectNoA11yViolations();
+    });
+
+    it('the notifications page has no violations', async () => {
+      renderApp('/notifications');
+      await screen.findByRole('link', { name: /assigned you to/ });
+
+      await expectNoA11yViolations();
+    });
+
+    it('the board view has no violations', async () => {
+      renderApp('/projects/7?view=board');
+      await screen.findByRole('button', { name: 'Move Fix login' });
 
       await expectNoA11yViolations();
     });

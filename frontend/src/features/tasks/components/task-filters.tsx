@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,10 +23,20 @@ export function TaskFiltersBar({
   assignees,
   tags,
 }: TaskFiltersProps) {
+  const { t } = useTranslation();
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = new FormData(event.currentTarget).get('search');
-    onChange({ search: typeof value === 'string' ? value.trim() : undefined });
+    const search = typeof value === 'string' ? value.trim() : '';
+    // A new search shows the best matches first; clearing it returns to the default order.
+    onChange({
+      search: search || undefined,
+      ...(search
+        ? { sortBy: 'relevance', order: 'desc' }
+        : filters.sortBy === 'relevance'
+          ? { sortBy: 'createdAt', order: 'desc' }
+          : {}),
+    });
   };
 
   return (
@@ -40,18 +51,18 @@ export function TaskFiltersBar({
         <Input
           name="search"
           type="search"
-          aria-label="Search tasks"
-          placeholder="Search tasks"
+          aria-label={t('Search tasks')}
+          placeholder={t('Search tasks')}
           defaultValue={filters.search ?? ''}
           className="w-56"
         />
         <Button type="submit" variant="outline">
-          Search
+          {t('Search')}
         </Button>
       </form>
 
       <div className="space-y-1">
-        <Label htmlFor="filter-status">Status</Label>
+        <Label htmlFor="filter-status">{t('Status')}</Label>
         <NativeSelect
           id="filter-status"
           value={filters.status ?? ''}
@@ -62,17 +73,17 @@ export function TaskFiltersBar({
             })
           }
         >
-          <option value="">All statuses</option>
+          <option value="">{t('All statuses')}</option>
           {TASK_STATUSES.map((status) => (
             <option key={status} value={status}>
-              {STATUS_LABELS[status]}
+              {t(STATUS_LABELS[status])}
             </option>
           ))}
         </NativeSelect>
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="filter-assignee">Assignee</Label>
+        <Label htmlFor="filter-assignee">{t('Assignee')}</Label>
         <NativeSelect
           id="filter-assignee"
           value={filters.assigneeId ?? ''}
@@ -80,7 +91,7 @@ export function TaskFiltersBar({
             onChange({ assigneeId: toNumber(event.target.value) })
           }
         >
-          <option value="">Anyone</option>
+          <option value="">{t('Anyone')}</option>
           {assignees.map((person) => (
             <option key={person.id} value={person.id}>
               {person.name}
@@ -90,7 +101,7 @@ export function TaskFiltersBar({
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="filter-tag">Tag</Label>
+        <Label htmlFor="filter-tag">{t('Tag')}</Label>
         <NativeSelect
           id="filter-tag"
           value={filters.tagId ?? ''}
@@ -98,7 +109,7 @@ export function TaskFiltersBar({
             onChange({ tagId: toNumber(event.target.value) })
           }
         >
-          <option value="">Any tag</option>
+          <option value="">{t('Any tag')}</option>
           {tags.map((tag) => (
             <option key={tag.id} value={tag.id}>
               {tag.name}
@@ -108,7 +119,7 @@ export function TaskFiltersBar({
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="filter-sort">Sort by</Label>
+        <Label htmlFor="filter-sort">{t('Sort by')}</Label>
         <NativeSelect
           id="filter-sort"
           value={`${filters.sortBy}:${filters.order}`}
@@ -120,9 +131,11 @@ export function TaskFiltersBar({
               onChange({ sortBy: option.sortBy, order: option.order });
           }}
         >
-          {SORT_OPTIONS.map((option) => (
+          {SORT_OPTIONS.filter(
+            (option) => option.sortBy !== 'relevance' || filters.search,
+          ).map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {t(option.label)}
             </option>
           ))}
         </NativeSelect>

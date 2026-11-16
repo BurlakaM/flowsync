@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, type FormEvent } from 'react';
 import { Spinner } from '@/components/spinner';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
   const add = useAddMember(project.id);
   const remove = useRemoveMember(project.id);
   const [email, setEmail] = useState('');
+  const { t } = useTranslation();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -36,9 +38,9 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Members</CardTitle>
+        <CardTitle>{t('Members')}</CardTitle>
         <CardDescription>
-          Members can create and edit tasks, comments and tags.
+          {t('Members can create and edit tasks, comments and tags.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -55,17 +57,17 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
                 </p>
               </div>
               {member.role === 'OWNER' ? (
-                <Badge>Owner</Badge>
+                <Badge>{t('Owner')}</Badge>
               ) : (
                 isOwner && (
                   <Button
                     variant="ghost"
                     size="sm"
                     disabled={remove.isPending}
-                    aria-label={`Remove ${member.name}`}
+                    aria-label={t('Remove {{name}}', { name: member.name })}
                     onClick={() => remove.mutate(member.userId)}
                   >
-                    Remove
+                    {t('Remove')}
                   </Button>
                 )
               )}
@@ -81,7 +83,7 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
 
         {isOwner && (
           <form onSubmit={submit} className="space-y-2">
-            <Label htmlFor="member-email">Add a member by email</Label>
+            <Label htmlFor="member-email">{t('Add a member by email')}</Label>
             <div className="flex gap-2">
               <Input
                 id="member-email"
@@ -92,7 +94,7 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
               />
               <Button type="submit" disabled={add.isPending || !email.trim()}>
                 {add.isPending && <Spinner className="text-current" />}
-                Add
+                {t('Add')}
               </Button>
             </div>
             {add.isError && (

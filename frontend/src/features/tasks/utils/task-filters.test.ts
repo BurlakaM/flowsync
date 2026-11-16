@@ -35,6 +35,14 @@ describe('parseTaskFilters', () => {
     });
   });
 
+  it('accepts the relevance order', () => {
+    expect(parse('search=bug&sortBy=relevance&order=desc')).toMatchObject({
+      search: 'bug',
+      sortBy: 'relevance',
+      order: 'desc',
+    });
+  });
+
   it('ignores anything unknown or malformed', () => {
     expect(
       parse(

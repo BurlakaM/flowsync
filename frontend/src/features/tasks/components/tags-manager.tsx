@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, type FormEvent } from 'react';
 import { LoadingState } from '@/components/states/loading-state';
 import { ErrorState } from '@/components/states/error-state';
@@ -23,6 +24,7 @@ interface TagsManagerProps {
 }
 
 export function TagsManager({ projectId, canManage }: TagsManagerProps) {
+  const { t } = useTranslation();
   const tags = useTags(projectId);
   const create = useCreateTag(projectId);
   const remove = useDeleteTag();
@@ -38,22 +40,22 @@ export function TagsManager({ projectId, canManage }: TagsManagerProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tags</CardTitle>
+        <CardTitle>{t('Tags')}</CardTitle>
         <CardDescription>
-          Labels that group tasks of the project.
+          {t('Labels that group tasks of the project.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {tags.isPending ? (
-          <LoadingState label="Loading tags" />
+          <LoadingState label={t('Loading tags')} />
         ) : tags.isError ? (
           <ErrorState
             error={tags.error}
-            what="tags"
+            title={t('Could not load tags')}
             onRetry={() => void tags.refetch()}
           />
         ) : tags.data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tags yet.</p>
+          <p className="text-sm text-muted-foreground">{t('No tags yet.')}</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {tags.data.map((tag) => (
@@ -63,7 +65,7 @@ export function TagsManager({ projectId, canManage }: TagsManagerProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label={`Delete tag ${tag.name}`}
+                    aria-label={t('Delete tag {{name}}', { name: tag.name })}
                     disabled={remove.isPending}
                     onClick={() =>
                       remove.mutate(tag.id, {
@@ -87,7 +89,7 @@ export function TagsManager({ projectId, canManage }: TagsManagerProps) {
 
         {canManage && (
           <form onSubmit={submit} className="space-y-2">
-            <Label htmlFor="new-tag">New tag</Label>
+            <Label htmlFor="new-tag">{t('New tag')}</Label>
             <div className="flex gap-2">
               <Input
                 id="new-tag"
@@ -98,7 +100,7 @@ export function TagsManager({ projectId, canManage }: TagsManagerProps) {
               />
               <Button type="submit" disabled={create.isPending || !name.trim()}>
                 {create.isPending && <Spinner className="text-current" />}
-                Add tag
+                {t('Add tag')}
               </Button>
             </div>
             {create.isError && (

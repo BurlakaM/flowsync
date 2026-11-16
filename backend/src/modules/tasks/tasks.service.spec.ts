@@ -4,9 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DeepMockProxy, mockDeep } from 'vitest-mock-extended';
+import { DomainEventsService } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { QueryTasksDto } from './dto/query-tasks.dto';
+import { TasksSearchService } from './tasks-search.service';
 import { TasksService } from './tasks.service';
 
 const date = new Date('2026-01-01T00:00:00Z');
@@ -31,9 +33,12 @@ function taskRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const publish = vi.fn();
+
 describe('TasksService', () => {
   let prisma: DeepMockProxy<PrismaService>;
   const assertAccess = vi.fn();
+  const rankedIds = vi.fn();
   let service: TasksService;
 
   const query = (extra: Partial<QueryTasksDto> = {}) =>
@@ -46,7 +51,16 @@ describe('TasksService', () => {
       accessFilter: vi.fn().mockReturnValue(ACCESS),
       assertAccess,
     } as unknown as ProjectsService;
-    service = new TasksService(prisma, projects);
+    publish.mockReset();
+    rankedIds.mockReset().mockResolvedValue([]);
+    service = new TasksService(
+      prisma,
+      projects,
+      {
+        rankedIds,
+      } as unknown as TasksSearchService,
+      { publish } as unknown as DomainEventsService,
+    );
   });
 
   describe('list', () => {
@@ -73,6 +87,7 @@ describe('TasksService', () => {
     });
 
     it('applies the filters, the search and the sort order', async () => {
+      rankedIds.mockResolvedValue([11, 12]);
       prisma.task.findMany.mockResolvedValue([]);
       prisma.task.count.mockResolvedValue(0);
 
@@ -96,12 +111,59 @@ describe('TasksService', () => {
         status: 'DONE',
         assignees: { some: { userId: 5 } },
         tags: { some: { id: 6 } },
-        OR: [
-          { name: { contains: 'login', mode: 'insensitive' } },
-          { description: { contains: 'login', mode: 'insensitive' } },
-        ],
+        id: { in: [11, 12] },
       });
+      expect(rankedIds).toHaveBeenCalledWith('login', 4);
       expect(args?.orderBy).toEqual([{ name: 'asc' }, { id: 'desc' }]);
+    });
+
+    it('finds nothing when the search matches nothing, and still checks access', async () => {
+      rankedIds.mockResolvedValue([]);
+      prisma.task.findMany.mockResolvedValue([]);
+      prisma.task.count.mockResolvedValue(0);
+
+      await service.list(1, query({ search: 'zzz' }));
+
+      expect(prisma.task.findMany.mock.calls[0][0]?.where).toMatchObject({
+        project: ACCESS,
+        id: { in: [] },
+      });
+    });
+
+    it('orders by relevance and drops matches the user cannot see', async () => {
+      rankedIds.mockResolvedValue([30, 20, 10]);
+      // Task 20 belongs to a foreign project: access filtering removes it.
+      prisma.task.findMany
+        .mockResolvedValueOnce([{ id: 10 }, { id: 30 }] as never)
+        .mockResolvedValueOnce([
+          taskRow({ id: 10 }),
+          taskRow({ id: 30 }),
+        ] as never);
+
+      const page = await service.list(
+        1,
+        query({ search: 'login', sortBy: 'relevance' }),
+      );
+
+      expect(page.items.map((item) => item.id)).toEqual([30, 10]);
+      expect(page.meta.total).toBe(2);
+      expect(prisma.task.findMany.mock.calls[0][0]?.where).toMatchObject({
+        project: ACCESS,
+        id: { in: [30, 20, 10] },
+      });
+    });
+
+    it('treats relevance without a search as the default order', async () => {
+      prisma.task.findMany.mockResolvedValue([]);
+      prisma.task.count.mockResolvedValue(0);
+
+      await service.list(1, query({ sortBy: 'relevance', order: 'desc' }));
+
+      expect(prisma.task.findMany.mock.calls[0][0]?.orderBy).toEqual([
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ]);
+      expect(rankedIds).not.toHaveBeenCalled();
     });
 
     it('flattens assignees and counts comments', async () => {
@@ -181,11 +243,52 @@ describe('TasksService', () => {
     beforeEach(() => {
       prisma.task.findFirst.mockResolvedValue({
         id: 1,
+        name: 'T',
+        description: null,
+        status: 'TODO',
         projectId: 3,
         createdById: 1,
+        assignees: [],
+        tags: [],
         project: { ownerId: 1 },
       } as never);
       prisma.task.update.mockResolvedValue(taskRow() as never);
+    });
+
+    it('publishes what changed, including the new assignees', async () => {
+      prisma.user.count.mockResolvedValue(1);
+      prisma.tag.count.mockResolvedValue(0);
+      prisma.task.update.mockResolvedValue(
+        taskRow({ name: 'Renamed', status: 'DONE' }) as never,
+      );
+
+      await service.update(1, 1, {
+        name: 'Renamed',
+        status: 'DONE',
+        assigneeIds: [5],
+      });
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith({
+        type: 'task.updated',
+        actorId: 1,
+        projectId: 3,
+        entityType: 'Task',
+        entityId: 1,
+        data: {
+          name: 'Renamed',
+          changed: ['name', 'status', 'assignees', 'tags'],
+          status: { from: 'TODO', to: 'DONE' },
+          assigneesAdded: [5],
+        },
+      });
+    });
+
+    it('publishes nothing when the update fails', async () => {
+      prisma.task.update.mockRejectedValue(new Error('db down'));
+
+      await expect(service.update(1, 1, { name: 'X' })).rejects.toThrow();
+      expect(publish).not.toHaveBeenCalled();
     });
 
     it('replaces assignees and tags only when they are sent', async () => {

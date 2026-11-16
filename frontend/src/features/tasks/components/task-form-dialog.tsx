@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next';
+import { tKey } from '@/i18n/t-key';
+import { FormFieldError } from '@/components/form/form-field-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -15,7 +18,6 @@ import {
 } from '@/components/ui/dialog';
 import {
   Field,
-  FieldError,
   FieldGroup,
   FieldLabel,
   FieldSet,
@@ -39,9 +41,9 @@ const taskSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, 'Enter a name')
-    .max(200, 'Use at most 200 characters'),
-  description: z.string().trim().max(5000, 'Use at most 5000 characters'),
+    .min(1, tKey('Enter a name'))
+    .max(200, tKey('Use at most 200 characters')),
+  description: z.string().trim().max(5000, tKey('Use at most 5000 characters')),
   status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']),
   assigneeIds: z.array(z.number()),
   tagIds: z.array(z.number()),
@@ -70,15 +72,16 @@ export function TaskFormDialog({
   tags,
   onSaved,
 }: TaskFormDialogProps) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{task ? 'Edit task' : 'New task'}</DialogTitle>
+          <DialogTitle>{task ? t('Edit task') : t('New task')}</DialogTitle>
           <DialogDescription>
             {task
-              ? 'Change the details of the task.'
-              : 'Describe what needs to be done.'}
+              ? t('Change the details of the task.')
+              : t('Describe what needs to be done.')}
           </DialogDescription>
         </DialogHeader>
         {/* Mounted only while open, so every opening starts from the current values. */}
@@ -115,6 +118,7 @@ function TaskForm({
   onCancel,
   onSaved,
 }: TaskFormProps) {
+  const { t } = useTranslation();
   const create = useCreateTask(projectId);
   const update = useUpdateTask(task?.id ?? 0);
   const mutation = task ? update : create;
@@ -148,7 +152,7 @@ function TaskForm({
         <TextField
           control={form.control}
           name="name"
-          label="Name"
+          label={t('Name')}
           autoComplete="off"
         />
 
@@ -157,14 +161,18 @@ function TaskForm({
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="task-description">Description</FieldLabel>
+              <FieldLabel htmlFor="task-description">
+                {t('Description')}
+              </FieldLabel>
               <Textarea
                 {...field}
                 id="task-description"
                 rows={4}
                 aria-invalid={fieldState.invalid}
               />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              {fieldState.invalid && (
+                <FormFieldError error={fieldState.error} />
+              )}
             </Field>
           )}
         />
@@ -174,7 +182,7 @@ function TaskForm({
           control={form.control}
           render={({ field }) => (
             <Field>
-              <FieldLabel htmlFor="task-status">Status</FieldLabel>
+              <FieldLabel htmlFor="task-status">{t('Status')}</FieldLabel>
               <NativeSelect
                 id="task-status"
                 {...field}
@@ -184,7 +192,7 @@ function TaskForm({
               >
                 {TASK_STATUSES.map((status) => (
                   <option key={status} value={status}>
-                    {STATUS_LABELS[status]}
+                    {t(STATUS_LABELS[status])}
                   </option>
                 ))}
               </NativeSelect>
@@ -197,8 +205,8 @@ function TaskForm({
           control={form.control}
           render={({ field }) => (
             <CheckboxGroup
-              legend="Assignees"
-              emptyText="No one to assign yet."
+              legend={t('Assignees')}
+              emptyText={t('No one to assign yet.')}
               idPrefix="assignee"
               options={people.map((person) => ({
                 id: person.id,
@@ -215,8 +223,8 @@ function TaskForm({
           control={form.control}
           render={({ field }) => (
             <CheckboxGroup
-              legend="Tags"
-              emptyText="This project has no tags yet."
+              legend={t('Tags')}
+              emptyText={t('This project has no tags yet.')}
               idPrefix="tag"
               options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
               value={field.value}
@@ -234,11 +242,11 @@ function TaskForm({
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t('Cancel')}
         </Button>
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending && <Spinner className="text-current" />}
-          {task ? 'Save changes' : 'Create task'}
+          {task ? t('Save changes') : t('Create task')}
         </Button>
       </DialogFooter>
     </form>

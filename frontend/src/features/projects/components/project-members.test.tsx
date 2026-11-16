@@ -10,7 +10,7 @@ const details = (myRole: 'OWNER' | 'MEMBER'): ProjectDetails => ({
   id: 7,
   name: 'Roadmap',
   description: null,
-  image: null,
+  hasImage: false,
   ownerId: 1,
   myRole,
   tasksCount: 0,

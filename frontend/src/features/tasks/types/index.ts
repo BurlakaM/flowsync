@@ -20,7 +20,8 @@ export interface AssigneeOption {
   name: string;
 }
 
-export type TaskSortBy = 'createdAt' | 'updatedAt' | 'name';
+/** `relevance` is only meaningful together with a search. */
+export type TaskSortBy = 'createdAt' | 'updatedAt' | 'name' | 'relevance';
 export type SortOrder = 'asc' | 'desc';
 
 /** Everything the list of tasks can be narrowed or ordered by; mirrors the query string of the page. */

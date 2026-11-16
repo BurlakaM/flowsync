@@ -1,9 +1,12 @@
+import { useTranslation } from 'react-i18next';
+import { tKey } from '@/i18n/t-key';
+import { FormFieldError } from '@/components/form/form-field-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Spinner } from '@/components/spinner';
 import { Button } from '@/components/ui/button';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage } from '@/lib/api-client';
 import { useCreateComment } from '../api/comment-mutations';
@@ -13,8 +16,8 @@ const commentSchema = z.object({
   text: z
     .string()
     .trim()
-    .min(1, 'Write something first')
-    .max(5000, 'Use at most 5000 characters'),
+    .min(1, tKey('Write something first'))
+    .max(5000, tKey('Use at most 5000 characters')),
 });
 
 type CommentValues = z.infer<typeof commentSchema>;
@@ -25,6 +28,7 @@ interface CommentFormProps {
 }
 
 export function CommentForm({ taskId, onCreated }: CommentFormProps) {
+  const { t } = useTranslation();
   const create = useCreateComment(taskId);
   const form = useForm<CommentValues>({
     resolver: zodResolver(commentSchema),
@@ -47,14 +51,14 @@ export function CommentForm({ taskId, onCreated }: CommentFormProps) {
         control={form.control}
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
-            <FieldLabel htmlFor="new-comment">Add a comment</FieldLabel>
+            <FieldLabel htmlFor="new-comment">{t('Add a comment')}</FieldLabel>
             <Textarea
               {...field}
               id="new-comment"
               rows={3}
               aria-invalid={fieldState.invalid}
             />
-            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            {fieldState.invalid && <FormFieldError error={fieldState.error} />}
           </Field>
         )}
       />
@@ -67,7 +71,7 @@ export function CommentForm({ taskId, onCreated }: CommentFormProps) {
 
       <Button type="submit" disabled={create.isPending}>
         {create.isPending && <Spinner className="text-current" />}
-        Comment
+        {t('Comment')}
       </Button>
     </form>
   );

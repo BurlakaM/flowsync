@@ -16,7 +16,8 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: true,
-    proxy: { '/api': { target: proxyTarget, changeOrigin: true } },
+    // ws: the live-updates socket (/api/socket.io) goes through the same rule.
+    proxy: { '/api': { target: proxyTarget, changeOrigin: true, ws: true } },
     // Bind mounts from Windows do not deliver file-system events: poll when asked to.
     watch:
       process.env.VITE_USE_POLLING === 'true'
@@ -32,7 +33,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/testing/**', 'src/components/ui/**'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/testing/**',
+        'src/components/ui/**',
+      ],
       reporter: ['text', 'lcov'],
     },
   },

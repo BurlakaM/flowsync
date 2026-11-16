@@ -146,6 +146,15 @@ async list(userId: number, query: PaginationQueryDto) {
   а не дублюють умови. Роль ADMIN не дає доступу до чужих проєктів.
 - Обмеження частоти: глобально 100 запитів/хв з IP, для логіну й реєстрації `@Throttle` 5/хв. У `NODE_ENV=test` вимкнено.
 
+**Події, права, пошта, файли**
+- Зміни даних публікують доменні події через `DomainEventsService.publish` (`common/events`) **після** успішного збереження, з `await`. Підписники (`@OnEvent(DOMAIN_EVENT)`): журнал аудиту (`modules/activity`), сповіщення (`modules/notifications`), real-time (`modules/realtime`). Підписник мусить бути швидким і ніколи не кидати помилку назовні (повільне — у чергу); помилка підписника логується й ковтається.
+- Події містять лише дрібні факти (імена, зміни, id): не сутності й не секрети. Журнал проєкту очищується разом із проєктом.
+- Права «хто що може в проєкті» — тільки в `common/casl/app-ability.ts`; сервіси викликають `authorize(userId, project, дія, суб'єкт, повідомлення)` (403). Доступ (404) лишається в `ProjectsService.assertAccess`. Змінюєш правило — зміни там і в `app-ability.spec.ts`.
+- Пошта: лише через `MailQueueService.enqueue` (ніколи не кидає). Без `SMTP_HOST`+`MAIL_FROM` нічого не шлеться; з `REDIS_URL` листи йдуть через BullMQ з повторами, без нього — одразу. Транспорт підміняється токеном `MAIL_TRANSPORT` (у e2e: `createTestApp({ mailTransport })`).
+- Файли: лише через `StorageService` (`common/storage`), токен `OBJECT_STORE`; у e2e `createTestApp({ objectStore })`. Тип зображення визначається за байтами (`detectImageType`), SVG не приймаємо. Ключ об'єкта ніколи не віддається клієнту.
+- Пошук задач — `TasksSearchService` (повнотекстовий, `to_tsquery('simple', …)` з префіксами); вираз в індексі `tasks_fts_idx` має збігатися з виразом у запиті.
+- Real-time: шлях `/api/socket.io`; кімнати `project:<id>` і `user:<id>`; доступ перевіряється при підключенні й оновлюється подіями `member.added/removed`, `project.created/deleted`.
+
 **Конфігурація**
 - Усі змінні середовища описані в `config/env.schema.ts` (zod). Нова змінна = рядок у схемі + `.env.example` + README.
 - Читати значення лише через `AppConfigService`; `process.env` поза `config/` та `test/` заборонений.

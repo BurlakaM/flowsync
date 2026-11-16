@@ -39,6 +39,12 @@ export const routes: RouteObject[] = [
                 }),
               },
               {
+                path: 'notifications',
+                lazy: async () => ({
+                  Component: (await import('./routes/notifications')).default,
+                }),
+              },
+              {
                 path: 'tasks/:taskId',
                 lazy: async () => ({
                   Component: (await import('./routes/task')).default,

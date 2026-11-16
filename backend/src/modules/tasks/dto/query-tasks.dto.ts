@@ -11,7 +11,13 @@ import {
 import { Trim } from '../../../common/decorators/transform.decorators';
 import { PaginationQueryDto } from '../../../common/pagination/pagination-query.dto';
 
-export const TASK_SORT_FIELDS = ['createdAt', 'updatedAt', 'name'] as const;
+/** `relevance` orders by the quality of the match and only makes sense together with `search`. */
+export const TASK_SORT_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'relevance',
+] as const;
 
 export class QueryTasksDto extends PaginationQueryDto {
   @IsOptional()
@@ -34,7 +40,7 @@ export class QueryTasksDto extends PaginationQueryDto {
   @IsInt()
   projectId?: number;
 
-  /** Matches the name or the description (case-insensitive). */
+  /** Full-text search over the name, the description and the comments; every word must match, as a prefix. */
   @IsOptional()
   @Trim()
   @IsString()

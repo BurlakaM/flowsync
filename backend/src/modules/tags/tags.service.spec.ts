@@ -4,9 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DeepMockProxy, mockDeep } from 'vitest-mock-extended';
+import { DomainEventsService } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { TagsService } from './tags.service';
+
+const publish = vi.fn();
 
 describe('TagsService', () => {
   let prisma: DeepMockProxy<PrismaService>;
@@ -15,11 +18,16 @@ describe('TagsService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>();
+    publish.mockReset();
     assertAccess.mockReset().mockResolvedValue({ id: 3, ownerId: 1 });
-    service = new TagsService(prisma, {
-      accessFilter: vi.fn().mockReturnValue({}),
-      assertAccess,
-    } as unknown as ProjectsService);
+    service = new TagsService(
+      prisma,
+      {
+        accessFilter: vi.fn().mockReturnValue({}),
+        assertAccess,
+      } as unknown as ProjectsService,
+      { publish } as unknown as DomainEventsService,
+    );
   });
 
   describe('list and create', () => {

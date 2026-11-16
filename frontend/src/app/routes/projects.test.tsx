@@ -17,7 +17,7 @@ const project = (id: number, name: string, myRole = 'OWNER') => ({
   id,
   name,
   description: `${name} description`,
-  image: null,
+  hasImage: false,
   ownerId: 1,
   myRole,
   tasksCount: id,

@@ -1,3 +1,4 @@
+import { LanguageSwitcher } from '@/components/language-switcher';
 import type { ReactNode } from 'react';
 import logoMark from '@/assets/logo-mark.svg';
 import {
@@ -25,7 +26,10 @@ export function AuthLayout({
   children,
 }: AuthLayoutProps) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
+    <main className="relative flex min-h-screen items-center justify-center bg-muted/40 px-4">
+      <div className="absolute right-4 top-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <img src={logoMark} alt="" className="mb-2 size-10 dark:invert" />

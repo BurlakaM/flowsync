@@ -11,4 +11,8 @@ export const handlers: RequestHandler[] = [
     () => new HttpResponse(null, { status: 401 }),
   ),
   http.post('*/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
+  // Every signed-in page shows the bell, so it needs an answer in every test; tests override it.
+  http.get('*/api/notifications/unread-count', () =>
+    HttpResponse.json({ count: 0 }),
+  ),
 ];

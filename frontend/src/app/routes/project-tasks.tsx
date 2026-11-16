@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Pagination } from '@/components/pagination';
@@ -12,8 +13,10 @@ import {
   parseTaskFilters,
   TaskFiltersBar,
   TaskFormDialog,
+  TaskBoard,
   TaskList,
   useProjectTasks,
+  BOARD_PAGE_SIZE,
   useTags,
 } from '@/features/tasks';
 
@@ -27,10 +30,23 @@ export function ProjectTasks({ project }: ProjectTasksProps) {
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
   const refreshProjects = useRefreshProjects();
+  const { t } = useTranslation();
 
   // Filters, sorting and the page live in the URL: the list can be shared and survives a reload.
   const filters = parseTaskFilters(params);
-  const tasks = useProjectTasks(project.id, filters);
+  // The board shows every status at once, so it loads as many tasks as one request allows and has no pages.
+  const view = params.get('view') === 'board' ? 'board' : 'list';
+  const tasks = useProjectTasks(
+    project.id,
+    filters,
+    view === 'board' ? BOARD_PAGE_SIZE : undefined,
+  );
+  const setView = (next: 'list' | 'board') => {
+    const nextParams = new URLSearchParams(params);
+    if (next === 'board') nextParams.set('view', 'board');
+    else nextParams.delete('view');
+    setParams(nextParams);
+  };
   const tags = useTags(project.id);
 
   const assignees = project.members.map((member) => ({
@@ -43,9 +59,29 @@ export function ProjectTasks({ project }: ProjectTasksProps) {
     <section aria-labelledby="tasks-heading" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="tasks-heading" className="text-xl font-semibold">
-          Tasks
+          {t('Tasks')}
         </h2>
-        <Button onClick={() => setCreating(true)}>New task</Button>
+        <div className="flex items-center gap-2">
+          <div role="group" aria-label={t('View')} className="flex gap-1">
+            <Button
+              variant={view === 'list' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={view === 'list'}
+              onClick={() => setView('list')}
+            >
+              {t('List')}
+            </Button>
+            <Button
+              variant={view === 'board' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={view === 'board'}
+              onClick={() => setView('board')}
+            >
+              {t('Board')}
+            </Button>
+          </div>
+          <Button onClick={() => setCreating(true)}>{t('New task')}</Button>
+        </div>
       </div>
 
       <TaskFiltersBar
@@ -56,24 +92,24 @@ export function ProjectTasks({ project }: ProjectTasksProps) {
       />
 
       {tasks.isPending ? (
-        <LoadingState label="Loading tasks" />
+        <LoadingState label={t('Loading tasks')} />
       ) : tasks.isError ? (
         <ErrorState
           error={tasks.error}
-          what="tasks"
+          title={t('Could not load tasks')}
           onRetry={() => void tasks.refetch()}
         />
       ) : tasks.data.items.length === 0 ? (
         <EmptyState
           title={
             hasActiveFilters(filters)
-              ? 'No tasks match the filters'
-              : 'No tasks yet'
+              ? t('No tasks match the filters')
+              : t('No tasks yet')
           }
           description={
             hasActiveFilters(filters)
-              ? 'Try changing or clearing the filters.'
-              : 'Create the first task of this project.'
+              ? t('Try changing or clearing the filters.')
+              : t('Create the first task of this project.')
           }
           action={
             hasActiveFilters(filters) ? (
@@ -90,13 +126,28 @@ export function ProjectTasks({ project }: ProjectTasksProps) {
                   )
                 }
               >
-                Clear filters
+                {t('Clear filters')}
               </Button>
             ) : (
-              <Button onClick={() => setCreating(true)}>New task</Button>
+              <Button onClick={() => setCreating(true)}>{t('New task')}</Button>
             )
           }
         />
+      ) : view === 'board' ? (
+        <>
+          <TaskBoard tasks={tasks.data.items} />
+          {tasks.data.meta.total > tasks.data.items.length && (
+            <p className="text-sm text-muted-foreground">
+              {t(
+                'Showing the first {{shown}} of {{total}} tasks. Use the filters to narrow the board.',
+                {
+                  shown: tasks.data.items.length,
+                  total: tasks.data.meta.total,
+                },
+              )}
+            </p>
+          )}
+        </>
       ) : (
         <>
           <TaskList tasks={tasks.data.items} />

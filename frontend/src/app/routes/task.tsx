@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { formatDate } from '@/lib/format-date';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { EmptyState } from '@/components/states/empty-state';
@@ -17,9 +19,6 @@ import {
   useTask,
 } from '@/features/tasks';
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
-
 export default function TaskRoute() {
   const taskId = Number(useParams().taskId);
   const navigate = useNavigate();
@@ -32,18 +31,22 @@ export default function TaskRoute() {
   const me = useMe();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { t } = useTranslation();
 
   if (!Number.isInteger(taskId) || taskId < 1) {
     return (
-      <EmptyState title="Task not found" description="The link is not valid." />
+      <EmptyState
+        title={t('Task not found')}
+        description={t('The link is not valid.')}
+      />
     );
   }
-  if (task.isPending) return <LoadingState label="Loading task" />;
+  if (task.isPending) return <LoadingState label={t('Loading task')} />;
   if (task.isError) {
     return (
       <ErrorState
         error={task.error}
-        what="the task"
+        title={t('Could not load the task')}
         onRetry={() => void task.refetch()}
       />
     );
@@ -68,10 +71,10 @@ export default function TaskRoute() {
           <h1 className="text-2xl font-semibold">{data.name}</h1>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setEditing(true)}>
-              Edit
+              {t('Edit')}
             </Button>
             <Button variant="destructive" onClick={() => setDeleting(true)}>
-              Delete
+              {t('Delete')}
             </Button>
           </div>
         </div>
@@ -79,7 +82,7 @@ export default function TaskRoute() {
 
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
         <div className="space-y-1">
-          <dt className="text-muted-foreground">Status</dt>
+          <dt className="text-muted-foreground">{t('Status')}</dt>
           <dd>
             <StatusSelect
               taskId={data.id}
@@ -89,15 +92,15 @@ export default function TaskRoute() {
           </dd>
         </div>
         <div className="space-y-1">
-          <dt className="text-muted-foreground">Assignees</dt>
+          <dt className="text-muted-foreground">{t('Assignees')}</dt>
           <dd>
             {data.assignees.length > 0
               ? data.assignees.map((user) => user.name).join(', ')
-              : 'Nobody'}
+              : t('Nobody')}
           </dd>
         </div>
         <div className="space-y-1">
-          <dt className="text-muted-foreground">Tags</dt>
+          <dt className="text-muted-foreground">{t('Tags')}</dt>
           <dd className="flex flex-wrap gap-2">
             {data.tags.length > 0
               ? data.tags.map((tag) => (
@@ -105,25 +108,27 @@ export default function TaskRoute() {
                     {tag.name}
                   </Badge>
                 ))
-              : 'None'}
+              : t('None')}
           </dd>
         </div>
         <div className="space-y-1">
-          <dt className="text-muted-foreground">Created</dt>
+          <dt className="text-muted-foreground">{t('Created')}</dt>
           <dd>
             {formatDate(data.createdAt)}
-            {data.createdBy ? ` by ${data.createdBy.name}` : ''}
+            {data.createdBy
+              ? ` ${t('by {{name}}', { name: data.createdBy.name })}`
+              : ''}
           </dd>
         </div>
       </dl>
 
       <section aria-labelledby="description-heading" className="space-y-2">
         <h2 id="description-heading" className="text-lg font-semibold">
-          Description
+          {t('Description')}
         </h2>
         <p className="whitespace-pre-wrap text-sm">
           {data.description || (
-            <span className="text-muted-foreground">No description</span>
+            <span className="text-muted-foreground">{t('No description')}</span>
           )}
         </p>
       </section>

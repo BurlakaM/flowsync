@@ -15,6 +15,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-flowsync}
       # nginx is the only proxy in front of the API: trust it to get the real client IP.
       TRUST_PROXY: "1"
+      # The job queue (emails). SMTP_* are not set here: put them into backend/.env to switch email on.
+      REDIS_URL: redis://redis:6379
     # Applies the committed migrations, then starts the API. The demo seed never runs here.
     command: sh -c "npx prisma migrate deploy && node dist/main"
     healthcheck:
@@ -25,6 +27,8 @@ services:
       start_period: 40s
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - app_network
@@ -48,6 +52,22 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - app_network
+
+  # Job queue for emails. Data lives in a volume so that queued messages survive a restart.
+  redis:
+    image: redis:7-alpine
+    container_name: flowsync-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
     networks:
       - app_network
 
@@ -75,3 +95,4 @@ networks:
 
 volumes:
   pg_data:
+  redis_data:

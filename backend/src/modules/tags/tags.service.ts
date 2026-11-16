@@ -1,10 +1,11 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { authorize } from '../../common/casl/authorize';
+import { DomainEventsService } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { CreateTagDto } from './dto/create-tag.dto';
@@ -23,6 +24,7 @@ export class TagsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
+    private readonly events: DomainEventsService,
   ) {}
 
   /** Tags are a short reference list, so they are returned without pagination. */
@@ -43,10 +45,19 @@ export class TagsService {
   ): Promise<TagResponseDto> {
     await this.projects.assertAccess(userId, projectId);
     await this.assertNameIsFree(projectId, dto.name);
-    return this.prisma.tag.create({
+    const tag = await this.prisma.tag.create({
       data: { name: dto.name, projectId },
       select: tagSelect,
     });
+    await this.events.publish({
+      type: 'tag.created',
+      actorId: userId,
+      projectId,
+      entityType: 'Tag',
+      entityId: tag.id,
+      data: { name: tag.name },
+    });
+    return tag;
   }
 
   async update(
@@ -57,20 +68,41 @@ export class TagsService {
     const tag = await this.findAccessible(userId, id);
     if (tag.name !== dto.name)
       await this.assertNameIsFree(tag.projectId, dto.name);
-    return this.prisma.tag.update({
+    const updated = await this.prisma.tag.update({
       where: { id },
       data: { name: dto.name },
       select: tagSelect,
     });
+    await this.events.publish({
+      type: 'tag.updated',
+      actorId: userId,
+      projectId: tag.projectId,
+      entityType: 'Tag',
+      entityId: id,
+      data: { name: updated.name, renamedFrom: tag.name },
+    });
+    return updated;
   }
 
   /** Owner only: deleting a tag removes it from every task of the project. */
   async remove(userId: number, id: number): Promise<void> {
     const tag = await this.findAccessible(userId, id);
-    if (tag.project.ownerId !== userId) {
-      throw new ForbiddenException('Only the project owner can delete tags');
-    }
+    authorize(
+      userId,
+      tag.project,
+      'delete',
+      'Tag',
+      'Only the project owner can delete tags',
+    );
     await this.prisma.tag.delete({ where: { id } });
+    await this.events.publish({
+      type: 'tag.deleted',
+      actorId: userId,
+      projectId: tag.projectId,
+      entityType: 'Tag',
+      entityId: id,
+      data: { name: tag.name },
+    });
   }
 
   private async findAccessible(userId: number, id: number) {
