@@ -1,15 +1,13 @@
 # Frontend (React) — правила
 
 Спільні правила: `../AGENTS.md`. План і поточна фаза: `../docs/ARCHITECTURE_PLAN.md`.
-Цей файл описує **цільову** архітектуру (Vite + React 19 + TypeScript).
+Цей файл описує архітектуру frontend (Vite + React 19 + TypeScript). Фундамент готовий (фаза 5); фічі додаються у фазі 6.
 
-> **Поки фаза 5 не завершена**, у `src/` лежить старий CRA-код на JS (`App.js`, `auth/`, `cabinet/`, `components/`).
-> Його **не розширюй**: лише виправлення багів. Нові функції чекають на нову структуру.
+## Стек
 
-## Стек (ціль)
-
-Vite · React 19 · TypeScript strict · `react-router` v7 · TanStack Query v5 · `react-hook-form` + `zod` ·
-Tailwind CSS 4 + shadcn/ui · axios · Vitest + Testing Library + MSW · Playwright (e2e).
+Vite · React 19 · TypeScript strict · `react-router` v8 (імпорт з `react-router`, `RouterProvider` з `react-router/dom`) ·
+TanStack Query v5 · `react-hook-form` + `zod` · Tailwind CSS 4 + shadcn/ui · axios ·
+Vitest + Testing Library + MSW · Playwright (e2e, фаза 7). Потрібен Node ≥ 22.22.
 Не додавай Redux, Bootstrap, jQuery, styled-components; нову бібліотеку спершу запропонуй власнику.
 
 ## Структура
@@ -33,7 +31,8 @@ src/
 ```
 
 **Напрямок імпортів:** `components, hooks, lib, config, types` → `features` → `app`.
-Фіча **не імпортує іншу фічу** (правило ESLint `no-restricted-paths`): їх складають разом на рівні `app/routes`.
+Фіча **не імпортує іншу фічу** (правило ESLint `no-restricted-imports`): їх складають разом на рівні `app/routes`.
+Лінтер ловить імпорти через `@/features/...` і `@/app`, але не ловить відносні шляхи на кшталт `../../tasks/x`: у фічах використовуй лише `@/`.
 Із фічі назовні експортується лише те, що перелічено в її `index.ts`; з інших місць не імпортуй її внутрішні файли.
 
 ## Шаблони
@@ -96,7 +95,8 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
 
 **Стилі та UI**
 - Tailwind-класи й токени теми; без inline-стилів і власних CSS-файлів, крім `index.css` із темою.
-- Компоненти shadcn додаємо в `components/ui` командою CLI й не переписуємо без потреби.
+- Компоненти shadcn додаємо в `components/ui` командою CLI (`npx shadcn@latest add <name>`) й не переписуємо без потреби.
+  У новому реєстрі немає компонента `form`: для форм використовуй `field` разом із `react-hook-form`.
 
 **Типи**
 - Без `any` і `@ts-ignore`; типи відповідей API лежать у `features/*/types` (після фази 7 — генеруються з OpenAPI, тоді не дублюй їх вручну).
