@@ -34,7 +34,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/flowsync
-      SECRET_KEY: ci-only-secret
+      # The e2e tests wipe this database; it is disposable in CI.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/flowsync
+      JWT_SECRET: ci-only-secret
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -49,7 +51,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
-      - run: npx prisma db push
+      # Global setup of the e2e tests pushes the schema to TEST_DATABASE_URL.
       - run: npm run test:e2e
       - run: npm run build
 

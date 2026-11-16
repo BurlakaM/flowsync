@@ -1,28 +1,30 @@
 # Backend (NestJS) — правила
 
 Спільні правила: `../AGENTS.md`. План і поточна фаза: `../docs/ARCHITECTURE_PLAN.md`.
-Цей файл описує **цільову** архітектуру; частина старого коду їй ще не відповідає (див. baseline у плані).
-Нову логіку пиши за цими правилами, стару мігруй лише в межах фази.
+Структура нижче вже реальна (фаза 2). Ще не змінено лише схему БД і доменні модулі: вони мігрують у фазах 3–4
+(поки що поля й таблиці в `snake_case`, ролі в таблиці `role`).
 
 ## Структура
 
 ```
 src/
-├─ main.ts, app.module.ts
-├─ config/        env.schema.ts (zod), app-config.service.ts
-├─ database/      prisma.module.ts (global), prisma.service.ts
-├─ common/        decorators/ guards/ filters/ interceptors/ pagination/ types/
-├─ health/
+├─ main.ts                  bootstrap: pino-логер, configureApp, Swagger (не в production)
+├─ app.module.ts            модулі, глобальні guard-и (throttler → JWT → ролі) і фільтри
+├─ app.setup.ts             префікс /api, helmet, ValidationPipe, CORS, shutdown hooks, trust proxy
+├─ swagger.ts               /api/docs
+├─ config/                  env.schema.ts (zod), app-config.service.ts, config.module.ts
+├─ database/                prisma.module.ts (global), prisma.service.ts
+├─ common/                  decorators/ guards/ filters/ pagination/ types/
+├─ health/                  GET /api/health (публічний, без throttle)
 └─ modules/<feature>/
    ├─ dto/                    create-x.dto.ts, update-x.dto.ts, x-response.dto.ts, query-x.dto.ts
    ├─ x.controller.ts
    ├─ x.service.ts
    ├─ x.service.spec.ts       unit-тест поруч із сервісом
    └─ x.module.ts
-test/e2e/                     *.e2e-spec.ts
+prisma/                     schema.prisma, seed.ts, roles.ts
+test/                       e2e/*.e2e-spec.ts, utils/ (createTestApp, cleanDatabase), setup-env.ts, global-setup.ts
 ```
-
-Поточний стан до фази 2: фічі лежать у `src/<feature>/`, спільне — у `src/conception/`. Не додавай нічого нового в `conception/`.
 
 ## Шари й відповідальність
 
@@ -34,15 +36,16 @@ test/e2e/                     *.e2e-spec.ts
 
 Модулі спілкуються лише через експортовані сервіси. Імпорт файлів іншого модуля напряму заборонений.
 Цикл залежностей вирішуй винесенням спільного коду, а не через `forwardRef`.
+`PrismaService` глобальний: у модулях його не додають у `providers`, просто інжектять.
 
 ## Шаблон модуля
 
-DTO (`class-validator`; `PartialType` береться з `@nestjs/swagger`, щоб зберігати метадані Swagger):
+DTO (`class-validator`; поля з `!`, бо в TS 6 діє `strict`; `PartialType` береться з `@nestjs/swagger`):
 
 ```ts
 export class CreateTaskDto {
   @IsString() @IsNotEmpty() @MaxLength(200)
-  name: string;
+  name!: string;
 
   @IsOptional() @IsString() @MaxLength(5000)
   description?: string;
@@ -51,7 +54,7 @@ export class CreateTaskDto {
 export class UpdateTaskDto extends PartialType(CreateTaskDto) {}
 ```
 
-Контролер: тонкий, id користувача лише з `@CurrentUser()`:
+Контролер: тонкий, id користувача лише з `@CurrentUser()`. Guard вішати не треба: JWT перевіряється глобально.
 
 ```ts
 @ApiTags('tasks')
@@ -95,19 +98,42 @@ export class TasksService {
 }
 ```
 
+Список із пагінацією (`common/pagination`):
+
+```ts
+async list(userId: number, query: PaginationQueryDto) {
+  const where = { /* лише доступне користувачеві */ };
+  const [items, total] = await Promise.all([
+    this.prisma.task.findMany({ where, select: taskSelect, ...paginationArgs(query) }),
+    this.prisma.task.count({ where }),
+  ]);
+  return toPage(items, total, query); // { items, meta: { page, limit, total, totalPages } }
+}
+```
+
 ## Правила
 
 **API**
-- JSON у camelCase. Колекції повертай з пагінацією (`PaginationQueryDto`).
+- JSON у camelCase. Колекції повертай з пагінацією (`PaginationQueryDto`, `paginationArgs`, `toPage`).
 - Помилки — виключення Nest (`NotFoundException`, `ForbiddenException`, `ConflictException`); не повертай `null` замість 404.
-- Помилки Prisma (`P2002`, `P2025`, `P2003`) мапить `PrismaExceptionFilter`; у сервісах не лови їх без потреби.
-- Ендпоїнт без guard допустимий лише з `@Public()` і коментарем причини (логін, реєстрація, health).
-- Додавай `@ApiProperty`/`@ApiOperation`, якщо Nest CLI plugin цього не робить.
+  Усі помилки мають єдине тіло `{ statusCode, error, message, path, timestamp }` (`AllExceptionsFilter`).
+- Помилки Prisma (`P2002` → 409, `P2025` → 404, `P2003` → 409) мапить `PrismaExceptionFilter`; у сервісах не лови їх без потреби.
+- Swagger: Nest CLI plugin описує DTO автоматично (файли `*.dto.ts`); додавай `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation` вручну.
 
 **Автентифікація й доступ**
-- Користувач у запиті — `AuthenticatedUser { id: number; email: string; role: Role }`, дістається через `@CurrentUser()`. Ніяких `req.user.sub`.
-- Реєстрація завжди створює роль `USER`; роль із тіла запиту ігнорується.
-- Доступ до ресурсу перевіряє сервіс (членство в проєкті), а не контролер.
+- Усі маршрути закриті глобальним `JwtAuthGuard`. Публічним маршрут робить лише `@Public()` і коментар про причину
+  (зараз: реєстрація, логін, `validate-token`, health).
+- Обмеження за роллю — `@Roles(Role.Admin)` (перевіряє глобальний `RolesGuard`).
+- Користувач у запиті — `AuthenticatedUser { id; email; role }`, дістається через `@CurrentUser()`. Ніяких `req.user.sub`.
+  `JwtStrategy` читає користувача з БД на кожен запит, тож токен видаленого користувача одразу недійсний.
+- Реєстрація завжди створює роль `user`; роль у тілі запиту заборонена (400).
+- Доступ до ресурсу перевіряє сервіс (членство в проєкті), а не контролер; чужий ресурс → `NotFoundException`.
+- Обмеження частоти: глобально 100 запитів/хв з IP, для логіну й реєстрації `@Throttle` 5/хв. У `NODE_ENV=test` вимкнено.
+
+**Конфігурація**
+- Усі змінні середовища описані в `config/env.schema.ts` (zod). Нова змінна = рядок у схемі + `.env.example` + README.
+- Читати значення лише через `AppConfigService`; `process.env` поза `config/` та `test/` заборонений.
+- Застосунок не стартує при невалідному env. У production `JWT_SECRET` має бути ≥ 32 символів.
 
 **Дані**
 - Prisma лише в сервісах/репозиторіях, ніколи в контролерах. Raw SQL — лише з обґрунтуванням у коментарі.
@@ -116,29 +142,49 @@ export class TasksService {
 - Перевірка деструктивних міграцій (drop, rename з даними) — лише з дозволу власника.
 - Кілька записів, що мають бути атомарними, — `prisma.$transaction`.
 - Для списків не допускай N+1: `include`/`select` у одному запиті.
+- Seed: `prisma/seed.ts` ідемпотентний і запускається через `tsx`; спільна логіка (ролі) в `prisma/roles.ts`.
 
 **Код**
 - Файли kebab-case із суфіксом ролі (`tasks.service.ts`, `create-task.dto.ts`); один клас на файл; класи PascalCase.
-- Без `any`; тип невідомого — `unknown` + звуження. Без `@ts-ignore`.
-- `process.env` лише в `config/`; решта коду бере значення з `AppConfigService`.
-- Логування — Nest `Logger` (або pino), не `console.log`. Секрети й токени в лог не пиши.
-- Паролі — `bcryptjs`, cost з конфігурації. Порівняння — лише `bcrypt.compare`.
+- TypeScript 6 зі `strict: true`. Без `any` (ESLint попереджає), тип невідомого — `unknown` + звуження. Без `@ts-ignore`.
+- Логування — `Logger` з `@nestjs/common` (під капотом pino), ніколи `console.log`. Секрети й токени в лог не пиши
+  (заголовки `authorization` і `cookie` редагуються автоматично).
+- Паролі — `bcryptjs`, порівняння лише `bcrypt.compare`.
 - Не змінюй глобальний префікс `api` і порт 3000 без узгодження: на них налаштовано nginx і compose.
+- Nest 12 і Vitest потребують Node ≥ 22.12 (рекомендовано 24). Пакети Nest тепер ESM: Jest не підходить, використовуємо Vitest.
 
-## Тести
+## Тести (Vitest)
 
-- **Unit** (`*.spec.ts`): кожен публічний метод сервісу; Prisma мокається через `jest-mock-extended` (`mockDeep<PrismaService>()`).
-- **E2E** (`test/e2e`): кожен ендпоїнт — мінімум 401 без токена, 400 на некоректне тіло, 404 на чужий ресурс, успішний сценарій.
-  Працюють на окремій тестовій БД; кожен тест готує власні дані.
+- **Unit** (`src/**/*.spec.ts`, `npm test`): кожен публічний метод сервісу, guard-и, фільтри. Prisma мокається через
+  `vitest-mock-extended` (`mockDeep<PrismaService>()`); глобали `describe/it/vi/expect` доступні без імпорту.
+- **E2E** (`test/e2e/*.e2e-spec.ts`, `npm run test:e2e`): кожен ендпоїнт — мінімум 401 без токена, 400 на некоректне тіло,
+  404 на чужий ресурс, успішний сценарій. Застосунок створює `createTestApp()` (справжній `AppModule` + `configureApp`),
+  у `beforeAll` викликай `cleanDatabase(prisma)` і `seedRoles(prisma)`.
+- Тести йдуть на **окрему БД** `flowsync_test`: `docker compose --profile test up -d db_test` (порт 5434, дані в пам'яті).
+  `cleanDatabase` і `globalSetup` відмовляються працювати з БД, назва якої не містить `test` (у CI дозволено).
+  **Ніколи не вказуй `TEST_DATABASE_URL` на робочу БД.**
 - Назви: `it('returns 404 when task belongs to another project')` — поведінка, а не реалізація.
 - Нова перевірка безпеки (guard, доступ) без тесту не вважається виконаною.
+
+## Команди
+
+```bash
+npm run start:dev    # API з watch (на хості потрібна БД на :5433)
+npm run lint         # ESLint 9; lint:fix виправляє
+npm run format       # Prettier (format:check — лише перевірка)
+npm run typecheck    # tsc --noEmit
+npm test             # unit; test:cov — покриття
+npm run test:e2e     # e2e (потрібен db_test)
+npm run build        # nest build -> dist/main.js
+```
 
 ## Чекліст нового модуля
 
 1. DTO (`Create`/`Update`/`Response`/`Query`) із валідацією.
 2. Сервіс: перевірка доступу → логіка → `select`.
-3. Контролер без логіки, з Swagger-декораторами.
-4. Модуль: `exports: [XService]`, якщо його використовують інші.
+3. Контролер без логіки, з Swagger-декораторами; публічні маршрути лише з `@Public()` і коментарем.
+4. Модуль: `exports: [XService]`, якщо його використовують інші; додати в `AppModule`.
 5. Unit-тест сервісу + e2e ендпоїнтів.
 6. Міграція Prisma (якщо змінювалась схема) + оновлений seed.
-7. Видалено старий код; відмічено пункт у плані.
+7. Нові змінні середовища: схема zod, `.env.example`, README.
+8. Видалено старий код; відмічено пункт у плані.
