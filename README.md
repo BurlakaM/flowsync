@@ -1,6 +1,6 @@
 # FlowSync
 
-**FlowSync** is a personal pet project with a **Nest.js** backend, **React/Vite** frontend, **MySQL** database, and **Docker** support for local development and production deployment.  
+**FlowSync** is a personal pet project with a **Nest.js** backend, **React/Vite** frontend, **PostgreSQL** database, and **Docker** support for local development and production deployment.  
 The project also has **CI/CD** configured via GitHub Actions.
 
 ---
@@ -24,7 +24,7 @@ The project also has **CI/CD** configured via GitHub Actions.
 
 - **Backend:** Nest.js with TypeScript
 - **Frontend:** React + Vite
-- **Database:** MySQL
+- **Database:** PostgreSQL
 - **Docker:** for local development and production
 - Easy switching between **dev** and **prod** environments
 - **CI/CD:** GitHub Actions for building and pushing Docker images
@@ -36,7 +36,7 @@ The project also has **CI/CD** configured via GitHub Actions.
 - Node.js 20
 - Nest.js 10
 - React 18 + Vite 5
-- MySQL 8
+- PostgreSQL 16
 - Docker / Docker Compose
 - GitHub Actions
 
@@ -76,7 +76,7 @@ React: http://localhost:5173
 
 Nest.js API: http://localhost:3000
 
-MySQL: localhost:3306 (user: root, password from .env)
+PostgreSQL: localhost:5433 (user: postgres, password: postgres)
 
 Production Deployment
 Build production images:
@@ -88,7 +88,7 @@ React: http://localhost:8080
 
 Nest.js API: http://localhost:3000
 
-MySQL: localhost:3306
+PostgreSQL: localhost:5433
 
 Environment variables are loaded from .env files. Switch between dev/prod by using different docker-compose files.
 
@@ -112,14 +112,14 @@ Backend: Nest.js
 
 Frontend: React/Vite
 
-Database: MySQL 8
+Database: PostgreSQL 16
 
-Local volumes are used for persistent MySQL data
+Local volumes are used for persistent PostgreSQL data
 
 Environment Configuration
 Backend .env:
 
-DATABASE_URL="mysql://root:rootpassword@db:3306/database_name"
+DATABASE_URL="postgresql://postgres:postgres@db:5432/jira"
 SECRET_KEY=YOUR_SECRET_KEY
 Frontend .env:
 
