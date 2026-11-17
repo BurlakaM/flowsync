@@ -404,6 +404,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liveness: the process is up and the event loop answers. It checks no dependency on purpose,
+         *     otherwise a database outage would make the orchestrator restart a healthy API in a loop.
+         */
+        get: operations["HealthController_live"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -411,7 +431,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["HealthController_check"];
+        /**
+         * Readiness: the API can serve traffic, i.e. its dependencies answer. A failure returns 503 so
+         *     a proxy stops sending requests without restarting the container. `GET /health` is the same
+         *     check, kept for the existing Docker healthchecks.
+         */
+        get: operations["HealthController_ready[0]"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness: the API can serve traffic, i.e. its dependencies answer. A failure returns 503 so
+         *     a proxy stops sending requests without restarting the container. `GET /health` is the same
+         *     check, kept for the existing Docker healthchecks.
+         */
+        get: operations["HealthController_ready[1]"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1553,7 +1599,172 @@ export interface operations {
             };
         };
     };
-    HealthController_check: {
+    HealthController_live: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "HealthController_ready[0]": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The Health Check is successful */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @example ok
+                         * @enum {string}
+                         */
+                        status?: "ok" | "degraded";
+                        /**
+                         * @example {
+                         *       "database": {
+                         *         "status": "up",
+                         *         "responseTime": 12
+                         *       }
+                         *     }
+                         */
+                        info?: {
+                            [key: string]: {
+                                /** @enum {string} */
+                                status: "up" | "degraded" | "down";
+                                /** @description Time the health indicator took to respond, in ms */
+                                responseTime?: number;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        } | null;
+                        /** @example {} */
+                        error?: {
+                            [key: string]: {
+                                /** @enum {string} */
+                                status: "up" | "degraded" | "down";
+                                /** @description Time the health indicator took to respond, in ms */
+                                responseTime?: number;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        } | null;
+                        /**
+                         * @example {
+                         *       "database": {
+                         *         "status": "up",
+                         *         "responseTime": 12
+                         *       }
+                         *     }
+                         */
+                        details?: {
+                            [key: string]: {
+                                /** @enum {string} */
+                                status: "up" | "degraded" | "down";
+                                /** @description Time the health indicator took to respond, in ms */
+                                responseTime?: number;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description The Health Check is not successful */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @example error
+                         * @enum {string}
+                         */
+                        status?: "error" | "shutting_down";
+                        /**
+                         * @example {
+                         *       "database": {
+                         *         "status": "up",
+                         *         "responseTime": 12
+                         *       }
+                         *     }
+                         */
+                        info?: {
+                            [key: string]: {
+                                /** @enum {string} */
+                                status: "up" | "degraded" | "down";
+                                /** @description Time the health indicator took to respond, in ms */
+                                responseTime?: number;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        } | null;
+                        /**
+                         * @example {
+                         *       "redis": {
+                         *         "status": "down",
+                         *         "message": "Could not connect",
+                         *         "responseTime": 3005
+                         *       }
+                         *     }
+                         */
+                        error?: {
+                            [key: string]: {
+                                /** @enum {string} */
+                                status: "up" | "degraded" | "down";
+                                /** @description Time the health indicator took to respond, in ms */
+                                responseTime?: number;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        } | null;
+                        /**
+                         * @example {
+                         *       "database": {
+                         *         "status": "up",
+                         *         "responseTime": 12
+                         *       },
+                         *       "redis": {
+                         *         "status": "down",
+                         *         "message": "Could not connect",
+                         *         "responseTime": 3005
+                         *       }
+                         *     }
+                         */
+                        details?: {
+                            [key: string]: {
+                                /** @enum {string} */
+                                status: "up" | "degraded" | "down";
+                                /** @description Time the health indicator took to respond, in ms */
+                                responseTime?: number;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "HealthController_ready[1]": {
         parameters: {
             query?: never;
             header?: never;

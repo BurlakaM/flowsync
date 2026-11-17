@@ -16,7 +16,7 @@ src/
 ├─ config/                  env.schema.ts (zod), app-config.service.ts, config.module.ts
 ├─ database/                prisma.module.ts (global), prisma.service.ts
 ├─ common/                  decorators/ guards/ filters/ pagination/ types/
-├─ health/                  GET /api/health (публічний, без throttle)
+├─ health/                  GET /api/health/live і /ready (= /api/health); публічні, без throttle; Redis лише якщо задано REDIS_URL
 └─ modules/<feature>/
    ├─ dto/                    create-x.dto.ts, update-x.dto.ts, x-response.dto.ts, query-x.dto.ts
    ├─ x.controller.ts

@@ -54,6 +54,7 @@ cd backend && npm run openapi:export  # після зміни API: оновит�
 cd frontend && npm run dev           # Vite з HMR
 cd frontend && npm test              # Vitest; також lint, typecheck, build, format:check
 cd frontend && npm run api:types     # після зміни API (і openapi.json): оновити src/types/api.generated.ts (CI перевіряє)
+./ops/backup.sh && ./ops/restore-verify.sh   # бекап БД і доказ, що його можна відновити (docs/OPERATIONS.md)
 cd frontend && npm run test:e2e      # Playwright проти прод-подібного стеку на :8080 (спершу docker compose -f docker-compose.yml up -d --build)
 ```
 
