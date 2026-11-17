@@ -147,9 +147,16 @@ function TaskForm({
     ),
   ];
 
-  const submit = form.handleSubmit((values) =>
-    mutation.mutate(values, { onSuccess: onSaved }),
-  );
+  const submit = form.handleSubmit((values) => {
+    if (task) {
+      update.mutate(
+        { ...values, version: task.version },
+        { onSuccess: onSaved },
+      );
+    } else {
+      create.mutate(values, { onSuccess: onSaved });
+    }
+  });
 
   return (
     <form onSubmit={submit} noValidate className="space-y-6">

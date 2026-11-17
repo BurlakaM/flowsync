@@ -44,7 +44,11 @@ describe('ProjectsService', () => {
     Object.values(storage).forEach((fn) => fn.mockReset());
     service = new ProjectsService(
       prisma,
-      { publish } as unknown as DomainEventsService,
+      {
+        // The real service runs the work in a transaction; here the mocked client plays the transaction.
+        transact: (work: (tx: unknown, emit: unknown) => unknown) =>
+          work(prisma, publish),
+      } as unknown as DomainEventsService,
       storage as unknown as StorageService,
     );
   });

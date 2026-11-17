@@ -590,7 +590,9 @@ export interface components {
             name: string;
             description: string | null;
             /** @enum {string} */
-            status: "TODO" | "IN_PROGRESS" | "DONE";
+            status: "DONE" | "TODO" | "IN_PROGRESS";
+            /** @description Send it back with every update (optimistic concurrency). */
+            version: number;
             projectId: number;
             /** @description Null when the author's account was deleted. */
             createdById: number | null;
@@ -613,7 +615,7 @@ export interface components {
              * @description Defaults to TODO.
              * @enum {string}
              */
-            status?: "TODO" | "IN_PROGRESS" | "DONE";
+            status?: "DONE" | "TODO" | "IN_PROGRESS";
             /** @description User ids; every assignee must be the owner or a member of the project. */
             assigneeIds?: number[];
             /** @description Tag ids; every tag must belong to the same project. */
@@ -628,7 +630,9 @@ export interface components {
             name: string;
             description: string | null;
             /** @enum {string} */
-            status: "TODO" | "IN_PROGRESS" | "DONE";
+            status: "DONE" | "TODO" | "IN_PROGRESS";
+            /** @description Send it back with every update (optimistic concurrency). */
+            version: number;
             projectId: number;
             /** @description Null when the author's account was deleted. */
             createdById: number | null;
@@ -649,11 +653,12 @@ export interface components {
              * @description Defaults to TODO.
              * @enum {string}
              */
-            status?: "TODO" | "IN_PROGRESS" | "DONE";
+            status?: "DONE" | "TODO" | "IN_PROGRESS";
             /** @description User ids; every assignee must be the owner or a member of the project. */
             assigneeIds?: number[];
             /** @description Tag ids; every tag must belong to the same project. */
             tagIds?: number[];
+            version: number;
         };
         CommentResponseDto: {
             id: number;
@@ -667,8 +672,9 @@ export interface components {
             updatedAt: string;
         };
         CommentPageDto: {
+            /** @description Pass it as `cursor` to get the next page; null on the last one. */
+            nextCursor: string | null;
             items: components["schemas"]["CommentResponseDto"][];
-            meta: components["schemas"]["PageMetaDto"];
         };
         CreateCommentDto: {
             text: string;
@@ -712,7 +718,8 @@ export interface components {
         };
         ActivityPageDto: {
             items: components["schemas"]["ActivityResponseDto"][];
-            meta: components["schemas"]["PageMetaDto"];
+            /** @description Pass it as `cursor` to get the next page; null on the last one. */
+            nextCursor: string | null;
         };
         NotificationResponseDto: {
             /** @description Names and ids the client needs to write the sentence and to link to the target. */
@@ -1162,7 +1169,7 @@ export interface operations {
     TasksController_list: {
         parameters: {
             query: {
-                status?: "TODO" | "IN_PROGRESS" | "DONE";
+                status?: "DONE" | "TODO" | "IN_PROGRESS";
                 assigneeId?: number;
                 tagId?: number;
                 /** @description Only for GET /tasks (across projects); the nested route takes it from the URL. */
@@ -1193,7 +1200,7 @@ export interface operations {
     TasksController_listInProject: {
         parameters: {
             query: {
-                status?: "TODO" | "IN_PROGRESS" | "DONE";
+                status?: "DONE" | "TODO" | "IN_PROGRESS";
                 assigneeId?: number;
                 tagId?: number;
                 /** @description Only for GET /tasks (across projects); the nested route takes it from the URL. */
@@ -1315,10 +1322,7 @@ export interface operations {
     };
     CommentsController_list: {
         parameters: {
-            query: {
-                page: number;
-                limit: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 taskId: number;
@@ -1498,10 +1502,7 @@ export interface operations {
     };
     ActivityController_list: {
         parameters: {
-            query: {
-                page: number;
-                limit: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: number;

@@ -18,7 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
+import { CursorQueryDto } from '../../common/pagination/cursor';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.type';
 import { CommentsService } from './comments.service';
 import { CommentPageDto, CommentResponseDto } from './dto/comment-response.dto';
@@ -36,7 +36,7 @@ export class CommentsController {
   list(
     @CurrentUser() user: AuthenticatedUser,
     @Param('taskId', ParseIntPipe) taskId: number,
-    @Query() query: PaginationQueryDto,
+    @Query() query: CursorQueryDto,
   ) {
     return this.comments.list(user.id, taskId, query);
   }

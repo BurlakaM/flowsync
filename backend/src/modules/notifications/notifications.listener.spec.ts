@@ -1,13 +1,16 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { mockDeep } from 'vitest-mock-extended';
-import type { DomainEvent } from '../../common/events/domain-event';
+import type { DeliveredDomainEvent } from '../../common/events/domain-event';
 import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../database/prisma.service';
 import type { MailQueueService } from '../mail/mail-queue.service';
 import { NotificationsListener } from './notifications.listener';
 
 const ACTOR = 1;
-const event = (overrides: Partial<DomainEvent>): DomainEvent => ({
+const event = (
+  overrides: Partial<DeliveredDomainEvent>,
+): DeliveredDomainEvent => ({
+  id: 'evt-1',
   type: 'task.created',
   actorId: ACTOR,
   projectId: 7,
@@ -35,6 +38,7 @@ describe('NotificationsListener', () => {
     vi.resetAllMocks();
     prisma.user.findUnique.mockResolvedValue({ name: 'Ann' } as never);
     prisma.project.findUnique.mockResolvedValue({ name: 'Roadmap' } as never);
+    prisma.notification.findMany.mockResolvedValue([]);
   });
 
   const created = () => prisma.notification.createMany.mock.calls[0]?.[0];
@@ -54,6 +58,7 @@ describe('NotificationsListener', () => {
         expect.objectContaining({ userId: 2, type: 'task.assigned' }),
         expect.objectContaining({ userId: 3, type: 'task.assigned' }),
       ],
+      skipDuplicates: true,
     });
   });
 
@@ -194,12 +199,49 @@ describe('NotificationsListener', () => {
     expect(prisma.notification.createMany).not.toHaveBeenCalled();
   });
 
-  it('swallows failures: the change is saved, a lost notification is not an error', async () => {
+  it('lets a failure out so that the outbox retries the event', async () => {
     prisma.project.findUnique.mockRejectedValue(new Error('db down'));
     prisma.user.findMany.mockResolvedValue(users(2) as never);
 
     await expect(
       listener.handle(event({ data: { name: 'T', assigneeIds: [2] } })),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('db down');
+  });
+
+  describe('redelivery of the same event', () => {
+    it('notifies and mails only the people who were not notified yet', async () => {
+      prisma.notification.findMany.mockResolvedValue([{ userId: 2 }] as never);
+      prisma.user.findMany.mockResolvedValue(users(3) as never);
+
+      await listener.handle(
+        event({ data: { name: 'Fix login', assigneeIds: [2, 3] } }),
+      );
+
+      expect(prisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { eventId: 'evt-1', userId: { in: [2, 3] } },
+        }),
+      );
+      expect(created()?.data).toEqual([
+        expect.objectContaining({ userId: 3, eventId: 'evt-1' }),
+      ]);
+      expect(enqueue).toHaveBeenCalledTimes(1);
+      expect(emit).toHaveBeenCalledWith('notifications.created', [3]);
+    });
+
+    it('does nothing when everybody was notified already', async () => {
+      prisma.notification.findMany.mockResolvedValue([
+        { userId: 2 },
+        { userId: 3 },
+      ] as never);
+
+      await listener.handle(
+        event({ data: { name: 'Fix login', assigneeIds: [2, 3] } }),
+      );
+
+      expect(prisma.notification.createMany).not.toHaveBeenCalled();
+      expect(enqueue).not.toHaveBeenCalled();
+      expect(emit).not.toHaveBeenCalled();
+    });
   });
 });

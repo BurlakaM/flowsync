@@ -687,9 +687,9 @@
             "schema": {
               "type": "string",
               "enum": [
+                "DONE",
                 "TODO",
-                "IN_PROGRESS",
-                "DONE"
+                "IN_PROGRESS"
               ]
             }
           },
@@ -820,9 +820,9 @@
             "schema": {
               "type": "string",
               "enum": [
+                "DONE",
                 "TODO",
-                "IN_PROGRESS",
-                "DONE"
+                "IN_PROGRESS"
               ]
             }
           },
@@ -1091,27 +1091,6 @@
             "required": true,
             "in": "path",
             "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "page",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
               "type": "number"
             }
           }
@@ -1416,27 +1395,6 @@
             "required": true,
             "in": "path",
             "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "page",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
               "type": "number"
             }
           }
@@ -2499,10 +2457,14 @@
           "status": {
             "type": "string",
             "enum": [
+              "DONE",
               "TODO",
-              "IN_PROGRESS",
-              "DONE"
+              "IN_PROGRESS"
             ]
+          },
+          "version": {
+            "type": "number",
+            "description": "Send it back with every update (optimistic concurrency)."
           },
           "projectId": {
             "type": "number"
@@ -2541,6 +2503,7 @@
           "name",
           "description",
           "status",
+          "version",
           "projectId",
           "createdById",
           "assignees",
@@ -2583,9 +2546,9 @@
             "type": "string",
             "description": "Defaults to TODO.",
             "enum": [
+              "DONE",
               "TODO",
-              "IN_PROGRESS",
-              "DONE"
+              "IN_PROGRESS"
             ]
           },
           "assigneeIds": {
@@ -2641,11 +2604,15 @@
           },
           "status": {
             "enum": [
+              "DONE",
               "TODO",
-              "IN_PROGRESS",
-              "DONE"
+              "IN_PROGRESS"
             ],
             "type": "string"
+          },
+          "version": {
+            "type": "number",
+            "description": "Send it back with every update (optimistic concurrency)."
           },
           "projectId": {
             "type": "number"
@@ -2696,6 +2663,7 @@
           "name",
           "description",
           "status",
+          "version",
           "projectId",
           "createdById",
           "assignees",
@@ -2721,9 +2689,9 @@
           "status": {
             "description": "Defaults to TODO.",
             "enum": [
+              "DONE",
               "TODO",
-              "IN_PROGRESS",
-              "DONE"
+              "IN_PROGRESS"
             ],
             "type": "string"
           },
@@ -2744,8 +2712,15 @@
             "items": {
               "type": "number"
             }
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
           }
-        }
+        },
+        "required": [
+          "version"
+        ]
       },
       "CommentResponseDto": {
         "type": "object",
@@ -2790,19 +2765,21 @@
       "CommentPageDto": {
         "type": "object",
         "properties": {
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass it as `cursor` to get the next page; null on the last one."
+          },
           "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CommentResponseDto"
             }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/PageMetaDto"
           }
         },
         "required": [
-          "items",
-          "meta"
+          "nextCursor",
+          "items"
         ]
       },
       "CreateCommentDto": {
@@ -2936,13 +2913,15 @@
               "$ref": "#/components/schemas/ActivityResponseDto"
             }
           },
-          "meta": {
-            "$ref": "#/components/schemas/PageMetaDto"
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pass it as `cursor` to get the next page; null on the last one."
           }
         },
         "required": [
           "items",
-          "meta"
+          "nextCursor"
         ]
       },
       "NotificationResponseDto": {

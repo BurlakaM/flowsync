@@ -10,6 +10,8 @@ interface StatusSelectProps {
   taskId: number;
   taskName: string;
   status: TaskStatus;
+  /** The version of the task this screen shows; the API refuses the change if the task has moved on. */
+  version: number;
   /** `icon` is just the glyph (rows and cards); `pill` adds the name of the status (task page). */
   variant?: 'icon' | 'pill';
   onChanged?: () => void;
@@ -20,6 +22,7 @@ export function StatusSelect({
   taskId,
   taskName,
   status,
+  version,
   variant = 'icon',
   onChanged,
 }: StatusSelectProps) {
@@ -40,7 +43,7 @@ export function StatusSelect({
         }))}
         onValueChange={(value) =>
           update.mutate(
-            { status: value as TaskStatus },
+            { version, status: value as TaskStatus },
             { onSuccess: onChanged },
           )
         }

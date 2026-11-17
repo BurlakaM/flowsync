@@ -42,6 +42,9 @@ export const uk: Record<string, string> = {
   'Something went wrong. Please try again.':
     'Щось пішло не так. Спробуйте ще раз.',
   'An unexpected error occurred.': 'Сталася неочікувана помилка.',
+  'Show older activity': 'Показати давнішу активність',
+  'Could not load older activity': 'Не вдалося завантажити давнішу активність',
+  'Show more comments': 'Показати більше коментарів',
   'Reload the page': 'Перезавантажити сторінку',
   'Cannot reach the server. Check your connection.':
     'Не вдається зв’язатися із сервером. Перевірте з’єднання.',

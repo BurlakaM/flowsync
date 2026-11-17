@@ -24,7 +24,7 @@ describe('Project activity (e2e)', () => {
       await api
         .get(`/api/projects/${projectId}/activity${query}`, user)
         .expect(200)
-    ).body as { items: Entry[]; meta: { total: number } };
+    ).body as { items: Entry[]; nextCursor: string | null };
   const types = async (user: TestUser = owner) =>
     (await feed('?limit=100', user)).items.map((entry) => entry.type);
 
@@ -102,7 +102,7 @@ describe('Project activity (e2e)', () => {
           .expect(201)
       ).body.id;
       await api
-        .patch(`/api/tasks/${taskId}`, owner, { status: 'DONE' })
+        .patch(`/api/tasks/${taskId}`, owner, { version: 1, status: 'DONE' })
         .expect(200);
 
       const [updated, created] = (await feed('?limit=2')).items;
@@ -165,7 +165,7 @@ describe('Project activity (e2e)', () => {
     });
 
     it('records nothing for a request that was refused', async () => {
-      const before = (await feed()).meta.total;
+      const before = (await feed('?limit=100')).items.length;
 
       await api
         .post(`/api/projects/${projectId}/tasks`, outsider, { name: 'No' })
@@ -174,16 +174,54 @@ describe('Project activity (e2e)', () => {
         .patch(`/api/projects/${projectId}`, member, { name: 'Hijacked' })
         .expect(404);
 
-      expect((await feed()).meta.total).toBe(before);
+      expect((await feed('?limit=100')).items).toHaveLength(before);
     });
 
-    it('pages the feed', async () => {
+    it('pages the feed by cursor without repeats or gaps, even while it grows', async () => {
       const all = (await feed('?limit=100')).items;
-      const second = (await feed('?limit=2&page=2')).items;
+      expect(all.length).toBeGreaterThan(4);
 
-      expect(second.map((entry) => entry.type)).toEqual(
+      const first = await feed('?limit=2');
+      expect(first.items.map((entry) => entry.entityId)).toEqual(
+        all.slice(0, 2).map((entry) => entry.entityId),
+      );
+      expect(first.nextCursor).toEqual(expect.any(String));
+
+      // New activity arrives between two page requests: offset paging would now repeat entries.
+      await api
+        .post(`/api/projects/${projectId}/tags`, owner, {
+          name: 'arrived-late',
+        })
+        .expect(201);
+
+      const second = await feed(`?limit=2&cursor=${first.nextCursor}`);
+      expect(second.items.map((entry) => entry.type)).toEqual(
         all.slice(2, 4).map((entry) => entry.type),
       );
+    });
+
+    it('walks the whole feed page by page and ends with a null cursor', async () => {
+      const all = (await feed('?limit=100')).items;
+      const seen: number[] = [];
+      let cursor: string | null = null;
+      do {
+        const page: { items: Entry[]; nextCursor: string | null } = await feed(
+          `?limit=3${cursor ? `&cursor=${cursor}` : ''}`,
+        );
+        seen.push(...page.items.map((entry) => entry.entityId));
+        cursor = page.nextCursor;
+      } while (cursor);
+
+      expect(seen).toEqual(all.map((entry) => entry.entityId));
+    });
+
+    it('rejects a cursor this server did not issue', async () => {
+      await api
+        .get(`/api/projects/${projectId}/activity?cursor=not-a-cursor!`, owner)
+        .expect(400);
+      await api
+        .get(`/api/projects/${projectId}/activity?cursor=YWJj`, owner)
+        .expect(400);
     });
   });
 

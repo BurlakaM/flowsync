@@ -45,19 +45,21 @@ export class TagsService {
   ): Promise<TagResponseDto> {
     await this.projects.assertAccess(userId, projectId);
     await this.assertNameIsFree(projectId, dto.name);
-    const tag = await this.prisma.tag.create({
-      data: { name: dto.name, projectId },
-      select: tagSelect,
+    return this.events.transact(async (tx, emit) => {
+      const tag = await tx.tag.create({
+        data: { name: dto.name, projectId },
+        select: tagSelect,
+      });
+      emit({
+        type: 'tag.created',
+        actorId: userId,
+        projectId,
+        entityType: 'Tag',
+        entityId: tag.id,
+        data: { name: tag.name },
+      });
+      return tag;
     });
-    await this.events.publish({
-      type: 'tag.created',
-      actorId: userId,
-      projectId,
-      entityType: 'Tag',
-      entityId: tag.id,
-      data: { name: tag.name },
-    });
-    return tag;
   }
 
   async update(
@@ -68,20 +70,22 @@ export class TagsService {
     const tag = await this.findAccessible(userId, id);
     if (tag.name !== dto.name)
       await this.assertNameIsFree(tag.projectId, dto.name);
-    const updated = await this.prisma.tag.update({
-      where: { id },
-      data: { name: dto.name },
-      select: tagSelect,
+    return this.events.transact(async (tx, emit) => {
+      const updated = await tx.tag.update({
+        where: { id },
+        data: { name: dto.name },
+        select: tagSelect,
+      });
+      emit({
+        type: 'tag.updated',
+        actorId: userId,
+        projectId: tag.projectId,
+        entityType: 'Tag',
+        entityId: id,
+        data: { name: updated.name, renamedFrom: tag.name },
+      });
+      return updated;
     });
-    await this.events.publish({
-      type: 'tag.updated',
-      actorId: userId,
-      projectId: tag.projectId,
-      entityType: 'Tag',
-      entityId: id,
-      data: { name: updated.name, renamedFrom: tag.name },
-    });
-    return updated;
   }
 
   /** Owner only: deleting a tag removes it from every task of the project. */
@@ -94,14 +98,16 @@ export class TagsService {
       'Tag',
       'Only the project owner can delete tags',
     );
-    await this.prisma.tag.delete({ where: { id } });
-    await this.events.publish({
-      type: 'tag.deleted',
-      actorId: userId,
-      projectId: tag.projectId,
-      entityType: 'Tag',
-      entityId: id,
-      data: { name: tag.name },
+    await this.events.transact(async (tx, emit) => {
+      await tx.tag.delete({ where: { id } });
+      emit({
+        type: 'tag.deleted',
+        actorId: userId,
+        projectId: tag.projectId,
+        entityType: 'Tag',
+        entityId: id,
+        data: { name: tag.name },
+      });
     });
   }
 

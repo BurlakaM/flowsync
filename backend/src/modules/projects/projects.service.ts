@@ -90,17 +90,20 @@ export class ProjectsService {
     userId: number,
     dto: CreateProjectDto,
   ): Promise<ProjectResponseDto> {
-    const project = await this.prisma.project.create({
-      data: { ...dto, ownerId: userId },
-      select: projectSelect,
-    });
-    await this.events.publish({
-      type: 'project.created',
-      actorId: userId,
-      projectId: project.id,
-      entityType: 'Project',
-      entityId: project.id,
-      data: { name: project.name },
+    const project = await this.events.transact(async (tx, emit) => {
+      const created = await tx.project.create({
+        data: { ...dto, ownerId: userId },
+        select: projectSelect,
+      });
+      emit({
+        type: 'project.created',
+        actorId: userId,
+        projectId: created.id,
+        entityType: 'Project',
+        entityId: created.id,
+        data: { name: created.name },
+      });
+      return created;
     });
     return toResponse(project, userId);
   }
@@ -179,21 +182,24 @@ export class ProjectsService {
       'Project',
       'Only the project owner can do this',
     );
-    const project = await this.prisma.project.update({
-      where: { id },
-      data: dto,
-      select: projectSelect,
-    });
-    await this.events.publish({
-      type: 'project.updated',
-      actorId: userId,
-      projectId: id,
-      entityType: 'Project',
-      entityId: id,
-      data: {
-        name: project.name,
-        renamedFrom: current.name !== project.name ? current.name : undefined,
-      },
+    const project = await this.events.transact(async (tx, emit) => {
+      const updated = await tx.project.update({
+        where: { id },
+        data: dto,
+        select: projectSelect,
+      });
+      emit({
+        type: 'project.updated',
+        actorId: userId,
+        projectId: id,
+        entityType: 'Project',
+        entityId: id,
+        data: {
+          name: updated.name,
+          renamedFrom: current.name !== updated.name ? current.name : undefined,
+        },
+      });
+      return updated;
     });
     return toResponse(project, userId);
   }
@@ -212,17 +218,19 @@ export class ProjectsService {
       where: { id },
       select: { image: true },
     });
-    await this.prisma.project.delete({ where: { id } });
+    await this.events.transact(async (tx, emit) => {
+      await tx.project.delete({ where: { id } });
+      emit({
+        type: 'project.deleted',
+        actorId: userId,
+        projectId: id,
+        entityType: 'Project',
+        entityId: id,
+        data: {},
+      });
+    });
     // The row is gone; a picture that cannot be removed is only a leftover.
     if (stored?.image) await this.storage.remove(stored.image);
-    await this.events.publish({
-      type: 'project.deleted',
-      actorId: userId,
-      projectId: id,
-      entityType: 'Project',
-      entityId: id,
-      data: {},
-    });
   }
 
   /** Owner only. Replaces the picture; the old one is deleted from the storage. */
@@ -254,21 +262,23 @@ export class ProjectsService {
       where: { id: projectId },
       select: { image: true },
     });
-    const project = await this.prisma.project.update({
-      where: { id: projectId },
-      data: { image: key },
-      select: projectSelect,
+    const project = await this.events.transact(async (tx, emit) => {
+      const updated = await tx.project.update({
+        where: { id: projectId },
+        data: { image: key },
+        select: projectSelect,
+      });
+      emit({
+        type: 'project.updated',
+        actorId: userId,
+        projectId,
+        entityType: 'Project',
+        entityId: projectId,
+        data: { name: updated.name, image: 'changed' },
+      });
+      return updated;
     });
     if (previous?.image) await this.storage.remove(previous.image);
-
-    await this.events.publish({
-      type: 'project.updated',
-      actorId: userId,
-      projectId,
-      entityType: 'Project',
-      entityId: projectId,
-      data: { name: project.name, image: 'changed' },
-    });
     return toResponse(project, userId);
   }
 
@@ -288,19 +298,21 @@ export class ProjectsService {
     });
     if (!stored?.image) return;
 
-    await this.prisma.project.update({
-      where: { id: projectId },
-      data: { image: null },
+    await this.events.transact(async (tx, emit) => {
+      await tx.project.update({
+        where: { id: projectId },
+        data: { image: null },
+      });
+      emit({
+        type: 'project.updated',
+        actorId: userId,
+        projectId,
+        entityType: 'Project',
+        entityId: projectId,
+        data: { name: current.name, image: 'removed' },
+      });
     });
     await this.storage.remove(stored.image);
-    await this.events.publish({
-      type: 'project.updated',
-      actorId: userId,
-      projectId,
-      entityType: 'Project',
-      entityId: projectId,
-      data: { name: current.name, image: 'removed' },
-    });
   }
 
   /** Anyone who can see the project can see its picture; everyone else gets the usual 404. */
@@ -350,17 +362,20 @@ export class ProjectsService {
     });
     if (existing) throw new ConflictException('The user is already a member');
 
-    const member = await this.prisma.projectMember.create({
-      data: { projectId, userId: target.id },
-      select: { createdAt: true },
-    });
-    await this.events.publish({
-      type: 'member.added',
-      actorId: userId,
-      projectId,
-      entityType: 'Member',
-      entityId: target.id,
-      data: { name: target.name },
+    const member = await this.events.transact(async (tx, emit) => {
+      const created = await tx.projectMember.create({
+        data: { projectId, userId: target.id },
+        select: { createdAt: true },
+      });
+      emit({
+        type: 'member.added',
+        actorId: userId,
+        projectId,
+        entityType: 'Member',
+        entityId: target.id,
+        data: { name: target.name },
+      });
+      return created;
     });
     return {
       userId: target.id,
@@ -393,17 +408,20 @@ export class ProjectsService {
       where: { id: targetUserId },
       select: { name: true },
     });
-    const { count } = await this.prisma.projectMember.deleteMany({
-      where: { projectId, userId: targetUserId },
-    });
-    if (count === 0) throw new NotFoundException('Member not found');
-    await this.events.publish({
-      type: 'member.removed',
-      actorId: userId,
-      projectId,
-      entityType: 'Member',
-      entityId: targetUserId,
-      data: { name: removed?.name },
+    await this.events.transact(async (tx, emit) => {
+      const { count } = await tx.projectMember.deleteMany({
+        where: { projectId, userId: targetUserId },
+      });
+      // Thrown inside the transaction: nothing is deleted and no event is stored.
+      if (count === 0) throw new NotFoundException('Member not found');
+      emit({
+        type: 'member.removed',
+        actorId: userId,
+        projectId,
+        entityType: 'Member',
+        entityId: targetUserId,
+        data: { name: removed?.name },
+      });
     });
   }
 }

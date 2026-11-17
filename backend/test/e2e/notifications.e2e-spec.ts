@@ -146,6 +146,7 @@ describe('Notifications (e2e)', () => {
 
       await api
         .patch(`/api/tasks/${taskId}`, owner, {
+          version: 1,
           assigneeIds: [member.id, other.id],
         })
         .expect(200);

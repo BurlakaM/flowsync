@@ -45,7 +45,10 @@ export function TaskBoard({ tasks, onChanged }: TaskBoardProps) {
     const task = tasks.find((item) => item.id === active.id);
     const status = task && getDropStatus(task.status, over?.id);
     if (task && status) {
-      move.mutate({ id: task.id, status }, { onSuccess: onChanged });
+      move.mutate(
+        { id: task.id, status, version: task.version },
+        { onSuccess: onChanged },
+      );
     }
   };
 
@@ -150,6 +153,7 @@ function Card({ task, onChanged }: CardProps) {
             taskId={task.id}
             taskName={task.name}
             status={task.status}
+            version={task.version}
             onChanged={onChanged}
           />
         </div>

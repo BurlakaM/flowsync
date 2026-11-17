@@ -36,6 +36,22 @@ groups:
         annotations:
           summary: Mail jobs have been failing for 15 minutes, the mail server is probably down
 
+      - alert: OutboxEventDead
+        # A domain event gave up after 8 attempts: an audit row, notification or live update is missing.
+        expr: flowsync_outbox_events{status="DEAD"} > 0
+        for: 1m
+        labels: { severity: ticket }
+        annotations:
+          summary: An outbox event is DEAD, see "Outbox" in docs/OPERATIONS.md
+
+      - alert: OutboxLagging
+        # The relay delivers within seconds; minutes mean it is stuck or the database is struggling.
+        expr: flowsync_outbox_oldest_pending_age_seconds > 300
+        for: 5m
+        labels: { severity: ticket }
+        annotations:
+          summary: The oldest undelivered event is more than 5 minutes old
+
       - alert: EventLoopLagging
         expr: nodejs_eventloop_lag_p99_seconds > 0.2
         for: 5m

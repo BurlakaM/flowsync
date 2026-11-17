@@ -17,6 +17,8 @@ export class TaskResponseDto {
   name!: string;
   description!: string | null;
   status!: TaskStatus;
+  /** Send it back with every update (optimistic concurrency). */
+  version!: number;
   projectId!: number;
   /** Null when the author's account was deleted. */
   createdById!: number | null;

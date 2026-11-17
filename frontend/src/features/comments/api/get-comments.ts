@@ -1,18 +1,19 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import type { Page } from '@/types/api';
+import type { CursorPage } from '@/types/api';
 import type { Comment } from '../types';
 import { commentsKeys } from './comments-keys';
 
 export const COMMENTS_PAGE_SIZE = 50;
 
-/** Comments come oldest first, like a conversation. */
-export const useComments = (taskId: number, page: number) =>
-  useQuery({
-    queryKey: commentsKeys.list(taskId, page),
-    queryFn: () =>
-      apiClient.get<Page<Comment>>(`/tasks/${taskId}/comments`, {
-        params: { page, limit: COMMENTS_PAGE_SIZE },
+/** Comments come oldest first, like a conversation, and are read by cursor. */
+export const useComments = (taskId: number) =>
+  useInfiniteQuery({
+    queryKey: commentsKeys.list(taskId),
+    queryFn: ({ pageParam }) =>
+      apiClient.get<CursorPage<Comment>>(`/tasks/${taskId}/comments`, {
+        params: { limit: COMMENTS_PAGE_SIZE, cursor: pageParam },
       }),
-    placeholderData: keepPreviousData,
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   });

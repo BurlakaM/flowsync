@@ -20,9 +20,9 @@ const entry = (
   createdAt: '2026-01-01T10:00:00.000Z',
 });
 
-const page = (items: unknown[], pageNumber = 1, totalPages = 1) => ({
+const page = (items: unknown[], nextCursor: string | null = null) => ({
   items,
-  meta: { page: pageNumber, limit: 15, total: items.length, totalPages },
+  nextCursor,
 });
 
 describe('ActivityFeed', () => {
@@ -73,35 +73,48 @@ describe('ActivityFeed', () => {
     expect(screen.queryByText('Nothing happened yet.')).not.toBeInTheDocument();
   });
 
-  it('pages through older entries', async () => {
-    const pages: string[] = [];
+  it('shows older entries on request, asking for them by cursor', async () => {
+    const cursors: (string | null)[] = [];
     server.use(
       http.get('*/api/projects/7/activity', ({ request }) => {
-        const pageNumber = new URL(request.url).searchParams.get('page') ?? '1';
-        pages.push(pageNumber);
+        const cursor = new URL(request.url).searchParams.get('cursor');
+        cursors.push(cursor);
         return HttpResponse.json(
-          page(
-            [
-              entry(
-                Number(pageNumber),
-                'Ann',
-                'task.created',
-                `Task ${pageNumber}`,
-              ),
-            ],
-            Number(pageNumber),
-            2,
-          ),
+          cursor
+            ? page([entry(1, 'Ann', 'task.created', 'Task old')])
+            : page([entry(2, 'Ann', 'task.created', 'Task new')], 'abc'),
         );
       }),
     );
     const user = userEvent.setup();
     renderWithProviders(<ActivityFeed projectId={7} />);
 
-    await screen.findByText(/Task 1/);
-    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByText(/Task new/);
+    expect(screen.queryByText(/Task old/)).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Show older activity' }),
+    );
 
-    expect(await screen.findByText(/Task 2/)).toBeInTheDocument();
-    expect(pages).toEqual(['1', '2']);
+    expect(await screen.findByText(/Task old/)).toBeInTheDocument();
+    // Both entries stay on screen and the button is gone: that was the last page.
+    expect(screen.getByText(/Task new/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Show older activity' }),
+    ).not.toBeInTheDocument();
+    expect(cursors).toEqual([null, 'abc']);
+  });
+
+  it('offers no "older" button when everything fits on one page', async () => {
+    server.use(
+      http.get('*/api/projects/7/activity', () =>
+        HttpResponse.json(page([entry(1, 'Ann', 'task.created', 'Only')])),
+      ),
+    );
+    renderWithProviders(<ActivityFeed projectId={7} />);
+
+    await screen.findByText(/Only/);
+    expect(
+      screen.queryByRole('button', { name: 'Show older activity' }),
+    ).not.toBeInTheDocument();
   });
 });

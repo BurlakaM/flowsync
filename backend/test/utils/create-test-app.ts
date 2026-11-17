@@ -6,6 +6,7 @@ import {
   OBJECT_STORE,
   type ObjectStore,
 } from '../../src/common/storage/object-store';
+import { RedisIoAdapter } from '../../src/modules/realtime/redis-io.adapter';
 import {
   MAIL_TRANSPORT,
   type MailTransport,
@@ -18,7 +19,12 @@ import {
  * file storage (without it uploads answer 503).
  */
 export async function createTestApp(
-  options: { mailTransport?: MailTransport; objectStore?: ObjectStore } = {},
+  options: {
+    mailTransport?: MailTransport;
+    objectStore?: ObjectStore;
+    /** Connects live updates through Redis, as several API instances do in production. */
+    redisUrl?: string;
+  } = {},
 ): Promise<INestApplication> {
   const builder = Test.createTestingModule({ imports: [AppModule] });
   if (options.mailTransport) {
@@ -30,6 +36,11 @@ export async function createTestApp(
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication();
   configureApp(app);
+  if (options.redisUrl) {
+    const adapter = new RedisIoAdapter(app, options.redisUrl);
+    adapter.connect();
+    app.useWebSocketAdapter(adapter);
+  }
   await app.init();
   return app;
 }

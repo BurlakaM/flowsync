@@ -3,11 +3,11 @@ import { subject } from '@casl/ability';
 import { Prisma } from '@prisma/client';
 import { authorize } from '../../common/casl/authorize';
 import {
-  paginationArgs,
-  toPage,
-  type Page,
-} from '../../common/pagination/paginate';
-import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
+  CursorQueryDto,
+  decodeCursor,
+  toCursorPage,
+  type CursorPage,
+} from '../../common/pagination/cursor';
 import { DomainEventsService } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -38,24 +38,22 @@ export class CommentsService {
     private readonly events: DomainEventsService,
   ) {}
 
-  /** Oldest first, like a conversation. */
+  /** Oldest first, like a conversation; by cursor, so new comments never shift the pages already read. */
   async list(
     userId: number,
     taskId: number,
-    query: PaginationQueryDto,
-  ): Promise<Page<CommentResponseDto>> {
+    query: CursorQueryDto,
+  ): Promise<CursorPage<CommentResponseDto>> {
     await this.tasks.assertTaskAccess(userId, taskId);
 
-    const [items, total] = await Promise.all([
-      this.prisma.comment.findMany({
-        where: { taskId },
-        select: commentSelect,
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        ...paginationArgs(query),
-      }),
-      this.prisma.comment.count({ where: { taskId } }),
-    ]);
-    return toPage(items, total, query);
+    const after = decodeCursor(query.cursor);
+    const rows = await this.prisma.comment.findMany({
+      where: { taskId, ...(after !== undefined && { id: { gt: after } }) },
+      select: commentSelect,
+      orderBy: { id: 'asc' },
+      take: query.limit + 1,
+    });
+    return toCursorPage(rows, query.limit);
   }
 
   /** Any member of the task's project can comment. */
@@ -65,27 +63,29 @@ export class CommentsService {
     dto: CreateCommentDto,
   ): Promise<CommentResponseDto> {
     const task = await this.tasks.assertTaskAccess(userId, taskId);
-    const comment = await this.prisma.comment.create({
-      data: {
-        text: dto.text,
-        task: { connect: { id: taskId } },
-        author: { connect: { id: userId } },
-      },
-      select: commentSelect,
+    return this.events.transact(async (tx, emit) => {
+      const comment = await tx.comment.create({
+        data: {
+          text: dto.text,
+          task: { connect: { id: taskId } },
+          author: { connect: { id: userId } },
+        },
+        select: commentSelect,
+      });
+      emit({
+        type: 'comment.created',
+        actorId: userId,
+        projectId: task.projectId,
+        entityType: 'Comment',
+        entityId: comment.id,
+        data: {
+          taskId,
+          taskName: task.name,
+          excerpt: excerpt(comment.text),
+        },
+      });
+      return comment;
     });
-    await this.events.publish({
-      type: 'comment.created',
-      actorId: userId,
-      projectId: task.projectId,
-      entityType: 'Comment',
-      entityId: comment.id,
-      data: {
-        taskId,
-        taskName: task.name,
-        excerpt: excerpt(comment.text),
-      },
-    });
-    return comment;
   }
 
   async update(
@@ -101,20 +101,22 @@ export class CommentsService {
       subject('Comment', { authorId: comment.authorId }),
       'Only the author can edit a comment',
     );
-    const updated = await this.prisma.comment.update({
-      where: { id },
-      data: { text: dto.text },
-      select: commentSelect,
+    return this.events.transact(async (tx, emit) => {
+      const updated = await tx.comment.update({
+        where: { id },
+        data: { text: dto.text },
+        select: commentSelect,
+      });
+      emit({
+        type: 'comment.updated',
+        actorId: userId,
+        projectId: comment.task.projectId,
+        entityType: 'Comment',
+        entityId: id,
+        data: { taskId: comment.task.id, taskName: comment.task.name },
+      });
+      return updated;
     });
-    await this.events.publish({
-      type: 'comment.updated',
-      actorId: userId,
-      projectId: comment.task.projectId,
-      entityType: 'Comment',
-      entityId: id,
-      data: { taskId: comment.task.id, taskName: comment.task.name },
-    });
-    return updated;
   }
 
   /** The author may delete their comment; the project owner may moderate. */
@@ -127,14 +129,16 @@ export class CommentsService {
       subject('Comment', { authorId: comment.authorId }),
       'Only the author or the project owner can delete a comment',
     );
-    await this.prisma.comment.delete({ where: { id } });
-    await this.events.publish({
-      type: 'comment.deleted',
-      actorId: userId,
-      projectId: comment.task.projectId,
-      entityType: 'Comment',
-      entityId: id,
-      data: { taskId: comment.task.id, taskName: comment.task.name },
+    await this.events.transact(async (tx, emit) => {
+      await tx.comment.delete({ where: { id } });
+      emit({
+        type: 'comment.deleted',
+        actorId: userId,
+        projectId: comment.task.projectId,
+        entityType: 'Comment',
+        entityId: id,
+        data: { taskId: comment.task.id, taskName: comment.task.name },
+      });
     });
   }
 

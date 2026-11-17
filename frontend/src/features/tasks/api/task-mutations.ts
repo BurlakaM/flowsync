@@ -1,7 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type { Page } from '@/types/api';
-import type { Task, TaskDetails, TaskInput, TaskStatus } from '../types';
+import type {
+  Task,
+  TaskDetails,
+  TaskInput,
+  TaskStatus,
+  TaskUpdate,
+} from '../types';
 import { tasksKeys } from './tasks-keys';
 
 export function useCreateTask(projectId: number) {
@@ -13,13 +19,16 @@ export function useCreateTask(projectId: number) {
   });
 }
 
-/** Updates any subset of the fields: the status select sends only `{ status }`. */
+/**
+ * Updates any subset of the fields (the status select sends only `{ version, status }`).
+ * It refetches on failure too: after a 409 the screen must show the version that won.
+ */
 export function useUpdateTask(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<TaskInput>) =>
+    mutationFn: (input: TaskUpdate) =>
       apiClient.patch<TaskDetails>(`/tasks/${id}`, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: tasksKeys.all }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: tasksKeys.all }),
   });
 }
 
@@ -42,8 +51,15 @@ export function useDeleteTask(id: number) {
 export function useMoveTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: number; status: TaskStatus }) =>
-      apiClient.patch<TaskDetails>(`/tasks/${id}`, { status }),
+    mutationFn: ({
+      id,
+      status,
+      version,
+    }: {
+      id: number;
+      status: TaskStatus;
+      version: number;
+    }) => apiClient.patch<TaskDetails>(`/tasks/${id}`, { version, status }),
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: tasksKeys.lists() });
       const snapshots = queryClient.getQueriesData<Page<Task>>({

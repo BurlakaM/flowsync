@@ -77,6 +77,10 @@ export class AppConfigService {
     return this.config.get('REDIS_URL', { infer: true });
   }
 
+  get outboxPollIntervalMs(): number {
+    return this.config.get('OUTBOX_POLL_INTERVAL_MS', { infer: true });
+  }
+
   get metricsToken(): string | undefined {
     return this.config.get('METRICS_TOKEN', { infer: true });
   }

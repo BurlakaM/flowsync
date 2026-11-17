@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import {
   DOMAIN_EVENT,
-  type DomainEvent,
+  type DeliveredDomainEvent,
 } from '../../common/events/domain-event';
 import { AppConfigService } from '../../config/app-config.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -23,8 +23,6 @@ const numbers = (value: unknown): number[] =>
 /** Turns domain events into notifications for the people they concern. */
 @Injectable()
 export class NotificationsListener {
-  private readonly logger = new Logger(NotificationsListener.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailQueue: MailQueueService,
@@ -32,50 +30,47 @@ export class NotificationsListener {
     private readonly emitter: EventEmitter2,
   ) {}
 
+  /**
+   * Errors are not caught on purpose: a failure makes the outbox retry the event, and `notify` is safe
+   * to repeat (one notification per event and person).
+   */
   @OnEvent(DOMAIN_EVENT)
-  async handle(event: DomainEvent): Promise<void> {
-    try {
-      switch (event.type) {
-        case 'task.created':
-          return await this.notify(
-            event,
-            numbers(event.data.assigneeIds),
-            'task.assigned',
-            { taskId: event.entityId, taskName: String(event.data.name) },
-          );
-        case 'task.updated':
-          return await this.notify(
-            event,
-            numbers(event.data.assigneesAdded),
-            'task.assigned',
-            { taskId: event.entityId, taskName: String(event.data.name) },
-          );
-        case 'comment.created':
-          return await this.notify(
-            event,
-            await this.interestedInTask(Number(event.data.taskId)),
-            'comment.added',
-            {
-              taskId: Number(event.data.taskId),
-              taskName: String(event.data.taskName),
-              excerpt: String(event.data.excerpt ?? ''),
-            },
-          );
-        case 'member.added':
-          return await this.notify(
-            event,
-            [event.entityId],
-            'project.invited',
-            {},
-          );
-        default:
-          return;
-      }
-    } catch (error) {
-      // The change that caused this is saved already; a lost notification must not become an error.
-      this.logger.error(
-        `Could not notify about ${event.type}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+  async handle(event: DeliveredDomainEvent): Promise<void> {
+    switch (event.type) {
+      case 'task.created':
+        return await this.notify(
+          event,
+          numbers(event.data.assigneeIds),
+          'task.assigned',
+          { taskId: event.entityId, taskName: String(event.data.name) },
+        );
+      case 'task.updated':
+        return await this.notify(
+          event,
+          numbers(event.data.assigneesAdded),
+          'task.assigned',
+          { taskId: event.entityId, taskName: String(event.data.name) },
+        );
+      case 'comment.created':
+        return await this.notify(
+          event,
+          await this.interestedInTask(Number(event.data.taskId)),
+          'comment.added',
+          {
+            taskId: Number(event.data.taskId),
+            taskName: String(event.data.taskName),
+            excerpt: String(event.data.excerpt ?? ''),
+          },
+        );
+      case 'member.added':
+        return await this.notify(
+          event,
+          [event.entityId],
+          'project.invited',
+          {},
+        );
+      default:
+        return;
     }
   }
 
@@ -96,7 +91,7 @@ export class NotificationsListener {
   }
 
   private async notify(
-    event: DomainEvent,
+    event: DeliveredDomainEvent,
     candidates: number[],
     type: NotificationType,
     extra: Pick<NotificationData, 'taskId' | 'taskName' | 'excerpt'>,
@@ -106,6 +101,17 @@ export class NotificationsListener {
       (id) => id !== event.actorId,
     );
     if (recipientIds.length === 0) return;
+
+    // Recipients already notified about this very event (a redelivery) are skipped, so they get neither a
+    // second notification nor a second email.
+    const already = await this.prisma.notification.findMany({
+      where: { eventId: event.id, userId: { in: recipientIds } },
+      select: { userId: true },
+    });
+    const fresh = recipientIds.filter(
+      (id) => !already.some((row) => row.userId === id),
+    );
+    if (fresh.length === 0) return;
 
     const [actor, project, recipients] = await Promise.all([
       this.prisma.user.findUnique({
@@ -117,7 +123,7 @@ export class NotificationsListener {
         select: { name: true },
       }),
       this.prisma.user.findMany({
-        where: { id: { in: recipientIds } },
+        where: { id: { in: fresh } },
         select: { id: true, email: true },
       }),
     ]);
@@ -134,7 +140,10 @@ export class NotificationsListener {
         userId: recipient.id,
         type,
         data: data as unknown as Prisma.InputJsonObject,
+        eventId: event.id,
       })),
+      // Two deliveries racing each other: the unique (eventId, userId) keeps it to one row.
+      skipDuplicates: true,
     });
 
     // Open browsers of the recipients refresh their bell at once.
