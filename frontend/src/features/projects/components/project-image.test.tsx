@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { apiClient } from '@/lib/api-client';
 import { server } from '@/testing/mocks/server';
 import { renderWithProviders } from '@/testing/test-utils';
 import type { Project } from '../types';
@@ -77,21 +78,24 @@ describe('ProjectImageField', () => {
   const png = (size = 11) =>
     new File([new Uint8Array(size)], 'logo.png', { type: 'image/png' });
 
-  it('uploads the chosen picture as a multipart file', async () => {
-    let received: File | null = null;
-    server.use(
-      http.put('*/api/projects/7/image', async ({ request }) => {
-        received = (await request.formData()).get('file') as File;
-        return HttpResponse.json(project({ hasImage: true }));
-      }),
-    );
+  it('sends the chosen picture as a multipart file', async () => {
+    // Not through MSW: the jsdom FormData and File cannot be turned into a request by the Node 24 fetch
+    // implementation that MSW uses ("expected a File"), although a real browser does it. The wire format is
+    // covered by the Playwright test (e2e/project-image.spec.ts); here we check what the form builds.
+    const put = vi
+      .spyOn(apiClient, 'put')
+      .mockResolvedValue(project({ hasImage: true }));
     renderWithProviders(<ProjectImageField project={project()} />);
 
     await pick(png());
 
-    await waitFor(() => expect(received).not.toBeNull());
-    expect(received!.name).toBe('logo.png');
-    expect(received!.type).toBe('image/png');
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    const [url, body] = put.mock.calls[0];
+    expect(url).toBe('/projects/7/image');
+    const file = (body as FormData).get('file') as File;
+    expect(file.name).toBe('logo.png');
+    expect(file.type).toBe('image/png');
+    put.mockRestore();
   });
 
   it('refuses a file of the wrong type or size without asking the server', async () => {

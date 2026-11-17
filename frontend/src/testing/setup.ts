@@ -12,8 +12,9 @@ vi.mock('@/lib/realtime', async () => {
   return { createRealtimeSocket: createFakeSocket };
 });
 
-// Lazy routes are transformed on first use, which can take more than the default second on a cold start.
-configure({ asyncUtilTimeout: 5000 });
+// Lazy routes are transformed on first use, which can take more than the default second on a cold start
+// (more still with coverage on a two-core CI runner: 5.6 s was measured, so 5 s was a flaky limit).
+configure({ asyncUtilTimeout: 10_000 });
 
 // jsdom has no ResizeObserver, which Radix components (checkbox) use to measure themselves.
 globalThis.ResizeObserver ??= class {
