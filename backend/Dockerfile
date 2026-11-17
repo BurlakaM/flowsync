@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- base: Node + OpenSSL (required by the Prisma engines on Alpine) ----
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 WORKDIR /app
 # The npm bundled in the base image lags behind: its own copies of undici and brace-expansion carried known
 # high vulnerabilities (found by Trivy). Prod needs npm only for `npx prisma migrate deploy`.
