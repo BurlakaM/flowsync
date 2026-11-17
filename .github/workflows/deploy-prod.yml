@@ -1,0 +1,44 @@
+name: Deploy to production
+
+# Manual on purpose: nothing reaches the VPS until the owner starts this workflow.
+# The images must already be published by the "Deploy" workflow for the same commit.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag to deploy (a commit sha published by the Deploy workflow)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment in the repository settings for a second pair of eyes.
+    environment: production
+    steps:
+      - name: Prepare SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Pinned host key instead of trust-on-first-use: protects against a man-in-the-middle.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy (rolls back by itself when the smoke test fails)
+        env:
+          TAG: ${{ inputs.tag }}
+          HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+        run: |
+          # The tag goes through an env var and is checked, never interpolated into the script.
+          [[ "$TAG" =~ ^[0-9a-f]{7,40}$ ]] || { echo "Tag must be a commit sha"; exit 1; }
+          ssh -i ~/.ssh/id_deploy "$SSH_USER@$HOST" \
+            "cd /opt/flowsync && git pull --ff-only && COMPOSE_FILES='-f docker-compose.yml -f docker-compose.vps.yml' ./ops/deploy.sh $TAG"

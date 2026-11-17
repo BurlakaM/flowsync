@@ -25,6 +25,20 @@ describe('Application foundation (e2e)', () => {
       expect(res.body.status).toBe('ok');
       expect(res.body.info.database.status).toBe('up');
     });
+
+    it('answers liveness without touching dependencies', async () => {
+      const res = await request(server()).get('/api/health/live').expect(200);
+
+      expect(res.body).toEqual({ status: 'ok' });
+    });
+
+    it('serves readiness on /health/ready as well as /health', async () => {
+      const res = await request(server()).get('/api/health/ready').expect(200);
+
+      expect(res.body.info.database.status).toBe('up');
+      // Redis is not configured in tests, so it must not appear as a dependency.
+      expect(res.body.info.redis).toBeUndefined();
+    });
   });
 
   describe('error format', () => {
