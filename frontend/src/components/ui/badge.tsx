@@ -8,7 +8,10 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground [a]:hover:bg-primary/80',
+        default: 'bg-accent text-accent-foreground [a]:hover:bg-accent/80',
+        todo: 'bg-status-todo-soft text-status-todo-ink',
+        progress: 'bg-status-progress-soft text-status-progress-ink',
+        done: 'bg-status-done-soft text-status-done-ink',
         secondary:
           'bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80',
         destructive:

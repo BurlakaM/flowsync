@@ -73,9 +73,27 @@ export const uk: Record<string, string> = {
   'Enter your name': 'Введіть ім’я',
   'Use at least 8 characters': 'Використайте щонайменше 8 символів',
   'Use at most 72 characters': 'Використайте не більше 72 символів',
+  'Show password': 'Показати пароль',
+  'Hide password': 'Сховати пароль',
+  'Keep every task in flow.': 'Тримайте кожну задачу в потоці.',
+  'Projects, boards and your team in one calm place.':
+    'Проєкти, дошки й команда — в одному спокійному місці.',
+  'Drag-and-drop board': 'Дошка з перетягуванням',
+  'Live updates': 'Оновлення наживо',
+  'Fast search': 'Швидкий пошук',
+
+  // --- appearance
+  Theme: 'Тема',
+  Light: 'Світла',
+  Dark: 'Темна',
+  System: 'Системна',
   '8 to 72 characters.': 'Від 8 до 72 символів.',
 
   // --- projects
+  Progress: 'Прогрес',
+  '{{done}} of {{total}} done': '{{done}} із {{total}} виконано',
+  'Project details': 'Про проєкт',
+  'Everything your team is working on.': 'Усе, над чим працює ваша команда.',
   Projects: 'Проєкти',
   'New project': 'Новий проєкт',
   'Edit project': 'Редагувати проєкт',
@@ -126,6 +144,8 @@ export const uk: Record<string, string> = {
   'Picture of the project {{name}}': 'Зображення проєкту {{name}}',
 
   // --- tasks
+  Details: 'Деталі',
+  Updated: 'Оновлено',
   Tasks: 'Задачі',
   View: 'Вигляд',
   List: 'Список',
@@ -158,7 +178,6 @@ export const uk: Record<string, string> = {
   'To do': 'До виконання',
   'In progress': 'У роботі',
   Done: 'Готово',
-  'All statuses': 'Усі статуси',
   Assignee: 'Виконавець',
   Assignees: 'Виконавці',
   Anyone: 'Будь-хто',

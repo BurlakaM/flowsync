@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import type userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { createMemoryRouter, MemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -39,4 +40,14 @@ export function renderApp(path = '/') {
     </QueryClientProvider>,
   );
   return { ...result, router, queryClient };
+}
+
+/** Opens a Radix Select by its trigger and picks the option with the given visible label. */
+export async function chooseOption(
+  user: ReturnType<typeof userEvent.setup>,
+  trigger: HTMLElement,
+  label: string,
+) {
+  await user.click(trigger);
+  await user.click(await screen.findByRole('option', { name: label }));
 }

@@ -30,6 +30,8 @@ export default defineConfig({
     css: false,
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/testing/setup.ts'],
+    // The first test of a file also transforms the lazy routes, which is slow on a cold start.
+    testTimeout: 15000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],

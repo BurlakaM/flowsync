@@ -4,6 +4,7 @@ import { FormFieldError } from '@/components/form/form-field-error';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { Send } from 'lucide-react';
 import { Spinner } from '@/components/spinner';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -45,7 +46,11 @@ export function CommentForm({ taskId, onCreated }: CommentFormProps) {
   );
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-3">
+    <form
+      onSubmit={submit}
+      noValidate
+      className="space-y-3 rounded-2xl bg-card p-4 shadow-card ring-1 ring-border"
+    >
       <Controller
         name="text"
         control={form.control}
@@ -70,7 +75,11 @@ export function CommentForm({ taskId, onCreated }: CommentFormProps) {
       )}
 
       <Button type="submit" disabled={create.isPending}>
-        {create.isPending && <Spinner className="text-current" />}
+        {create.isPending ? (
+          <Spinner className="text-current" />
+        ) : (
+          <Send data-icon="inline-start" />
+        )}
         {t('Comment')}
       </Button>
     </form>

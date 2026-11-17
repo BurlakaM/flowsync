@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { useState, type FormEvent } from 'react';
+import { Plus } from 'lucide-react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { SearchField } from '@/components/form/search-field';
 import { Pagination } from '@/components/pagination';
 import { EmptyState } from '@/components/states/empty-state';
 import { ErrorState } from '@/components/states/error-state';
 import { LoadingState } from '@/components/states/loading-state';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   ProjectFormDialog,
   ProjectList,
@@ -39,40 +40,31 @@ export default function ProjectsRoute() {
     setParams(next);
   };
 
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const value = new FormData(event.currentTarget).get('search');
-    updateParams({
-      search: typeof value === 'string' ? value.trim() : null,
-      page: null,
-    });
-  };
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">{t('Projects')}</h1>
-        <Button onClick={() => setCreating(true)}>{t('New project')}</Button>
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-semibold">{t('Projects')}</h1>
+          <p className="text-muted-foreground">
+            {t('Everything your team is working on.')}
+          </p>
+        </div>
+        <Button size="lg" onClick={() => setCreating(true)}>
+          <Plus data-icon="inline-start" />
+          {t('New project')}
+        </Button>
       </div>
 
-      <form
-        role="search"
-        onSubmit={submitSearch}
+      <SearchField
         // The key resets the uncontrolled input when the URL changes (back button, clear).
         key={search}
-        className="flex max-w-md gap-2"
-      >
-        <Input
-          name="search"
-          type="search"
-          aria-label={t('Search projects')}
-          placeholder={t('Search projects')}
-          defaultValue={search}
-        />
-        <Button type="submit" variant="outline">
-          {t('Search')}
-        </Button>
-      </form>
+        label={t('Search projects')}
+        defaultValue={search}
+        onSearch={(value) =>
+          updateParams({ search: value || null, page: null })
+        }
+        className="max-w-md"
+      />
 
       {projects.isPending ? (
         <LoadingState label={t('Loading projects')} />

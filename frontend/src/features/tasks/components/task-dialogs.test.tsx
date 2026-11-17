@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/testing/mocks/server';
-import { renderWithProviders } from '@/testing/test-utils';
+import { chooseOption, renderWithProviders } from '@/testing/test-utils';
 import type { Tag, Task } from '../types';
 import { DeleteTaskDialog } from './delete-task-dialog';
 import { StatusSelect } from './status-select';
@@ -74,7 +74,7 @@ describe('TaskFormDialog', () => {
     );
 
     await user.type(screen.getByLabelText('Name'), 'Fix login');
-    await user.selectOptions(screen.getByLabelText('Status'), 'DONE');
+    await chooseOption(user, screen.getByLabelText('Status'), 'Done');
     await user.click(screen.getByRole('checkbox', { name: 'Ann' }));
     await user.click(screen.getByRole('checkbox', { name: 'ui' }));
     await user.click(screen.getByRole('button', { name: 'Create task' }));
@@ -114,7 +114,7 @@ describe('TaskFormDialog', () => {
     );
 
     expect(screen.getByLabelText('Name')).toHaveValue('Fix login');
-    expect(screen.getByLabelText('Status')).toHaveValue('IN_PROGRESS');
+    expect(screen.getByLabelText('Status')).toHaveTextContent('In progress');
     expect(screen.getByRole('checkbox', { name: 'Bob' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Ann' })).not.toBeChecked();
 
@@ -182,9 +182,10 @@ describe('StatusSelect', () => {
       />,
     );
 
-    await user.selectOptions(
+    await chooseOption(
+      user,
       screen.getByRole('combobox', { name: 'Status of Fix login' }),
-      'DONE',
+      'Done',
     );
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
@@ -205,9 +206,10 @@ describe('StatusSelect', () => {
       <StatusSelect taskId={9} taskName="Fix login" status="TODO" />,
     );
 
-    await user.selectOptions(
+    await chooseOption(
+      user,
       screen.getByRole('combobox', { name: 'Status of Fix login' }),
-      'DONE',
+      'Done',
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

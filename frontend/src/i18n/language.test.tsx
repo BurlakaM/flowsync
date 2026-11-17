@@ -4,6 +4,7 @@ import { act } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '@/i18n';
 import { LanguageSwitcher } from '@/components/language-switcher';
+import { chooseOption } from '@/testing/test-utils';
 import { detectLanguage } from './language';
 
 describe('detectLanguage', () => {
@@ -63,10 +64,10 @@ describe('the interface in Ukrainian', () => {
     render(<Sample />);
     expect(screen.getByText('Sign in')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Language'), 'uk');
+    await chooseOption(user, screen.getByLabelText('Language'), 'Українська');
 
     expect(await screen.findByText('Увійти')).toBeInTheDocument();
-    expect(screen.getByLabelText('Мова')).toHaveValue('uk');
+    expect(screen.getByLabelText('Мова')).toHaveTextContent('Українська');
     expect(localStorage.getItem('language')).toBe('uk');
   });
 

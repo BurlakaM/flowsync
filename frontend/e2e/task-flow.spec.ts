@@ -15,7 +15,7 @@ test('a new user signs up, creates a project and a task, comments, reloads and s
     await page.goto('/register');
     await page.getByLabel('Name').fill(user.name);
     await page.getByLabel('Email').fill(user.email);
-    await page.getByLabel('Password').fill(user.password);
+    await page.getByLabel('Password', { exact: true }).fill(user.password);
     await page.getByRole('button', { name: 'Create account' }).click();
 
     await expect(page).toHaveURL(/\/projects$/);
@@ -51,10 +51,11 @@ test('a new user signs up, creates a project and a task, comments, reloads and s
   await test.step('change the status and add a comment', async () => {
     await page
       .getByRole('combobox', { name: 'Status of Write the announcement' })
-      .selectOption('DONE');
+      .click();
+    await page.getByRole('option', { name: 'Done' }).click();
     await expect(
       page.getByRole('combobox', { name: 'Status of Write the announcement' }),
-    ).toHaveValue('DONE');
+    ).toHaveText('Done');
 
     await page.getByLabel('Add a comment').fill('Ready to publish');
     await page.getByRole('button', { name: 'Comment', exact: true }).click();
@@ -83,7 +84,7 @@ test('a new user signs up, creates a project and a task, comments, reloads and s
 
   await test.step('signing in again shows the same project', async () => {
     await page.getByLabel('Email').fill(user.email);
-    await page.getByLabel('Password').fill(user.password);
+    await page.getByLabel('Password', { exact: true }).fill(user.password);
     await page.getByRole('button', { name: 'Sign in' }).click();
 
     await expect(page.getByRole('link', { name: 'Launch' })).toBeVisible();

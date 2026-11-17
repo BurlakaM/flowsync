@@ -1,14 +1,8 @@
-import { LanguageSwitcher } from '@/components/language-switcher';
 import type { ReactNode } from 'react';
-import logoMark from '@/assets/logo-mark.svg';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { BrandMark } from '@/components/brand-mark';
+import { LanguageSwitcher } from '@/components/language-switcher';
+import { ThemeSwitcher } from '@/components/theme-switcher';
+import { AuthHero } from './auth-hero';
 
 interface AuthLayoutProps {
   title: string;
@@ -18,7 +12,7 @@ interface AuthLayoutProps {
   children: ReactNode;
 }
 
-/** The frame of the sign-in and sign-up pages: a centred card with the brand. */
+/** The frame of the sign-in and sign-up pages: the brand side on wide screens, the form on the other. */
 export function AuthLayout({
   title,
   description,
@@ -26,24 +20,34 @@ export function AuthLayout({
   children,
 }: AuthLayoutProps) {
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-muted/40 px-4">
-      <div className="absolute right-4 top-4">
-        <LanguageSwitcher />
-      </div>
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <img src={logoMark} alt="" className="mb-2 size-10 dark:invert" />
-          {/* CardTitle is a div: the page needs a real heading for screen readers. */}
-          <CardTitle className="text-xl">
-            <h1>{title}</h1>
-          </CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent>{children}</CardContent>
-        <CardFooter className="justify-center text-sm text-muted-foreground">
-          {footer}
-        </CardFooter>
-      </Card>
-    </main>
+    <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+      <AuthHero />
+      <main className="relative flex flex-col bg-background px-6 py-6 sm:px-10">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-aurora" />
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-2.5 lg:invisible">
+            <BrandMark />
+            <span className="font-heading font-semibold tracking-tight">
+              FlowSync
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher />
+            <ThemeSwitcher />
+          </div>
+        </div>
+        <div className="relative mx-auto flex w-full max-w-sm flex-1 animate-fade-up flex-col justify-center py-10">
+          {/* A real heading for screen readers (the card title is only a div). */}
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">
+            {title}
+          </h1>
+          <p className="mt-2 text-muted-foreground">{description}</p>
+          <div className="mt-8">{children}</div>
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            {footer}
+          </p>
+        </div>
+      </main>
+    </div>
   );
 }

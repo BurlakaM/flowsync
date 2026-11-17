@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { useProjectTasks } from '../api/get-tasks';
 import { server } from '@/testing/mocks/server';
-import { createTestQueryClient } from '@/testing/test-utils';
+import { chooseOption, createTestQueryClient } from '@/testing/test-utils';
 import type { Task, TaskFilters } from '../types';
 import { TaskBoard } from './task-board';
 
@@ -106,9 +106,10 @@ describe('TaskBoard', () => {
     const user = userEvent.setup();
     renderBoard();
 
-    await user.selectOptions(
+    await chooseOption(
+      user,
       await screen.findByRole('combobox', { name: 'Status of Write docs' }),
-      'DONE',
+      'Done',
     );
 
     await waitFor(() =>

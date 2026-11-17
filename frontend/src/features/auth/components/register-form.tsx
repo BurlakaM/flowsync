@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { tKey } from '@/i18n/t-key';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowRight, Mail, UserRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { PasswordField } from '@/components/form/password-field';
 import { TextField } from '@/components/form/text-field';
 import { Spinner } from '@/components/spinner';
 import { Button } from '@/components/ui/button';
@@ -46,6 +48,7 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
           name="name"
           label={t('Name')}
           autoComplete="name"
+          icon={<UserRound />}
         />
         <TextField
           control={form.control}
@@ -53,12 +56,12 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
           label={t('Email')}
           type="email"
           autoComplete="email"
+          icon={<Mail />}
         />
-        <TextField
+        <PasswordField
           control={form.control}
           name="password"
           label={t('Password')}
-          type="password"
           autoComplete="new-password"
           description={t('8 to 72 characters.')}
         />
@@ -70,9 +73,15 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
         </p>
       )}
 
-      <Button type="submit" className="w-full" disabled={register.isPending}>
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full"
+        disabled={register.isPending}
+      >
         {register.isPending && <Spinner className="text-current" />}
         {t('Create account')}
+        {!register.isPending && <ArrowRight data-icon="inline-end" />}
       </Button>
     </form>
   );

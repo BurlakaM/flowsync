@@ -5,6 +5,7 @@ export { useProjects } from './api/get-projects';
 export { useRefreshProjects } from './api/use-refresh-projects';
 export { DeleteProjectDialog } from './components/delete-project-dialog';
 export { ProjectFormDialog } from './components/project-form-dialog';
+export { ProjectHeader } from './components/project-header';
 export { ProjectImage } from './components/project-image';
 export { ProjectList } from './components/project-list';
 export { ProjectMembers } from './components/project-members';
