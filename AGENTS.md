@@ -54,10 +54,19 @@ cd backend && npm run openapi:export  # після зміни API: оновит�
 cd frontend && npm run dev           # Vite з HMR
 cd frontend && npm test              # Vitest; також lint, typecheck, build, format:check
 cd frontend && npm run api:types     # після зміни API (і openapi.json): оновити src/types/api.generated.ts (CI перевіряє)
+./ops/load/run.sh                   # навантажувальний тест k6 на копії БД із 60 000 задач (docs/PERFORMANCE.md)
+cd backend && npm run test:mutation  # Stryker: чи помітили б тести помилку в ключових сервісах (docs/QUALITY.md)
+cd frontend && npm run lighthouse    # бюджети продуктивності; ./ops/visual.sh — візуальні знімки в контейнері
 ./ops/security-scan.sh all          # Trivy (образи), gitleaks (історія git), SBOM; усе в Docker, без акаунтів
 ./ops/backup.sh && ./ops/restore-verify.sh   # бекап БД і доказ, що його можна відновити (docs/OPERATIONS.md)
 cd frontend && npm run test:e2e      # Playwright проти прод-подібного стеку на :8080 (спершу docker compose -f docker-compose.yml up -d --build)
 ```
+
+## Документація, яку варто знати
+
+`docs/ARCHITECTURE.md` (C4), `docs/adr/` (рішення й чому), `docs/RUNBOOK.md` (що робити при аваріях), `docs/OPERATIONS.md`, `docs/SLO.md`,
+`docs/PERFORMANCE.md`, `docs/QUALITY.md`, `docs/THREAT_MODEL.md`, `CONTRIBUTING.md`. Нове архітектурне рішення = рядок у журналі плану **і** новий ADR.
+Повідомлення комітів — Conventional Commits (хук `commit-msg` це перевіряє; з них release-please будує версії й CHANGELOG).
 
 ## Робочий процес
 

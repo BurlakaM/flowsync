@@ -180,6 +180,12 @@ async list(userId: number, query: PaginationQueryDto) {
 - Перевірка деструктивних міграцій (drop, rename з даними) — лише з дозволу власника.
 - Кілька записів, що мають бути атомарними, — `prisma.$transaction`.
 - Для списків не допускай N+1: `include`/`select` у одному запиті.
+- **Не використовуй `_count: { select: { … } }` у списках і вибірках, що йдуть на сторінку**: Prisma перекладає його як `GROUP BY` по ВСІЙ
+  таблиці дітей (не залежить від розміру сторінки; на 180 000 коментарів це 45 мс на кожен запит). Рахуй окремо для id зі сторінки:
+  `groupBy` із `where: { id: { in } }` (приклади: `TasksService.withCommentCounts`, `ProjectsService.taskCounts`). Перш ніж вважати запит
+  швидким, дивись `EXPLAIN (ANALYZE)` на даних реального розміру (`ops/load/seed.sql`), а не на трьох рядках: `docs/PERFORMANCE.md`.
+- Повнотекстовий пошук (`TasksSearchService.rankedIds`) приймає **список доступних проєктів** (`ProjectsService.accessibleIds`) і розбитий на гілки
+  `UNION` (кожна — зі своїм GIN-індексом); умова `OR EXISTS` між задачею й коментарем відключає індекс.
 - Схема: моделі PascalCase, поля camelCase, у БД snake_case (`@@map`/`@map`); кожен зовнішній ключ має індекс; `onDelete` указується явно.
   Доступ до проєкту: власник = `Project.ownerId`, решта учасників у `ProjectMember`; задачі й коментарі зберігаються після видалення автора (`SetNull`).
 - Seed: `prisma/seed.ts` наповнює лише dev демо-даними (ідемпотентний, у production пропускається), запускається через `tsx`.

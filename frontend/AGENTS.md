@@ -132,6 +132,8 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
 - Покривай: хуки/мутації фіч, форми (валідація, успіх, помилка сервера), захищений маршрут.
 - Рендер у тестах — через `testing/test-utils.tsx` (QueryClient, Router).
 - Доступність: нова сторінка чи діалог додається в `app/accessibility.test.tsx` (`expectNoA11yViolations`, axe; контраст у jsdom не перевіряється).
+- Playwright: людей створює worker-фікстура `people` (`e2e/fixtures.ts`), у браузер вони заходять через refresh-cookie (`browserFor`), а не через форму: реєстрація й вхід мають ліміт 5/хв.
+  Візуальні знімки (`e2e/visual.spec.ts`) створюються й порівнюються лише через `./ops/visual.sh` (Linux-контейнер); не запускай їх на хості.
 - Наскрізні сценарії — Playwright у `e2e/` проти прод-подібного стеку (`npm run test:e2e`); локально береться встановлений Chrome.
 
 ## Чекліст нової фічі
