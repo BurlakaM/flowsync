@@ -32,7 +32,11 @@ describe('NotificationsListener', () => {
   );
 
   const users = (...ids: number[]) =>
-    ids.map((id) => ({ id, email: `u${id}@example.test` }));
+    ids.map((id) => ({
+      id,
+      email: `u${id}@example.test`,
+      emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+    }));
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -102,6 +106,23 @@ describe('NotificationsListener', () => {
         subject: 'Ann assigned you to “Fix login”',
         text: expect.stringContaining('https://app.example/tasks/9'),
       }),
+    );
+  });
+
+  it('emails only addresses that were confirmed, but notifies everyone in the application', async () => {
+    prisma.user.findMany.mockResolvedValue([
+      ...users(2),
+      { id: 3, email: 'u3@example.test', emailVerifiedAt: null },
+    ] as never);
+
+    await listener.handle(
+      event({ data: { name: 'Fix login', assigneeIds: [2, 3] } }),
+    );
+
+    expect(created()?.data).toHaveLength(2);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'u2@example.test' }),
     );
   });
 

@@ -23,6 +23,24 @@ export const routes: RouteObject[] = [
         }),
       },
       {
+        path: '/forgot-password',
+        lazy: async () => ({
+          Component: (await import('./routes/forgot-password')).default,
+        }),
+      },
+      {
+        path: '/reset-password',
+        lazy: async () => ({
+          Component: (await import('./routes/reset-password')).default,
+        }),
+      },
+      {
+        path: '/verify-email',
+        lazy: async () => ({
+          Component: (await import('./routes/verify-email')).default,
+        }),
+      },
+      {
         // Everything inside requires a signed-in user.
         Component: ProtectedRoute,
         children: [

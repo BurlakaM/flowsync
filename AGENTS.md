@@ -19,7 +19,7 @@ FlowSync — пет-проєкт, трекер задач у стилі Jira: п
 
 | Шар | Поточний стан | Ціль (після плану) |
 |---|---|---|
-| Backend | NestJS 12, Prisma 6.19, JWT (Passport), TypeScript 6 (strict), Vitest, Node 24 LTS | + схема БД і модулі за планом (фази 3–4) |
+| Backend | NestJS 12, Prisma 7.10 (адаптер `pg`), JWT (Passport), TypeScript 6 (strict), Vitest, Node 24 LTS | + схема БД і модулі за планом (фази 3–4) |
 | БД | PostgreSQL 16, міграції `prisma migrate`, PascalCase-моделі, `enum Role` | те саме |
 | Frontend | React 19, Vite 8, TypeScript (strict), Tailwind 4 + shadcn/ui (дизайн «Aurora», світла й темна теми), TanStack Query, react-router 8, Vitest + MSW | те саме; типи генеруються з OpenAPI, e2e на Playwright |
 | Інфра | Docker Compose (dev-override + прод), nginx-проксі, Redis (черга), Mailpit і S3-сховище в dev, CI з перевірками | деплой на VPS (фаза 8.9, ще не зроблено) |
@@ -54,6 +54,7 @@ cd backend && npm run openapi:export  # після зміни API: оновит�
 cd frontend && npm run dev           # Vite з HMR
 cd frontend && npm test              # Vitest; також lint, typecheck, build, format:check
 cd frontend && npm run api:types     # після зміни API (і openapi.json): оновити src/types/api.generated.ts (CI перевіряє)
+./ops/security-scan.sh all          # Trivy (образи), gitleaks (історія git), SBOM; усе в Docker, без акаунтів
 ./ops/backup.sh && ./ops/restore-verify.sh   # бекап БД і доказ, що його можна відновити (docs/OPERATIONS.md)
 cd frontend && npm run test:e2e      # Playwright проти прод-подібного стеку на :8080 (спершу docker compose -f docker-compose.yml up -d --build)
 ```

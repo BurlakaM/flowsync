@@ -63,6 +63,8 @@ describe('Notifications (e2e)', () => {
     projectId = (
       await api.post('/api/projects', owner, { name: 'Launch' }).expect(201)
     ).body.id;
+    // Registration sends a confirmation email to everyone; this file is about notification emails only.
+    mail.sent.length = 0;
   });
 
   afterAll(async () => {

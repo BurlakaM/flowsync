@@ -29,13 +29,25 @@ export function createApi(app: INestApplication) {
     return res.body.access_token;
   }
 
-  /** Registers through the API and logs in. */
-  async function signUp(name: string): Promise<TestUser> {
+  /**
+   * Registers through the API and logs in. The address is marked as confirmed (as the link in the email
+   * would do) unless `verified: false`, so tests of other features are not about email verification.
+   */
+  async function signUp(
+    name: string,
+    options: { verified?: boolean } = {},
+  ): Promise<TestUser> {
     const email = `${name}@example.test`;
     const res = await request(server())
       .post('/api/auth/register')
       .send({ name, email, password: PASSWORD })
       .expect(201);
+    if (options.verified !== false) {
+      await prisma.user.update({
+        where: { id: res.body.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+    }
     return { id: res.body.id, email, token: await login(email) };
   }
 
@@ -48,6 +60,7 @@ export function createApi(app: INestApplication) {
         email,
         password: await bcrypt.hash(PASSWORD, 4),
         role: Role.ADMIN,
+        emailVerifiedAt: new Date(),
       },
     });
     return { id: user.id, email, token: await login(email) };

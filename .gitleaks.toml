@@ -1,0 +1,10 @@
+# gitleaks configuration: the default rules plus the false positives below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives"
+regexes = [
+  # The CircleCI badge in the README of the NestJS starter template (commit ca0b092): a public placeholder.
+  '''abc123def456''',
+]

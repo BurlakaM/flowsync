@@ -26,6 +26,11 @@ RUN npm run build
 
 # ---- prod: unprivileged nginx (listens on 8080) ----
 FROM nginxinc/nginx-unprivileged:stable-alpine AS prod
+# The base image is rebuilt rarely; installing the latest patched Alpine packages closes the gap between its
+# release and ours (Trivy flags the difference in CI). The image runs as the unprivileged nginx user again after.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/dist /usr/share/nginx/html

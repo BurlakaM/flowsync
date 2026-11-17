@@ -137,6 +137,7 @@ async list(userId: number, query: PaginationQueryDto) {
 - Обмеження за роллю — `@Roles(Role.Admin)` (перевіряє глобальний `RolesGuard`).
 - Користувач у запиті — `AuthenticatedUser { id; email; role }`, дістається через `@CurrentUser()`. Ніяких `req.user.sub`.
   `JwtStrategy` читає користувача з БД на кожен запит, тож токен видаленого користувача одразу недійсний.
+- Безпека акаунта (`AuthService`, `UsersService`, `UserTokensService`): 5 невдалих паролів поспіль блокують акаунт на 15 хв (`429`, навіть для правильного пароля; невідомий email — завжди `401` і порівняння bcrypt із фіктивним хешем, щоб час відповіді не видавав акаунти). Скидання пароля й підтвердження email — одноразові токени з листа (`user_tokens`, у БД лише SHA-256), посилання з токеном у `#фрагменті`; `forgot-password` завжди `204` і не частіше листа на хвилину. Зміна й скидання пароля **в одній транзакції** оновлюють `passwordChangedAt`, відкликають усі refresh-токени й знімають блокування; `JwtStrategy` відхиляє access-токени, видані до `passwordChangedAt`. Листи-сповіщення йдуть лише на підтверджені адреси (`emailVerifiedAt`). Тести реєструють користувачів через `api.signUp(name)` (вона підтверджує адресу), а неперевірених — `signUp(name, { verified: false })`.
 - Сесія: access-JWT живе 15 хв; refresh-токен — випадкові 48 байт в `httpOnly` cookie `refresh_token` (`SameSite=Strict`, `Path=/api/auth`),
   у БД лише SHA-256 хеш (`RefreshToken`). Кожен refresh-токен діє один раз (ротація); повторне використання вже витраченого токена
   (поза вікном 10 с для двох вкладок) відкликає всю родину токенів. Логіка — `RefreshTokensService`, HTTP-частина (cookie) — лише в `AuthController`.
@@ -172,7 +173,8 @@ async list(userId: number, query: PaginationQueryDto) {
 
 **Дані**
 - Prisma лише в сервісах/репозиторіях, ніколи в контролерах. Raw SQL — лише з обґрунтуванням у коментарі.
-- Схема змінюється через `npx prisma migrate dev --name <verb_noun>`; **вже закомічену міграцію не редагуй**.
+- Prisma 7: клієнт працює через драйвер `pg` (`PrismaPg` у `PrismaService` і `prisma/seed.ts`), конфіг CLI (шлях схеми, міграцій, seed, `DATABASE_URL`) — у `prisma.config.ts`, а не в `package.json` чи `schema.prisma`. `prisma generate` вимагає змінної `DATABASE_URL` (у Dockerfile підставлено заглушку). Помилку унікальності (`P2002`) фільтр читає з імені індексу (`users_email_key`).
+- Схема змінюється через `npx prisma migrate dev --name <verb_noun>` (у неінтерактивному терміналі: `migrate diff --from-config-datasource --to-schema … --script` у нову папку міграції й `migrate deploy`); **вже закомічену міграцію не редагуй**.
   Нову міграцію комітимо разом зі змінами `schema.prisma`; CI падає, якщо схема розійшлась з міграціями. `prisma db push` не використовуємо.
   `prisma migrate reset` лише на dev-базі й лише з дозволу власника.
 - Перевірка деструктивних міграцій (drop, rename з даними) — лише з дозволу власника.

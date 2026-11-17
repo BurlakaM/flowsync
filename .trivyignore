@@ -1,0 +1,2 @@
+# Vulnerabilities accepted for now. Every entry needs a reason and a date to look at it again.
+# (Empty: the last one, deepmerge-ts in the Prisma 6 CLI, went away with the upgrade to Prisma 7.)

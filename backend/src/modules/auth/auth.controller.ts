@@ -25,8 +25,10 @@ import { AppConfigService } from '../../config/app-config.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthService, Session } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto, VerifyEmailDto } from './dto/token.dto';
 import {
   clearRefreshCookie,
   REFRESH_COOKIE,
@@ -100,6 +102,48 @@ export class AuthController {
     const token = this.refreshTokenOf(request);
     if (token) await this.authService.logout(token);
     clearRefreshCookie(response, this.config.cookieSecure);
+  }
+
+  // Public: asks for a reset link by email. Always 204, whether or not the address has an account.
+  // Limited to 3 requests per minute per IP (and one email per account per minute, see AuthService).
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto): Promise<void> {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  // Public: the one-time token from the emailed link is the credential. It ends every session of the user,
+  // so the client signs in again afterwards.
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
+    return this.authService.resetPassword(dto.token, dto.password);
+  }
+
+  // Public: the one-time token from the emailed link is the credential; it works without a session, so the
+  // link can be opened in any browser.
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @Post('verify-email')
+  verifyEmail(@Body() dto: VerifyEmailDto): Promise<void> {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @Post('resend-verification')
+  resendVerification(@CurrentUser() user: AuthenticatedUser): Promise<void> {
+    return this.authService.resendVerification(user.id);
   }
 
   @ApiBearerAuth()

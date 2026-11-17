@@ -3,6 +3,7 @@ import { tKey } from '@/i18n/t-key';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRight, Mail } from 'lucide-react';
 import { useForm } from 'react-hook-form';
+import { Link } from 'react-router';
 import { z } from 'zod';
 import { PasswordField } from '@/components/form/password-field';
 import { TextField } from '@/components/form/text-field';
@@ -59,6 +60,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           label={t('Password')}
           autoComplete="current-password"
         />
+        <Link
+          to="/forgot-password"
+          className="-mt-2 self-end text-sm font-medium text-primary-ink hover:underline"
+        >
+          {t('Forgot your password?')}
+        </Link>
       </FieldGroup>
 
       {serverError && (
