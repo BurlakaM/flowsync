@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 
 function createHost(path = '/api/example') {
@@ -18,11 +19,24 @@ function createHost(path = '/api/example') {
   return { host, status, json };
 }
 
+vi.mock('@sentry/nestjs', () => ({ captureException: vi.fn() }));
+
 describe('AllExceptionsFilter', () => {
   const filter = new AllExceptionsFilter();
 
   beforeEach(() => {
+    vi.mocked(Sentry.captureException).mockClear();
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  it('reports an unexpected error to Sentry but not a client error', () => {
+    const boom = new Error('boom');
+
+    filter.catch(boom, createHost().host);
+    filter.catch(new ForbiddenException(), createHost().host);
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(boom);
   });
 
   it('keeps the status and message of an HttpException', () => {

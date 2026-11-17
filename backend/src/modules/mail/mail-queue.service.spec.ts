@@ -1,4 +1,5 @@
 import { AppConfigService } from '../../config/app-config.service';
+import type { MetricsService } from '../../metrics/metrics.service';
 import { MailQueueService } from './mail-queue.service';
 import type { MailService } from './mail.service';
 
@@ -34,6 +35,7 @@ function setup(options: { redis?: string; enabled?: boolean } = {}) {
   const service = new MailQueueService(
     { redisUrl: options.redis } as AppConfigService,
     { enabled: options.enabled ?? true, send } as unknown as MailService,
+    { registerGauge: vi.fn() } as unknown as MetricsService,
   );
   service.onModuleInit();
   return { service, send };

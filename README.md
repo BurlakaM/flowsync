@@ -178,6 +178,8 @@ npx prisma db seed                                 # демо-дані (лише
 | `backend/.env` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | необов'язково: пошта. Листи вмикаються, коли задано `SMTP_HOST` і `MAIL_FROM`; без них нічого не відправляється й нічого не падає (сповіщення лишаються в застосунку). Заготовки з поясненнями — у `backend/.env.example` |
 | `backend/.env` | `APP_URL` | необов'язково: куди ведуть посилання в листах (типово `http://localhost:5173`) |
 | `backend/.env` | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | необов'язково: сховище файлів (зображення проєктів) у будь-якому S3-сумісному сервісі. Завантаження вмикається, коли задано пару ключів; без неї решта працює, а завантаження відповідає `503`. У dev-compose працює локальне сховище з тестовими ключами |
+| `backend/.env` | `METRICS_TOKEN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SENTRY_DSN` | необов'язково: спостережуваність (токен для `/api/metrics`, куди слати трейси, Sentry). Без них вимкнено; див. `docs/OPERATIONS.md` |
+| `frontend/.env` | `VITE_SENTRY_DSN` | необов'язково: звіти про помилки з браузера (вшивається при збірці; хост треба додати в CSP) |
 | `backend/.env` | `TEST_DATABASE_URL` | необов'язково: БД для e2e (типово `localhost:5434/flowsync_test`) |
 | `frontend/.env` | `VITE_API_URL` | необов'язково: базова адреса API, типово `/api` (той самий origin; у прод-образі `/api`) |
 | `frontend/.env` | `VITE_PROXY_TARGET` | необов'язково: куди Vite-проксі веде `/api` у dev, типово `http://localhost:3000` (у compose `http://backend:3000`) |

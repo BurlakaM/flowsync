@@ -1,6 +1,8 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { httpMetricsMiddleware } from './metrics/http-metrics.middleware';
+import { MetricsService } from './metrics/metrics.service';
 import { AppConfigService } from './config/app-config.service';
 
 /** Shared by main.ts and e2e tests so that tests run against the real configuration. */
@@ -10,6 +12,7 @@ export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
   app.use(helmet());
   app.use(cookieParser());
+  app.use(httpMetricsMiddleware(app.get(MetricsService)));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

@@ -19,6 +19,9 @@ COPY . .
 # backend, so the default is the same-origin path.
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
+# Optional: error reporting. The DSN's host must also be allowed in connect-src of security-headers.conf.
+ARG VITE_SENTRY_DSN=
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 RUN npm run build
 
 # ---- prod: unprivileged nginx (listens on 8080) ----
