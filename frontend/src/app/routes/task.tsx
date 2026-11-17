@@ -126,6 +126,7 @@ export default function TaskRoute() {
                       taskId={data.id}
                       taskName={data.name}
                       status={data.status}
+                      version={data.version}
                     />
                   </dd>
                 </div>

@@ -6,6 +6,7 @@ const task = (id: number, status: Task['status']): Task => ({
   name: `Task ${id}`,
   description: null,
   status,
+  version: 1,
   projectId: 1,
   createdById: 1,
   assignees: [],

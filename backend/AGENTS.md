@@ -117,7 +117,8 @@ async list(userId: number, query: PaginationQueryDto) {
 
 **API**
 - JSON у camelCase. Колекції повертай з пагінацією (`PaginationQueryDto`, `paginationArgs`, `toPage`); коротким довідникам
-  (теги проєкту) пагінація не потрібна.
+  (теги проєкту) пагінація не потрібна. Списки, що постійно ростуть (активність, коментарі), читаються **за курсором**
+  (`common/pagination/cursor.ts`: `CursorQueryDto`, `toCursorPage`, відповідь `{ items, nextCursor }`, без `total`; курсор — id останнього рядка, під нього є індекс).
 - Ресурси вкладені лише тоді, коли батько потрібен у URL: `projects/:projectId/tasks`, `tasks/:taskId/comments`; окремий елемент
   адресується власним id (`tasks/:id`). `DELETE` повертає `204` без тіла.
 - Відповіді описуй класами `*-response.dto.ts` і `@ApiOkResponse({ type })`: з них будуються Swagger і `openapi.json`.
@@ -126,6 +127,7 @@ async list(userId: number, query: PaginationQueryDto) {
 - Помилки — виключення Nest (`NotFoundException`, `ForbiddenException`, `ConflictException`); не повертай `null` замість 404.
   Усі помилки мають єдине тіло `{ statusCode, error, message, path, timestamp, requestId }` (`AllExceptionsFilter`).
   `requestId` збігається із заголовком `X-Request-Id` і з `req.id` у логах: беруть із вхідного заголовка (якщо він схожий на id) або генерують UUID.
+- Редагування задачі — **оптимістична конкурентність**: `PATCH /tasks/:id` вимагає `version` з останньої відповіді, запис іде одним оператором `update where { id, version }` з `version: { increment: 1 }`; розбіжність → `409`, видалена задача → `404`.
 - Помилки Prisma (`P2002` → 409, `P2025` → 404, `P2003` → 409) мапить `PrismaExceptionFilter`; у сервісах не лови їх без потреби.
 - Swagger: Nest CLI plugin описує DTO автоматично (файли `*.dto.ts`); додавай `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation` вручну.
 
@@ -148,13 +150,14 @@ async list(userId: number, query: PaginationQueryDto) {
 - Обмеження частоти: глобально 100 запитів/хв з IP, для логіну й реєстрації `@Throttle` 5/хв. У `NODE_ENV=test` вимкнено.
 
 **Події, права, пошта, файли**
-- Зміни даних публікують доменні події через `DomainEventsService.publish` (`common/events`) **після** успішного збереження, з `await`. Підписники (`@OnEvent(DOMAIN_EVENT)`): журнал аудиту (`modules/activity`), сповіщення (`modules/notifications`), real-time (`modules/realtime`). Підписник мусить бути швидким і ніколи не кидати помилку назовні (повільне — у чергу); помилка підписника логується й ковтається.
+- Зміни даних публікують доменні події через **transactional outbox**: `DomainEventsService.transact(async (tx, emit) => { …запис через tx…; emit({...}); return result; })`. Запис і подія лягають в одну транзакцію, тож «збережено, а подію втрачено» неможливе; одразу після коміту подія доставляється, а недоставлене (збій підписника, падіння процесу) підхоплює `OutboxRelayService` (`FOR UPDATE SKIP LOCKED`, lease 30 с, backoff 2^n с, після 8 спроб статус `DEAD`). Всередині `transact` пиши лише через `tx`, не через `this.prisma`; читання й перевірки доступу лишай до нього.
+- Доставка **щонайменше один раз**: підписник (`@OnEvent(DOMAIN_EVENT)`, отримує `DeliveredDomainEvent` з `id`) мусить бути ідемпотентним і **не ковтати помилки**, інакше outbox не повторить доставку. Аудит: унікальний `eventId` + `skipDuplicates`; сповіщення: унікальне `(eventId, userId)`; real-time безпечний за природою. Підписники: журнал аудиту (`modules/activity`), сповіщення (`modules/notifications`), real-time (`modules/realtime`). Підписник мусить бути швидким (повільне — у чергу).
 - Події містять лише дрібні факти (імена, зміни, id): не сутності й не секрети. Журнал проєкту очищується разом із проєктом.
 - Права «хто що може в проєкті» — тільки в `common/casl/app-ability.ts`; сервіси викликають `authorize(userId, project, дія, суб'єкт, повідомлення)` (403). Доступ (404) лишається в `ProjectsService.assertAccess`. Змінюєш правило — зміни там і в `app-ability.spec.ts`.
 - Пошта: лише через `MailQueueService.enqueue` (ніколи не кидає). Без `SMTP_HOST`+`MAIL_FROM` нічого не шлеться; з `REDIS_URL` листи йдуть через BullMQ з повторами, без нього — одразу. Транспорт підміняється токеном `MAIL_TRANSPORT` (у e2e: `createTestApp({ mailTransport })`).
 - Файли: лише через `StorageService` (`common/storage`), токен `OBJECT_STORE`; у e2e `createTestApp({ objectStore })`. Тип зображення визначається за байтами (`detectImageType`), SVG не приймаємо. Ключ об'єкта ніколи не віддається клієнту.
 - Пошук задач — `TasksSearchService` (повнотекстовий, `to_tsquery('simple', …)` з префіксами); вираз в індексі `tasks_fts_idx` має збігатися з виразом у запиті.
-- Real-time: шлях `/api/socket.io`; кімнати `project:<id>` і `user:<id>`; доступ перевіряється при підключенні й оновлюється подіями `member.added/removed`, `project.created/deleted`.
+- Real-time: з `REDIS_URL` Socket.IO працює через `RedisIoAdapter` (main.ts), тож кілька інстансів API діють як один сервер; без Redis — один інстанс. Шлях `/api/socket.io`; кімнати `project:<id>` і `user:<id>`; доступ перевіряється при підключенні й оновлюється подіями `member.added/removed`, `project.created/deleted`.
 
 **Спостережуваність**
 - Метрики: `MetricsService` (глобальний). Нова метрика даних — `registerGauge` у модулі-власнику (значення читається при scrape); мітки лише з обмеженого набору (ніколи id чи URL).

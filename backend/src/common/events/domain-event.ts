@@ -35,3 +35,9 @@ export interface DomainEvent {
   /** Small JSON-safe facts shown in the activity feed (names, changes); never secrets or whole entities. */
   data: Record<string, unknown>;
 }
+
+/** What a subscriber receives: the event plus the id of its outbox row, the key for idempotency. */
+export interface DeliveredDomainEvent extends DomainEvent {
+  /** The same event always arrives with the same id, however many times it is delivered. */
+  id: string;
+}

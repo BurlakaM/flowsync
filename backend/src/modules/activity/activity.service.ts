@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
-  paginationArgs,
-  toPage,
-  type Page,
-} from '../../common/pagination/paginate';
-import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
+  CursorQueryDto,
+  decodeCursor,
+  toCursorPage,
+  type CursorPage,
+} from '../../common/pagination/cursor';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { ActivityResponseDto } from './dto/activity-response.dto';
@@ -27,28 +27,31 @@ export class ActivityService {
     private readonly projects: ProjectsService,
   ) {}
 
-  /** The latest changes of a project, newest first. Everyone who can see the project can read it. */
+  /**
+   * The latest changes of a project, newest first, by cursor: the feed grows all the time, and offset
+   * pages would repeat or skip entries while the reader pages. Everyone who can see the project can read it.
+   */
   async list(
     userId: number,
     projectId: number,
-    query: PaginationQueryDto,
-  ): Promise<Page<ActivityResponseDto>> {
+    query: CursorQueryDto,
+  ): Promise<CursorPage<ActivityResponseDto>> {
     await this.projects.assertAccess(userId, projectId);
 
-    const where = { projectId };
-    const [rows, total] = await Promise.all([
-      this.prisma.auditLog.findMany({
-        where,
-        select: activitySelect,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        ...paginationArgs(query),
-      }),
-      this.prisma.auditLog.count({ where }),
-    ]);
-    const items = rows.map((row) => ({
-      ...row,
-      data: row.data as Record<string, unknown>,
-    }));
-    return toPage(items, total, query);
+    const before = decodeCursor(query.cursor);
+    const rows = await this.prisma.auditLog.findMany({
+      where: { projectId, ...(before !== undefined && { id: { lt: before } }) },
+      select: activitySelect,
+      // Newest first. Ids grow with time, so the id is both the order and the cursor.
+      orderBy: { id: 'desc' },
+      take: query.limit + 1,
+    });
+    return toCursorPage(
+      rows.map((row) => ({
+        ...row,
+        data: row.data as Record<string, unknown>,
+      })),
+      query.limit,
+    );
   }
 }

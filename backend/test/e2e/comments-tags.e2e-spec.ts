@@ -74,7 +74,7 @@ describe('Comments and tags (e2e)', () => {
         .expect(400);
     });
 
-    it('lists oldest first with pagination', async () => {
+    it('lists oldest first, paged by cursor', async () => {
       const thread = (
         await api.post('/api/projects', owner, { name: 'Thread' }).expect(201)
       ).body.id;
@@ -89,18 +89,25 @@ describe('Comments and tags (e2e)', () => {
           .expect(201);
       }
 
+      const first = await api
+        .get(`/api/tasks/${task}/comments?limit=2`, owner)
+        .expect(200);
+      expect(first.body.items.map((c: { text: string }) => c.text)).toEqual([
+        'first',
+        'second',
+      ]);
+      expect(first.body.nextCursor).toEqual(expect.any(String));
+
       const page = await api
-        .get(`/api/tasks/${task}/comments?limit=2&page=2`, owner)
+        .get(
+          `/api/tasks/${task}/comments?limit=2&cursor=${first.body.nextCursor}`,
+          owner,
+        )
         .expect(200);
       expect(page.body.items.map((c: { text: string }) => c.text)).toEqual([
         'third',
       ]);
-      expect(page.body.meta).toEqual({
-        page: 2,
-        limit: 2,
-        total: 3,
-        totalPages: 2,
-      });
+      expect(page.body.nextCursor).toBeNull();
 
       const all = await api
         .get(`/api/tasks/${task}/comments`, owner)

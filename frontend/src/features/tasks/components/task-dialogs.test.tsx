@@ -13,6 +13,7 @@ const task: Task = {
   name: 'Fix login',
   description: 'It fails',
   status: 'IN_PROGRESS',
+  version: 4,
   projectId: 7,
   createdById: 1,
   assignees: [{ id: 2, name: 'Bob' }],
@@ -123,6 +124,7 @@ describe('TaskFormDialog', () => {
 
     await waitFor(() =>
       expect(body).toEqual({
+        version: 4,
         name: 'Fix login',
         description: 'It fails',
         status: 'IN_PROGRESS',
@@ -163,6 +165,39 @@ describe('TaskFormDialog', () => {
 });
 
 describe('StatusSelect', () => {
+  it('shows the conflict and refetches when someone saved the task first', async () => {
+    server.use(
+      http.patch('*/api/tasks/9', () =>
+        HttpResponse.json(
+          { statusCode: 409, message: 'The task was changed by someone else.' },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const { queryClient } = renderWithProviders(
+      <StatusSelect
+        taskId={9}
+        taskName="Fix login"
+        status="TODO"
+        version={4}
+      />,
+    );
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await chooseOption(
+      user,
+      screen.getByRole('combobox', { name: 'Status of Fix login' }),
+      'Done',
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'changed by someone else',
+    );
+    // After a 409 the screen must show the version that won, so the lists are refetched.
+    expect(invalidate).toHaveBeenCalled();
+  });
+
   it('sends only the status when it changes', async () => {
     const onChanged = vi.fn();
     let body: unknown;
@@ -178,6 +213,7 @@ describe('StatusSelect', () => {
         taskId={9}
         taskName="Fix login"
         status="IN_PROGRESS"
+        version={4}
         onChanged={onChanged}
       />,
     );
@@ -189,7 +225,7 @@ describe('StatusSelect', () => {
     );
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
-    expect(body).toEqual({ status: 'DONE' });
+    expect(body).toEqual({ version: 4, status: 'DONE' });
   });
 
   it('shows why the change failed', async () => {
@@ -203,7 +239,12 @@ describe('StatusSelect', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(
-      <StatusSelect taskId={9} taskName="Fix login" status="TODO" />,
+      <StatusSelect
+        taskId={9}
+        taskName="Fix login"
+        status="TODO"
+        version={4}
+      />,
     );
 
     await chooseOption(

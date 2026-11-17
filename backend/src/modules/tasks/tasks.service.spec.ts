@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 import { DomainEventsService } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -20,6 +22,7 @@ function taskRow(overrides: Record<string, unknown> = {}) {
     name: 'T',
     description: null,
     status: 'TODO',
+    version: 1,
     projectId: 3,
     createdById: 1,
     createdAt: date,
@@ -59,7 +62,11 @@ describe('TasksService', () => {
       {
         rankedIds,
       } as unknown as TasksSearchService,
-      { publish } as unknown as DomainEventsService,
+      {
+        // The real service runs the work in a transaction; here the mocked client plays the transaction.
+        transact: (work: (tx: unknown, emit: unknown) => unknown) =>
+          work(prisma, publish),
+      } as unknown as DomainEventsService,
     );
   });
 
@@ -263,6 +270,7 @@ describe('TasksService', () => {
       );
 
       await service.update(1, 1, {
+        version: 1,
         name: 'Renamed',
         status: 'DONE',
         assigneeIds: [5],
@@ -287,7 +295,9 @@ describe('TasksService', () => {
     it('publishes nothing when the update fails', async () => {
       prisma.task.update.mockRejectedValue(new Error('db down'));
 
-      await expect(service.update(1, 1, { name: 'X' })).rejects.toThrow();
+      await expect(
+        service.update(1, 1, { version: 1, name: 'X' }),
+      ).rejects.toThrow();
       expect(publish).not.toHaveBeenCalled();
     });
 
@@ -296,6 +306,7 @@ describe('TasksService', () => {
       prisma.tag.count.mockResolvedValue(0);
 
       await service.update(1, 1, {
+        version: 1,
         status: 'DONE',
         assigneeIds: [5],
         tagIds: [],
@@ -309,18 +320,55 @@ describe('TasksService', () => {
     });
 
     it('leaves assignees and tags alone when they are omitted', async () => {
-      await service.update(1, 1, { name: 'Renamed' });
+      await service.update(1, 1, { version: 1, name: 'Renamed' });
 
       const { data } = prisma.task.update.mock.calls[0][0];
       expect(data).not.toHaveProperty('assignees');
       expect(data).not.toHaveProperty('tags');
     });
 
+    it('writes only while the stored version is the one the client saw, and bumps it', async () => {
+      await service.update(1, 1, { version: 4, name: 'Renamed' });
+
+      const args = prisma.task.update.mock.calls[0][0];
+      expect(args.where).toEqual({ id: 1, version: 4 });
+      expect(args.data).toMatchObject({ version: { increment: 1 } });
+    });
+
+    it('answers 409 when somebody saved the task first', async () => {
+      prisma.task.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('not found', {
+          code: 'P2025',
+          clientVersion: 'test',
+        }),
+      );
+      prisma.task.findUnique.mockResolvedValue({ version: 5 } as never);
+
+      await expect(
+        service.update(1, 1, { version: 4, name: 'X' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 when the task was deleted in the meantime', async () => {
+      prisma.task.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('not found', {
+          code: 'P2025',
+          clientVersion: 'test',
+        }),
+      );
+      prisma.task.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update(1, 1, { version: 1, name: 'X' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
     it('validates against the project of the task', async () => {
       prisma.user.count.mockResolvedValue(0);
 
       await expect(
-        service.update(1, 1, { assigneeIds: [5] }),
+        service.update(1, 1, { version: 1, assigneeIds: [5] }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.task.update).not.toHaveBeenCalled();
     });

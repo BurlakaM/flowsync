@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { UserSummaryDto } from '../../../common/dto/user-summary.dto';
-import { PageMetaDto } from '../../../common/pagination/page-meta.dto';
 
 export class ActivityResponseDto {
   id!: number;
@@ -29,5 +28,7 @@ export class ActivityPageDto {
   @ApiProperty({ type: () => [ActivityResponseDto] })
   items!: ActivityResponseDto[];
 
-  meta!: PageMetaDto;
+  /** Pass it as `cursor` to get the next page; null on the last one. */
+  @ApiProperty({ type: String, nullable: true })
+  nextCursor!: string | null;
 }

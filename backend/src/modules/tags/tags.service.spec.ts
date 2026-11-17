@@ -26,7 +26,11 @@ describe('TagsService', () => {
         accessFilter: vi.fn().mockReturnValue({}),
         assertAccess,
       } as unknown as ProjectsService,
-      { publish } as unknown as DomainEventsService,
+      {
+        // The real service runs the work in a transaction; here the mocked client plays the transaction.
+        transact: (work: (tx: unknown, emit: unknown) => unknown) =>
+          work(prisma, publish),
+      } as unknown as DomainEventsService,
     );
   });
 

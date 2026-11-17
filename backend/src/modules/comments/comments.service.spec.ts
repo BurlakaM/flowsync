@@ -1,13 +1,13 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 import { DomainEventsService } from '../../common/events/domain-events.service';
-import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
+import { CursorQueryDto, encodeCursor } from '../../common/pagination/cursor';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { TasksService } from '../tasks/tasks.service';
 import { CommentsService } from './comments.service';
 
-const query = Object.assign(new PaginationQueryDto(), { page: 1, limit: 20 });
+const query = Object.assign(new CursorQueryDto(), { limit: 20 });
 
 const publish = vi.fn();
 
@@ -26,7 +26,11 @@ describe('CommentsService', () => {
         accessFilter: vi.fn().mockReturnValue({}),
       } as unknown as ProjectsService,
       { assertTaskAccess } as unknown as TasksService,
-      { publish } as unknown as DomainEventsService,
+      {
+        // The real service runs the work in a transaction; here the mocked client plays the transaction.
+        transact: (work: (tx: unknown, emit: unknown) => unknown) =>
+          work(prisma, publish),
+      } as unknown as DomainEventsService,
     );
   });
 
@@ -46,14 +50,58 @@ describe('CommentsService', () => {
 
     it('lists the comments of the task oldest first', async () => {
       prisma.comment.findMany.mockResolvedValue([]);
-      prisma.comment.count.mockResolvedValue(0);
 
       await service.list(1, 7, query);
 
       expect(prisma.comment.findMany.mock.calls[0][0]).toMatchObject({
         where: { taskId: 7 },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        orderBy: { id: 'asc' },
+        // One more than a page: it only tells whether there is a next page.
+        take: 21,
       });
+    });
+
+    it('continues after the cursor', async () => {
+      prisma.comment.findMany.mockResolvedValue([]);
+
+      await service.list(
+        1,
+        7,
+        Object.assign(new CursorQueryDto(), {
+          limit: 5,
+          cursor: encodeCursor(40),
+        }),
+      );
+
+      expect(prisma.comment.findMany.mock.calls[0][0]).toMatchObject({
+        where: { taskId: 7, id: { gt: 40 } },
+        take: 6,
+      });
+    });
+
+    it('returns a next cursor only when more comments exist', async () => {
+      const row = (id: number) => ({ id, text: 'x' }) as never;
+      prisma.comment.findMany.mockResolvedValueOnce([row(1), row(2), row(3)]);
+
+      const page = await service.list(
+        1,
+        7,
+        Object.assign(new CursorQueryDto(), { limit: 2 }),
+      );
+
+      expect(page.items.map((item) => item.id)).toEqual([1, 2]);
+      expect(page.nextCursor).toBe(encodeCursor(2));
+
+      prisma.comment.findMany.mockResolvedValueOnce([row(3)]);
+      const last = await service.list(
+        1,
+        7,
+        Object.assign(new CursorQueryDto(), {
+          limit: 2,
+          cursor: encodeCursor(2),
+        }),
+      );
+      expect(last.nextCursor).toBeNull();
     });
 
     it('takes the author from the caller, never from the input', async () => {

@@ -280,7 +280,11 @@ describe('Tasks (e2e)', () => {
       });
 
       const res = await api
-        .patch(`/api/tasks/${task.id}`, member, { name: 'New', status: 'DONE' })
+        .patch(`/api/tasks/${task.id}`, member, {
+          version: task.version,
+          name: 'New',
+          status: 'DONE',
+        })
         .expect(200);
 
       expect(res.body).toMatchObject({ name: 'New', status: 'DONE' });
@@ -297,6 +301,7 @@ describe('Tasks (e2e)', () => {
 
       const replaced = await api
         .patch(`/api/tasks/${task.id}`, owner, {
+          version: task.version,
           assigneeIds: [owner.id],
           tagIds: [tagFeature],
         })
@@ -307,7 +312,11 @@ describe('Tasks (e2e)', () => {
       expect(replaced.body.tags).toEqual([{ id: tagFeature, name: 'feature' }]);
 
       const cleared = await api
-        .patch(`/api/tasks/${task.id}`, owner, { assigneeIds: [], tagIds: [] })
+        .patch(`/api/tasks/${task.id}`, owner, {
+          version: replaced.body.version,
+          assigneeIds: [],
+          tagIds: [],
+        })
         .expect(200);
       expect(cleared.body.assignees).toEqual([]);
       expect(cleared.body.tags).toEqual([]);
@@ -317,19 +326,81 @@ describe('Tasks (e2e)', () => {
       const task = await createTask(owner, { name: 'Strict' });
 
       await api
-        .patch(`/api/tasks/${task.id}`, owner, { assigneeIds: [outsider.id] })
+        .patch(`/api/tasks/${task.id}`, owner, {
+          version: task.version,
+          assigneeIds: [outsider.id],
+        })
         .expect(400);
       await api
-        .patch(`/api/tasks/${task.id}`, owner, { tagIds: [foreignTag] })
+        .patch(`/api/tasks/${task.id}`, owner, {
+          version: task.version,
+          tagIds: [foreignTag],
+        })
         .expect(400);
-      await api.patch(`/api/tasks/${task.id}`, owner, { name: '' }).expect(400);
+      await api
+        .patch(`/api/tasks/${task.id}`, owner, {
+          version: task.version,
+          name: '',
+        })
+        .expect(400);
+    });
+
+    it('bumps the version on every update', async () => {
+      const task = await createTask(owner, { name: 'Versions' });
+      expect(task.version).toBe(1);
+
+      const updated = await api
+        .patch(`/api/tasks/${task.id}`, owner, { version: 1, name: 'v2' })
+        .expect(200);
+
+      expect(updated.body.version).toBe(2);
+    });
+
+    it('answers 409 to the second of two edits based on the same version', async () => {
+      const task = await createTask(owner, { name: 'Race' });
+
+      await api
+        .patch(`/api/tasks/${task.id}`, owner, { version: 1, name: 'first' })
+        .expect(200);
+      const stale = await api
+        .patch(`/api/tasks/${task.id}`, member, { version: 1, name: 'second' })
+        .expect(409);
+
+      expect(stale.body.message).toMatch(/changed by someone else/);
+      const current = await api.get(`/api/tasks/${task.id}`, owner).expect(200);
+      expect(current.body.name).toBe('first');
+    });
+
+    it('lets only one of many parallel edits win', async () => {
+      const task = await createTask(owner, { name: 'Parallel' });
+
+      const results = await Promise.all(
+        ['a', 'b', 'c', 'd'].map((name) =>
+          api.patch(`/api/tasks/${task.id}`, owner, { version: 1, name }),
+        ),
+      );
+
+      expect(results.map((res) => res.status).sort()).toEqual([
+        200, 409, 409, 409,
+      ]);
+    });
+
+    it('requires the version', async () => {
+      const task = await createTask(owner, { name: 'NoVersion' });
+
+      await api
+        .patch(`/api/tasks/${task.id}`, owner, { name: 'x' })
+        .expect(400);
     });
 
     it('is a 404 for outsiders', async () => {
       const task = await createTask(owner, { name: 'Mine' });
 
       await api
-        .patch(`/api/tasks/${task.id}`, outsider, { name: 'x' })
+        .patch(`/api/tasks/${task.id}`, outsider, {
+          version: task.version,
+          name: 'x',
+        })
         .expect(404);
     });
   });

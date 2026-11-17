@@ -25,6 +25,7 @@ export function TaskList({ tasks, onChanged }: TaskListProps) {
             taskId={task.id}
             taskName={task.name}
             status={task.status}
+            version={task.version}
             onChanged={onChanged}
           />
           <div className="min-w-0 flex-1 space-y-1">

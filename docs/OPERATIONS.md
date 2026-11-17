@@ -74,3 +74,37 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 docker compose --profile observab
   **У проді додайте хост DSN у `connect-src` у `frontend/security-headers.conf`**, інакше CSP блокуватиме звіти.
 - `METRICS_TOKEN` додає перевірку bearer-токена на `/api/metrics`, якщо Prometheus стоїть поза Docker-мережею.
 - SLO й алерти: `docs/SLO.md`.
+
+## Outbox подій
+
+Кожна зміна даних пише подію в таблицю `outbox_events` **в тій самій транзакції**, що й зміну. Одразу після коміту подію
+доставляють підписникам (аудит, сповіщення, real-time); те, що не вдалося, повторює `OutboxRelayService` (раз на 2 с).
+Доставка «щонайменше один раз», тому підписники ідемпотентні (унікальні `eventId` в аудиті й сповіщеннях).
+
+| Статус | Значення |
+|---|---|
+| `PENDING` | чекає доставки; `attempts`, `last_error`, `next_attempt_at` показують, що пішло не так і коли наступна спроба (2, 4, 8 … 128 с) |
+| `DONE` | доставлено; записи старші за 7 днів видаляються |
+| `DEAD` | 8 невдалих спроб; **потрібна людина** (алерт `OutboxEventDead`) |
+
+```bash
+# Що застрягло і чому
+docker compose exec db psql -U postgres -d flowsync -c "SELECT id, type, attempts, last_error, next_attempt_at FROM outbox_events WHERE status <> 'DONE' ORDER BY created_at"
+
+# Після виправлення причини (наприклад, повернули підписника): дати DEAD-подіям ще одну серію спроб
+docker compose exec db psql -U postgres -d flowsync -c "UPDATE outbox_events SET status='PENDING', attempts=0, next_attempt_at=now() WHERE status='DEAD'"
+```
+
+Безпечно повторювати довільну подію: підписники не створять дублів. Метрики: `flowsync_outbox_events{status}`,
+`flowsync_outbox_oldest_pending_age_seconds`; алерти `OutboxEventDead`, `OutboxLagging`.
+
+## Кілька інстансів API
+
+З `REDIS_URL` Socket.IO працює через Redis-адаптер: оновлення, яке обробив один інстанс, доходить до браузерів, підключених до
+іншого. Воркери outbox теж безпечні для кількох інстансів (`SKIP LOCKED`). Без Redis API має працювати **одним інстансом**:
+інакше частина користувачів не отримуватиме живих оновлень.
+
+## Конфлікти редагування й курсори
+
+- `PATCH /tasks/:id` вимагає `version`; якщо хтось зберіг задачу раніше, відповідь `409` (UI показує повідомлення й перезавантажує задачу).
+- Активність і коментарі читаються за курсором (`?limit=&cursor=`); `nextCursor: null` означає останню сторінку.

@@ -13,3 +13,9 @@ export interface Page<T> {
 
 /** A user as embedded in other responses (project owner, task assignee, comment author). */
 export type UserSummary = Schemas['UserSummaryDto'];
+
+/** A list read by cursor: ask for more with `nextCursor`; null means this was the last page. */
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}

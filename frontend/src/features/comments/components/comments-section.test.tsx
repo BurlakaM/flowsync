@@ -19,9 +19,9 @@ const comment = (
   updatedAt: '2026-01-01T10:00:00.000Z',
 });
 
-const page = (items: unknown[], total = items.length, totalPages = 1) => ({
+const page = (items: unknown[], nextCursor: string | null = null) => ({
   items,
-  meta: { page: 1, limit: 50, total, totalPages },
+  nextCursor,
 });
 
 const renderSection = (
@@ -214,5 +214,72 @@ describe('CommentsSection', () => {
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     expect(deleted).toBe(true);
+  });
+
+  it('reads a long thread by cursor: more comments on request', async () => {
+    const cursors: (string | null)[] = [];
+    server.use(
+      http.get('*/api/tasks/9/comments', ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor');
+        cursors.push(cursor);
+        return HttpResponse.json(
+          cursor
+            ? page([comment(2, 2, 'Bob', 'Second')])
+            : page([comment(1, 1, 'Ann', 'First')], 'next-1'),
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderSection();
+
+    await screen.findByText('First');
+    await user.click(
+      screen.getByRole('button', { name: 'Show more comments' }),
+    );
+
+    expect(await screen.findByText('Second')).toBeInTheDocument();
+    expect(screen.getByText('First')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Show more comments' }),
+    ).not.toBeInTheDocument();
+    expect(cursors).toEqual([null, 'next-1']);
+  });
+
+  it('reads on to the end after a comment is posted, so that the new one is visible', async () => {
+    let posted = false;
+    server.use(
+      http.get('*/api/tasks/9/comments', ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor');
+        if (cursor) {
+          return HttpResponse.json(
+            page(
+              posted
+                ? [
+                    comment(2, 2, 'Bob', 'Second'),
+                    comment(3, 1, 'Ann', 'Newest'),
+                  ]
+                : [comment(2, 2, 'Bob', 'Second')],
+            ),
+          );
+        }
+        return HttpResponse.json(
+          page([comment(1, 1, 'Ann', 'First')], 'next-1'),
+        );
+      }),
+      http.post('*/api/tasks/9/comments', () => {
+        posted = true;
+        return HttpResponse.json(comment(3, 1, 'Ann', 'Newest'), {
+          status: 201,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderSection();
+
+    await screen.findByText('First');
+    await user.type(screen.getByLabelText('Add a comment'), 'Newest');
+    await user.click(screen.getByRole('button', { name: 'Comment' }));
+
+    expect(await screen.findByText('Newest')).toBeInTheDocument();
   });
 });

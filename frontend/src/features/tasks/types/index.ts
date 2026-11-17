@@ -14,6 +14,9 @@ export type TaskInput = Required<
   >
 >;
 
+/** An update names the version it is based on: the API answers 409 when someone saved the task first. */
+export type TaskUpdate = Partial<TaskInput> & { version: number };
+
 /** A person a task can be assigned to; the page that composes features supplies them (e.g. project members). */
 export interface AssigneeOption {
   id: number;

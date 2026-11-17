@@ -14,6 +14,7 @@ const task = (id: number, name: string, status: Task['status']): Task => ({
   name,
   description: null,
   status,
+  version: 3,
   projectId: 7,
   createdById: 1,
   assignees: [{ id: 2, name: 'Bob' }],
@@ -117,7 +118,7 @@ describe('TaskBoard', () => {
         within(column('Done')).getByRole('link', { name: 'Write docs' }),
       ).toBeInTheDocument(),
     );
-    expect(body).toEqual({ status: 'DONE' });
+    expect(body).toEqual({ version: 3, status: 'DONE' });
   });
 });
 
@@ -142,7 +143,9 @@ describe('moving a task with the mutation used by dragging', () => {
       const move = useMoveTask();
       return (
         <>
-          <button onClick={() => move.mutate({ id: 1, status: 'DONE' })}>
+          <button
+            onClick={() => move.mutate({ id: 1, status: 'DONE', version: 3 })}
+          >
             Drop
           </button>
           <p data-testid="status">{tasks.data?.items[0]?.status}</p>

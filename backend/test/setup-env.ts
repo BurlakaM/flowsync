@@ -12,3 +12,4 @@ process.env.BCRYPT_ROUNDS = '4';
 process.env.DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   'postgresql://postgres:postgres@localhost:5434/flowsync_test';
+process.env.OUTBOX_POLL_INTERVAL_MS = '0';

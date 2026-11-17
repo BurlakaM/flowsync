@@ -9,7 +9,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import {
   DOMAIN_EVENT,
-  type DomainEvent,
+  type DeliveredDomainEvent,
 } from '../../common/events/domain-event';
 import { MetricsService } from '../../metrics/metrics.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -102,7 +102,7 @@ export class RealtimeGateway implements OnGatewayInit {
   }
 
   @OnEvent(DOMAIN_EVENT)
-  onDomainEvent(event: DomainEvent): void {
+  onDomainEvent(event: DeliveredDomainEvent): void {
     if (!this.server) return;
     const room = projectRoom(event.projectId);
     const payload: RealtimeEvent = {

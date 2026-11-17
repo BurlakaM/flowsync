@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,7 +12,11 @@ import {
   toPage,
   type Page,
 } from '../../common/pagination/paginate';
-import { DomainEventsService } from '../../common/events/domain-events.service';
+import type { DomainEvent } from '../../common/events/domain-event';
+import {
+  DomainEventsService,
+  type EmitEvent,
+} from '../../common/events/domain-events.service';
 import { PrismaService } from '../../database/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { TasksSearchService } from './tasks-search.service';
@@ -25,6 +30,7 @@ const taskSelect = {
   name: true,
   description: true,
   status: true,
+  version: true,
   projectId: true,
   createdById: true,
   createdAt: true,
@@ -163,37 +169,40 @@ export class TasksService {
     await this.assertAssigneesAreMembers(projectId, dto.assigneeIds);
     await this.assertTagsBelongToProject(projectId, dto.tagIds);
 
-    const task = await this.prisma.task.create({
-      data: {
-        name: dto.name,
-        description: dto.description,
-        status: dto.status,
-        project: { connect: { id: projectId } },
-        createdBy: { connect: { id: userId } },
-        ...(dto.assigneeIds?.length && {
-          assignees: {
-            create: dto.assigneeIds.map((assigneeId) => ({
-              userId: assigneeId,
-            })),
-          },
-        }),
-        ...(dto.tagIds?.length && {
-          tags: { connect: dto.tagIds.map((id) => ({ id })) },
-        }),
-      },
-      select: taskDetailsSelect,
-    });
-    await this.events.publish({
-      type: 'task.created',
-      actorId: userId,
-      projectId,
-      entityType: 'Task',
-      entityId: task.id,
-      data: {
-        name: task.name,
-        status: task.status,
-        assigneeIds: task.assignees.map((assignee) => assignee.user.id),
-      },
+    const task = await this.events.transact(async (tx, emit) => {
+      const created = await tx.task.create({
+        data: {
+          name: dto.name,
+          description: dto.description,
+          status: dto.status,
+          project: { connect: { id: projectId } },
+          createdBy: { connect: { id: userId } },
+          ...(dto.assigneeIds?.length && {
+            assignees: {
+              create: dto.assigneeIds.map((assigneeId) => ({
+                userId: assigneeId,
+              })),
+            },
+          }),
+          ...(dto.tagIds?.length && {
+            tags: { connect: dto.tagIds.map((id) => ({ id })) },
+          }),
+        },
+        select: taskDetailsSelect,
+      });
+      emit({
+        type: 'task.created',
+        actorId: userId,
+        projectId,
+        entityType: 'Task',
+        entityId: created.id,
+        data: {
+          name: created.name,
+          status: created.status,
+          assigneeIds: created.assignees.map((assignee) => assignee.user.id),
+        },
+      });
+      return created;
     });
     return toDetails(task);
   }
@@ -217,29 +226,65 @@ export class TasksService {
     await this.assertAssigneesAreMembers(projectId, dto.assigneeIds);
     await this.assertTagsBelongToProject(projectId, dto.tagIds);
 
-    const task = await this.prisma.task.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        description: dto.description,
-        status: dto.status,
-        // When sent, the lists replace the current ones (the whole update is one transaction).
-        ...(dto.assigneeIds !== undefined && {
-          assignees: {
-            deleteMany: {},
-            create: dto.assigneeIds.map((assigneeId) => ({
-              userId: assigneeId,
-            })),
-          },
-        }),
-        ...(dto.tagIds !== undefined && {
-          tags: { set: dto.tagIds.map((tagId) => ({ id: tagId })) },
-        }),
-      },
-      select: taskDetailsSelect,
+    const task = await this.updateIfCurrent(id, async (tx, emit) => {
+      // The check and the write are one statement: two concurrent updates cannot both win.
+      const updated = await tx.task.update({
+        where: { id, version: dto.version },
+        data: {
+          name: dto.name,
+          description: dto.description,
+          status: dto.status,
+          version: { increment: 1 },
+          // When sent, the lists replace the current ones (the whole update is one transaction).
+          ...(dto.assigneeIds !== undefined && {
+            assignees: {
+              deleteMany: {},
+              create: dto.assigneeIds.map((assigneeId) => ({
+                userId: assigneeId,
+              })),
+            },
+          }),
+          ...(dto.tagIds !== undefined && {
+            tags: { set: dto.tagIds.map((tagId) => ({ id: tagId })) },
+          }),
+        },
+        select: taskDetailsSelect,
+      });
+      emit(this.updatedEvent(userId, before, updated));
+      return updated;
     });
-    await this.publishUpdate(userId, before, task);
     return toDetails(task);
+  }
+
+  /**
+   * Runs the update and turns "nothing matched" into the right error: the task is gone (404) or
+   * somebody saved it first (409). The lookup happens after the failed transaction, not inside it.
+   */
+  private async updateIfCurrent(
+    id: number,
+    work: (
+      tx: Prisma.TransactionClient,
+      emit: EmitEvent,
+    ) => Promise<TaskDetailsRow>,
+  ): Promise<TaskDetailsRow> {
+    try {
+      return await this.events.transact(work);
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== 'P2025'
+      ) {
+        throw error;
+      }
+      const current = await this.prisma.task.findUnique({
+        where: { id },
+        select: { version: true },
+      });
+      if (!current) throw new NotFoundException('Task not found');
+      throw new ConflictException(
+        'The task was changed by someone else. Review the latest version and apply your change again',
+      );
+    }
   }
 
   /** Only the author or the project owner may delete a task. */
@@ -252,23 +297,25 @@ export class TasksService {
       subject('Task', { createdById: task.createdById }),
       'Only the author or the project owner can delete a task',
     );
-    await this.prisma.task.delete({ where: { id } });
-    await this.events.publish({
-      type: 'task.deleted',
-      actorId: userId,
-      projectId: task.projectId,
-      entityType: 'Task',
-      entityId: id,
-      data: { name: task.name },
+    await this.events.transact(async (tx, emit) => {
+      await tx.task.delete({ where: { id } });
+      emit({
+        type: 'task.deleted',
+        actorId: userId,
+        projectId: task.projectId,
+        entityType: 'Task',
+        entityId: id,
+        data: { name: task.name },
+      });
     });
   }
 
   /** Describes what an update changed: the feed shows it and notifications use the new assignees. */
-  private async publishUpdate(
+  private updatedEvent(
     userId: number,
     before: Awaited<ReturnType<TasksService['assertTaskAccess']>>,
     after: TaskDetailsRow,
-  ): Promise<void> {
+  ): DomainEvent {
     const beforeAssignees = before.assignees.map((assignee) => assignee.userId);
     const afterAssignees = after.assignees.map((assignee) => assignee.user.id);
     const assigneesAdded = afterAssignees.filter(
@@ -290,7 +337,7 @@ export class TasksService {
       ids(before.tags) !== ids(after.tags) && 'tags',
     ].filter(Boolean);
 
-    await this.events.publish({
+    return {
       type: 'task.updated',
       actorId: userId,
       projectId: after.projectId,
@@ -304,7 +351,7 @@ export class TasksService {
         }),
         assigneesAdded,
       },
-    });
+    };
   }
 
   /** For other modules (comments): the task, when the user can see its project. */

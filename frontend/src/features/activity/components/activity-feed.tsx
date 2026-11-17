@@ -8,10 +8,9 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime, formatRelativeTime } from '@/lib/format-date';
-import { useState } from 'react';
-import { Pagination } from '@/components/pagination';
 import { ErrorState } from '@/components/states/error-state';
 import { LoadingState } from '@/components/states/loading-state';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -37,9 +36,9 @@ const ENTITY_ICONS: Record<string, LucideIcon> = {
 
 /** What happened in a project lately: who did what, newest first, on a timeline. */
 export function ActivityFeed({ projectId }: ActivityFeedProps) {
-  const [page, setPage] = useState(1);
   const { t } = useTranslation();
-  const activity = useActivity(projectId, page);
+  const activity = useActivity(projectId);
+  const entries = activity.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
     <Card size="sm">
@@ -60,14 +59,14 @@ export function ActivityFeed({ projectId }: ActivityFeedProps) {
             title={t('Could not load the activity')}
             onRetry={() => void activity.refetch()}
           />
-        ) : activity.data.items.length === 0 ? (
+        ) : entries.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t('Nothing happened yet.')}
           </p>
         ) : (
           <>
             <ol className="relative space-y-4 before:absolute before:top-3 before:bottom-3 before:left-[13px] before:w-px before:bg-border">
-              {activity.data.items.map((entry) => {
+              {entries.map((entry) => {
                 const Icon = ENTITY_ICONS[entry.entityType] ?? CircleCheck;
                 return (
                   <li key={entry.id} className="relative flex gap-3 text-sm">
@@ -96,11 +95,21 @@ export function ActivityFeed({ projectId }: ActivityFeedProps) {
                 );
               })}
             </ol>
-            <Pagination
-              page={activity.data.meta.page}
-              totalPages={activity.data.meta.totalPages}
-              onPageChange={setPage}
-            />
+            {activity.hasNextPage && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={activity.isFetchingNextPage}
+                onClick={() => void activity.fetchNextPage()}
+              >
+                {t('Show older activity')}
+              </Button>
+            )}
+            {activity.isFetchNextPageError && (
+              <p role="alert" className="text-xs text-destructive">
+                {t('Could not load older activity')}
+              </p>
+            )}
           </>
         )}
       </CardContent>
