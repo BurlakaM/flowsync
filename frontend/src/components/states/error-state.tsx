@@ -20,11 +20,16 @@ export function ErrorState({ error, onRetry, title }: ErrorStateProps) {
   return (
     <div
       role="alert"
-      className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-12 text-center"
+      className="flex flex-col items-center gap-4 rounded-2xl border border-dashed bg-card/50 px-6 py-14 text-center"
     >
-      <TriangleAlert aria-hidden="true" className="size-8 text-destructive" />
+      <span
+        aria-hidden="true"
+        className="grid size-12 place-items-center rounded-2xl bg-destructive/10 text-destructive"
+      >
+        <TriangleAlert className="size-6" />
+      </span>
       <div className="space-y-1">
-        <p className="font-medium">
+        <p className="font-heading text-lg font-semibold">
           {notFound ? t('Not found') : (title ?? t('Could not load the data'))}
         </p>
         <p className="text-sm text-muted-foreground">

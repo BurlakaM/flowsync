@@ -2,11 +2,13 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/manrope';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-sans);
+  /* Inter reads well in dense UI; Manrope gives headings and numbers their own voice (both have Cyrillic). */
+  --font-heading: 'Manrope Variable', 'Inter Variable', sans-serif;
   --font-sans: 'Inter Variable', sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -33,12 +35,24 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-brand-from: var(--brand-from);
+  --color-brand-to: var(--brand-to);
+  --color-status-todo: var(--status-todo);
+  --color-status-todo-soft: var(--status-todo-soft);
+  --color-status-todo-ink: var(--status-todo-ink);
+  --color-status-progress: var(--status-progress);
+  --color-status-progress-soft: var(--status-progress-soft);
+  --color-status-progress-ink: var(--status-progress-ink);
+  --color-status-done: var(--status-done);
+  --color-status-done-soft: var(--status-done-soft);
+  --color-status-done-ink: var(--status-done-ink);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -48,73 +62,224 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* "Aurora": warm paper, ink with a hint of indigo, and one accent that flows from indigo to teal. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.982 0.005 88);
+  --foreground: oklch(0.2 0.03 275);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.03 275);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.2 0.03 275);
+  --primary: oklch(0.52 0.23 277);
+  --primary-foreground: oklch(0.99 0.005 277);
+  /* The accent as text on a surface; in the dark theme it is lighter than the button fill. */
+  --primary-ink: oklch(0.52 0.23 277);
+  --secondary: oklch(0.955 0.012 275);
+  --secondary-foreground: oklch(0.28 0.05 275);
+  --muted: oklch(0.962 0.008 280);
+  --muted-foreground: oklch(0.5 0.025 275);
+  --accent: oklch(0.95 0.028 277);
+  --accent-foreground: oklch(0.3 0.1 277);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: oklch(0.915 0.012 275);
+  --input: oklch(0.9 0.014 275);
+  --ring: oklch(0.6 0.19 277);
+  --chart-1: oklch(0.7 0.13 185);
+  --chart-2: oklch(0.6 0.19 277);
+  --chart-3: oklch(0.66 0.16 70);
+  --chart-4: oklch(0.62 0.15 158);
+  --chart-5: oklch(0.55 0.03 255);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.982 0.005 88);
+  --sidebar-foreground: oklch(0.2 0.03 275);
+  --sidebar-primary: oklch(0.52 0.23 277);
+  --sidebar-primary-foreground: oklch(0.99 0.005 277);
+  --sidebar-accent: oklch(0.95 0.028 277);
+  --sidebar-accent-foreground: oklch(0.3 0.1 277);
+  --sidebar-border: oklch(0.915 0.012 275);
+  --sidebar-ring: oklch(0.6 0.19 277);
+
+  --brand-from: oklch(0.52 0.23 277);
+  --brand-to: oklch(0.7 0.13 185);
+
+  /* Statuses: an icon color, a soft fill, and an ink that reads on that fill. */
+  --status-todo: oklch(0.55 0.03 255);
+  --status-todo-soft: oklch(0.955 0.01 255);
+  --status-todo-ink: oklch(0.4 0.04 255);
+  --status-progress: oklch(0.66 0.16 70);
+  --status-progress-soft: oklch(0.96 0.05 85);
+  --status-progress-ink: oklch(0.45 0.1 65);
+  --status-done: oklch(0.62 0.15 158);
+  --status-done-soft: oklch(0.955 0.05 160);
+  --status-done-ink: oklch(0.4 0.09 160);
+
+  --aurora-1: oklch(0.75 0.12 277 / 0.2);
+  --aurora-2: oklch(0.8 0.1 190 / 0.18);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.165 0.02 275);
+  --foreground: oklch(0.96 0.008 275);
+  --card: oklch(0.205 0.025 275);
+  --card-foreground: oklch(0.96 0.008 275);
+  --popover: oklch(0.23 0.028 275);
+  --popover-foreground: oklch(0.96 0.008 275);
+  --primary: oklch(0.56 0.22 277);
+  --primary-foreground: oklch(0.99 0.005 277);
+  --primary-ink: oklch(0.76 0.14 277);
+  --secondary: oklch(0.26 0.03 275);
+  --secondary-foreground: oklch(0.95 0.01 275);
+  --muted: oklch(0.24 0.025 275);
+  --muted-foreground: oklch(0.72 0.03 275);
+  --accent: oklch(0.29 0.06 277);
+  --accent-foreground: oklch(0.93 0.04 277);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.65 0.18 277);
+  --chart-1: oklch(0.75 0.12 185);
+  --chart-2: oklch(0.7 0.17 277);
+  --chart-3: oklch(0.8 0.15 80);
+  --chart-4: oklch(0.75 0.15 160);
+  --chart-5: oklch(0.72 0.03 255);
+  --sidebar: oklch(0.205 0.025 275);
+  --sidebar-foreground: oklch(0.96 0.008 275);
+  --sidebar-primary: oklch(0.56 0.22 277);
+  --sidebar-primary-foreground: oklch(0.99 0.005 277);
+  --sidebar-accent: oklch(0.29 0.06 277);
+  --sidebar-accent-foreground: oklch(0.93 0.04 277);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.65 0.18 277);
+
+  --brand-from: oklch(0.58 0.22 277);
+  --brand-to: oklch(0.72 0.12 185);
+
+  --status-todo: oklch(0.72 0.03 255);
+  --status-todo-soft: oklch(0.28 0.02 255);
+  --status-todo-ink: oklch(0.86 0.02 255);
+  --status-progress: oklch(0.8 0.15 80);
+  --status-progress-soft: oklch(0.3 0.06 80);
+  --status-progress-ink: oklch(0.88 0.1 85);
+  --status-done: oklch(0.75 0.15 160);
+  --status-done-soft: oklch(0.28 0.06 160);
+  --status-done-ink: oklch(0.88 0.1 160);
+
+  --shadow-card:
+    0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px -10px oklch(0 0 0 / 0.5);
+  --shadow-lift:
+    0 2px 4px oklch(0 0 0 / 0.3), 0 16px 36px -10px oklch(0 0 0 / 0.65);
+  --shadow-glow: 0 8px 32px -8px oklch(0.56 0.22 277 / 0.6);
+
+  --aurora-1: oklch(0.5 0.2 277 / 0.28);
+  --aurora-2: oklch(0.6 0.12 190 / 0.18);
+}
+
+@theme {
+  --shadow-card:
+    0 1px 2px oklch(0.2 0.03 275 / 0.05),
+    0 6px 20px -8px oklch(0.2 0.05 275 / 0.1);
+  --shadow-lift:
+    0 2px 4px oklch(0.2 0.03 275 / 0.05),
+    0 14px 32px -10px oklch(0.2 0.08 277 / 0.22);
+  --shadow-glow: 0 8px 28px -8px oklch(0.52 0.23 277 / 0.55);
+
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-flow-card: flow-card 9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  --animate-flow-dot: flow-dot 9s linear infinite;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  /* One card travels through the three columns of the board in the login hero: to do, in progress, done. */
+  @keyframes flow-card {
+    0% {
+      opacity: 0;
+      transform: translateX(0) scale(0.96);
+    }
+    5%,
+    30% {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+    38%,
+    60% {
+      transform: translateX(calc(100% + 0.75rem)) scale(1.03) rotate(-1.2deg);
+    }
+    68%,
+    90% {
+      opacity: 1;
+      transform: translateX(calc(200% + 1.5rem)) scale(1) rotate(0deg);
+    }
+    97%,
+    100% {
+      opacity: 0;
+      transform: translateX(calc(200% + 1.5rem)) scale(0.96);
+    }
+  }
+
+  /* The dot on that card changes with the column it is in. */
+  @keyframes flow-dot {
+    0%,
+    32% {
+      background-color: oklch(0.75 0.03 255);
+    }
+    38%,
+    62% {
+      background-color: oklch(0.8 0.15 80);
+    }
+    68%,
+    100% {
+      background-color: oklch(0.75 0.15 160);
+    }
+  }
+
+  @keyframes shimmer {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+@utility bg-brand-gradient {
+  background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+}
+
+@utility text-brand-gradient {
+  background-image: linear-gradient(120deg, var(--brand-from), var(--brand-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* The soft glow behind the top of every signed-in page. */
+@utility bg-aurora {
+  background-image:
+    radial-gradient(60rem 26rem at 12% -12%, var(--aurora-1), transparent 62%),
+    radial-gradient(52rem 24rem at 92% -18%, var(--aurora-2), transparent 62%);
 }
 
 @layer base {
@@ -122,9 +287,29 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
   html {
     @apply font-sans;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading tracking-tight;
+  }
+  ::selection {
+    background: oklch(0.52 0.23 277 / 0.22);
+  }
+}
+
+/* Motion is an enhancement: nobody who asked the system for less of it gets any. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

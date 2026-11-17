@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { authStorage } from '@/lib/auth-storage';
 import { server } from '@/testing/mocks/server';
-import { renderApp } from '@/testing/test-utils';
+import { chooseOption, renderApp } from '@/testing/test-utils';
 
 const ann = {
   id: 1,
@@ -174,9 +174,9 @@ describe('project page', () => {
     const { router } = renderApp('/projects/7');
 
     await screen.findByRole('link', { name: 'Fix login' });
-    await user.selectOptions(screen.getByLabelText('Status'), 'DONE');
-    await user.selectOptions(screen.getByLabelText('Assignee'), 'Bob');
-    await user.selectOptions(screen.getByLabelText('Sort by'), 'Name A–Z');
+    await user.click(screen.getByRole('button', { name: /^Done/ }));
+    await chooseOption(user, screen.getByLabelText('Assignee'), 'Bob');
+    await chooseOption(user, screen.getByLabelText('Sort by'), 'Name A–Z');
 
     await screen.findByText('Page 1 of 3');
     expect(router.state.location.search).toBe(
@@ -185,11 +185,36 @@ describe('project page', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(router.state.location.search).toContain('page=2');
 
-    const last = queries.at(-1);
+    // The status tabs ask for one task each to learn their counts: only the list itself has the full page.
+    const last = queries.filter((query) => query.get('limit') !== '1').at(-1);
     expect(last?.get('status')).toBe('DONE');
     expect(last?.get('assigneeId')).toBe('2');
     expect(last?.get('sortBy')).toBe('name');
     expect(last?.get('limit')).toBe('20');
+  });
+
+  it('shows how many tasks each status has and how far the project has come', async () => {
+    server.use(
+      http.get('*/api/projects/7/tasks', ({ request }) => {
+        const status = new URL(request.url).searchParams.get('status');
+        const total = { TODO: 2, IN_PROGRESS: 1, DONE: 3 }[status ?? ''] ?? 99;
+        return HttpResponse.json({
+          items: [task(9, 'Fix login')],
+          meta: { page: 1, limit: 20, total, totalPages: 1 },
+        });
+      }),
+    );
+    renderApp('/projects/7');
+
+    expect(
+      await screen.findByRole('button', { name: /^Alls*6$/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^To dos*2$/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Dones*3$/ })).toBeVisible();
+    expect(
+      screen.getByRole('progressbar', { name: 'Progress' }),
+    ).toHaveAttribute('aria-valuenow', '3');
+    expect(screen.getByText('3 of 6 done')).toBeInTheDocument();
   });
 
   it('shows the tasks as a board and asks for as many as one request allows', async () => {
@@ -237,7 +262,7 @@ describe('project page', () => {
         '?search=login&sortBy=relevance&order=desc',
       ),
     );
-    expect(screen.getByLabelText('Sort by')).toHaveValue('relevance:desc');
+    expect(screen.getByLabelText('Sort by')).toHaveTextContent('Best match');
 
     await user.clear(screen.getByLabelText('Search tasks'));
     await user.click(screen.getByRole('button', { name: 'Search' }));

@@ -107,4 +107,17 @@ describe('LoginForm', () => {
       'Cannot reach the server',
     );
   });
+
+  it('reveals the password on request and hides it again', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm onSuccess={vi.fn()} />);
+    const field = screen.getByLabelText('Password');
+    expect(field).toHaveAttribute('type', 'password');
+
+    await user.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(field).toHaveAttribute('type', 'text');
+
+    await user.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(field).toHaveAttribute('type', 'password');
+  });
 });

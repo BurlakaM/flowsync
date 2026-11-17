@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 
@@ -27,6 +28,7 @@ export function Pagination({
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
       >
+        <ChevronLeft data-icon="inline-start" />
         {t('Previous')}
       </Button>
       <span className="text-sm text-muted-foreground">
@@ -39,6 +41,7 @@ export function Pagination({
         onClick={() => onPageChange(page + 1)}
       >
         {t('Next')}
+        <ChevronRight data-icon="inline-end" />
       </Button>
     </nav>
   );

@@ -7,6 +7,8 @@ export const useTags = (projectId: number) =>
   useQuery({
     queryKey: tasksKeys.tags(projectId),
     queryFn: () => apiClient.get<Tag[]>(`/projects/${projectId}/tags`),
+    // The task page asks with id 0 until the task (and its project) has loaded.
+    enabled: Number.isInteger(projectId) && projectId > 0,
   });
 
 export function useCreateTag(projectId: number) {

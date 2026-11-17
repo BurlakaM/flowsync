@@ -1,3 +1,4 @@
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -8,18 +9,20 @@ import { Button } from '@/components/ui/button';
 import {
   DeleteProjectDialog,
   ProjectFormDialog,
-  ProjectImage,
+  ProjectHeader,
   ProjectMembers,
   useProject,
 } from '@/features/projects';
 import { ActivityFeed } from '@/features/activity';
-import { TagsManager } from '@/features/tasks';
+import { TagsManager, useTaskCounts } from '@/features/tasks';
 import { ProjectTasks } from './project-tasks';
 
 export default function ProjectRoute() {
   const projectId = Number(useParams().projectId);
   const navigate = useNavigate();
   const project = useProject(projectId);
+  // The whole project, whatever the list below is filtered by: that is what the progress bar shows.
+  const counts = useTaskCounts(projectId, {});
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { t } = useTranslation();
@@ -32,7 +35,9 @@ export default function ProjectRoute() {
       />
     );
   }
-  if (project.isPending) return <LoadingState label={t('Loading project')} />;
+  if (project.isPending) {
+    return <LoadingState variant="page" label={t('Loading project')} />;
+  }
   if (project.isError) {
     return (
       <ErrorState
@@ -48,47 +53,51 @@ export default function ProjectRoute() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          to="/projects"
-          className="text-sm text-muted-foreground hover:underline"
-        >
-          ← {t('All projects')}
-        </Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-4">
-            <ProjectImage project={data} className="size-16 text-2xl" />
-            <div className="space-y-1">
-              <h1 className="text-2xl font-semibold">{data.name}</h1>
-              <p className="text-muted-foreground">
-                {data.description || t('No description')}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {t('Owner: {{name}}', { name: data.owner.name })}
-              </p>
-            </div>
-          </div>
-          {isOwner && (
-            <div className="flex gap-2">
+      <Link
+        to="/projects"
+        className="inline-flex items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        {t('All projects')}
+      </Link>
+
+      <ProjectHeader
+        project={data}
+        progress={
+          counts.all === undefined
+            ? undefined
+            : { done: counts.DONE ?? 0, total: counts.all }
+        }
+        actions={
+          isOwner && (
+            <>
               <Button variant="outline" onClick={() => setEditing(true)}>
+                <Pencil data-icon="inline-start" />
                 {t('Edit')}
               </Button>
               <Button variant="destructive" onClick={() => setDeleting(true)}>
+                <Trash2 data-icon="inline-start" />
                 {t('Delete')}
               </Button>
-            </div>
-          )}
-        </div>
+            </>
+          )
+        }
+      />
+
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <ProjectTasks project={data} />
+
+        <aside
+          aria-label={t('Project details')}
+          className="grid content-start gap-6 md:grid-cols-2 xl:grid-cols-1"
+        >
+          <ProjectMembers project={data} />
+          <TagsManager projectId={data.id} canManage={isOwner} />
+          <div className="md:col-span-2 xl:col-span-1">
+            <ActivityFeed projectId={data.id} />
+          </div>
+        </aside>
       </div>
-
-      <ProjectTasks project={data} />
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <ProjectMembers project={data} />
-        <TagsManager projectId={data.id} canManage={isOwner} />
-      </div>
-
-      <ActivityFeed projectId={data.id} />
 
       <ProjectFormDialog
         open={editing}

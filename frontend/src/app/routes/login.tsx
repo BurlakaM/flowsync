@@ -22,7 +22,7 @@ export default function LoginRoute() {
           {t('No account yet?')}&nbsp;
           <Link
             to={`/register${params.has('redirectTo') ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
-            className="text-foreground underline"
+            className="font-medium text-primary-ink hover:underline"
           >
             {t('Create one')}
           </Link>

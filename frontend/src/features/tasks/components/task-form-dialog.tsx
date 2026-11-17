@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { tKey } from '@/i18n/t-key';
 import { FormFieldError } from '@/components/form/form-field-error';
@@ -6,6 +7,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { TextField } from '@/components/form/text-field';
 import { Spinner } from '@/components/spinner';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -24,9 +26,11 @@ import {
   FieldLegend,
 } from '@/components/ui/field';
 import { Label } from '@/components/ui/label';
-import { NativeSelect } from '@/components/ui/native-select';
+import { OptionSelect } from '@/components/ui/option-select';
 import { Textarea } from '@/components/ui/textarea';
 import { getErrorMessage } from '@/lib/api-client';
+import { getIdentityColor } from '@/lib/identity';
+import { cn } from '@/lib/utils';
 import { useCreateTask, useUpdateTask } from '../api/task-mutations';
 import { STATUS_LABELS, TASK_STATUSES } from '../constants';
 import type {
@@ -36,6 +40,7 @@ import type {
   TaskDetails,
   TaskStatus,
 } from '../types';
+import { StatusIcon } from './status-icon';
 
 const taskSchema = z.object({
   name: z
@@ -183,19 +188,16 @@ function TaskForm({
           render={({ field }) => (
             <Field>
               <FieldLabel htmlFor="task-status">{t('Status')}</FieldLabel>
-              <NativeSelect
+              <OptionSelect
                 id="task-status"
-                {...field}
-                onChange={(event) =>
-                  field.onChange(event.target.value as TaskStatus)
-                }
-              >
-                {TASK_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {t(STATUS_LABELS[status])}
-                  </option>
-                ))}
-              </NativeSelect>
+                value={field.value}
+                options={TASK_STATUSES.map((status) => ({
+                  value: status,
+                  label: t(STATUS_LABELS[status]),
+                  icon: <StatusIcon status={status} />,
+                }))}
+                onValueChange={(value) => field.onChange(value as TaskStatus)}
+              />
             </Field>
           )}
         />
@@ -211,6 +213,14 @@ function TaskForm({
               options={people.map((person) => ({
                 id: person.id,
                 label: person.name,
+                leading: (
+                  <Avatar
+                    name={person.name}
+                    seed={person.id}
+                    size="xs"
+                    decorative
+                  />
+                ),
               }))}
               value={field.value}
               onChange={field.onChange}
@@ -226,7 +236,19 @@ function TaskForm({
               legend={t('Tags')}
               emptyText={t('This project has no tags yet.')}
               idPrefix="tag"
-              options={tags.map((tag) => ({ id: tag.id, label: tag.name }))}
+              options={tags.map((tag) => ({
+                id: tag.id,
+                label: tag.name,
+                leading: (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'size-2.5 rounded-full bg-linear-to-br',
+                      getIdentityColor(tag.id).avatar,
+                    )}
+                  />
+                ),
+              }))}
               value={field.value}
               onChange={field.onChange}
             />
@@ -257,7 +279,7 @@ interface CheckboxGroupProps {
   legend: string;
   emptyText: string;
   idPrefix: string;
-  options: { id: number; label: string }[];
+  options: { id: number; label: string; leading?: ReactNode }[];
   value: number[];
   onChange: (value: number[]) => void;
 }
@@ -276,11 +298,14 @@ function CheckboxGroup({
       {options.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyText}</p>
       ) : (
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
+        <div className="flex flex-wrap gap-2">
           {options.map((option) => {
             const id = `${idPrefix}-${option.id}`;
             return (
-              <div key={option.id} className="flex items-center gap-2">
+              <div
+                key={option.id}
+                className="flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 transition-colors hover:bg-accent/40 has-data-[state=checked]:border-primary/40 has-data-[state=checked]:bg-accent"
+              >
                 <Checkbox
                   id={id}
                   checked={value.includes(option.id)}
@@ -292,6 +317,7 @@ function CheckboxGroup({
                     )
                   }
                 />
+                {option.leading}
                 <Label htmlFor={id} className="font-normal">
                   {option.label}
                 </Label>

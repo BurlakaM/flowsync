@@ -1,6 +1,8 @@
+import { UserMinus, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState, type FormEvent } from 'react';
 import { Spinner } from '@/components/spinner';
+import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,23 +38,29 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
   };
 
   return (
-    <Card>
+    <Card size="sm">
       <CardHeader>
-        <CardTitle>{t('Members')}</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <h2>{t('Members')}</h2>
+          <span className="rounded-md bg-muted px-1.5 text-xs leading-5 font-medium text-muted-foreground tabular-nums">
+            {project.members.length}
+          </span>
+        </CardTitle>
         <CardDescription>
           {t('Members can create and edit tasks, comments and tags.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ul className="divide-y">
+        <ul className="space-y-1">
           {project.members.map((member) => (
             <li
               key={member.userId}
-              className="flex items-center justify-between gap-3 py-2"
+              className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-accent/40"
             >
-              <div className="min-w-0">
+              <Avatar name={member.name} seed={member.userId} decorative />
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{member.name}</p>
-                <p className="truncate text-sm text-muted-foreground">
+                <p className="truncate text-xs text-muted-foreground">
                   {member.email}
                 </p>
               </div>
@@ -62,12 +70,13 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
                 isOwner && (
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon-sm"
                     disabled={remove.isPending}
                     aria-label={t('Remove {{name}}', { name: member.name })}
+                    title={t('Remove')}
                     onClick={() => remove.mutate(member.userId)}
                   >
-                    {t('Remove')}
+                    <UserMinus />
                   </Button>
                 )
               )}
@@ -83,16 +92,30 @@ export function ProjectMembers({ project }: ProjectMembersProps) {
 
         {isOwner && (
           <form onSubmit={submit} className="space-y-2">
-            <Label htmlFor="member-email">{t('Add a member by email')}</Label>
+            <Label htmlFor="member-email" className="sr-only">
+              {t('Add a member by email')}
+            </Label>
             <div className="flex gap-2">
-              <Input
-                id="member-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="off"
-              />
-              <Button type="submit" disabled={add.isPending || !email.trim()}>
+              <div className="relative min-w-0 flex-1">
+                <UserPlus
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  id="member-email"
+                  type="email"
+                  value={email}
+                  placeholder={t('Add a member by email')}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="off"
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="h-10"
+                disabled={add.isPending || !email.trim()}
+              >
                 {add.isPending && <Spinner className="text-current" />}
                 {t('Add')}
               </Button>

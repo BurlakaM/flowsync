@@ -20,16 +20,18 @@ export function NotificationsLink() {
       }
       className={({ isActive }) =>
         cn(
-          'relative flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted',
-          isActive ? 'bg-muted text-foreground' : 'text-muted-foreground',
+          'relative grid size-9 place-items-center rounded-lg transition-colors hover:bg-accent/70 hover:text-accent-foreground',
+          isActive
+            ? 'bg-accent text-accent-foreground'
+            : 'text-muted-foreground',
         )
       }
     >
-      <Bell aria-hidden="true" className="size-4" />
+      <Bell aria-hidden="true" className="size-[18px]" />
       {count > 0 && (
         <span
           aria-hidden="true"
-          className="min-w-5 rounded-full bg-primary px-1.5 text-center text-xs text-primary-foreground"
+          className="absolute -top-0.5 -right-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] leading-4 font-semibold text-primary-foreground ring-2 ring-background"
         >
           {count > 99 ? '99+' : count}
         </span>

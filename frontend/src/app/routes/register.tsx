@@ -21,7 +21,7 @@ export default function RegisterRoute() {
           {t('Already have an account?')}&nbsp;
           <Link
             to={`/login${params.has('redirectTo') ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`}
-            className="text-foreground underline"
+            className="font-medium text-primary-ink hover:underline"
           >
             {t('Sign in')}
           </Link>

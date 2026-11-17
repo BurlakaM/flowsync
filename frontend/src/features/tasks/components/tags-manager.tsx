@@ -1,9 +1,9 @@
+import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useState, type FormEvent } from 'react';
 import { LoadingState } from '@/components/states/loading-state';
 import { ErrorState } from '@/components/states/error-state';
 import { Spinner } from '@/components/spinner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getErrorMessage } from '@/lib/api-client';
 import { useCreateTag, useDeleteTag, useTags } from '../api/tags';
+import { TagChip } from './tag-chip';
 
 interface TagsManagerProps {
   projectId: number;
@@ -38,9 +39,11 @@ export function TagsManager({ projectId, canManage }: TagsManagerProps) {
   };
 
   return (
-    <Card>
+    <Card size="sm">
       <CardHeader>
-        <CardTitle>{t('Tags')}</CardTitle>
+        <CardTitle>
+          <h2>{t('Tags')}</h2>
+        </CardTitle>
         <CardDescription>
           {t('Labels that group tasks of the project.')}
         </CardDescription>
@@ -59,23 +62,19 @@ export function TagsManager({ projectId, canManage }: TagsManagerProps) {
         ) : (
           <ul className="flex flex-wrap gap-2">
             {tags.data.map((tag) => (
-              <li key={tag.id} className="flex items-center gap-1">
-                <Badge variant="secondary">{tag.name}</Badge>
-                {canManage && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t('Delete tag {{name}}', { name: tag.name })}
-                    disabled={remove.isPending}
-                    onClick={() =>
+              <li key={tag.id}>
+                <TagChip
+                  tag={tag}
+                  className="text-sm"
+                  {...(canManage && {
+                    removeLabel: t('Delete tag {{name}}', { name: tag.name }),
+                    removeDisabled: remove.isPending,
+                    onRemove: () =>
                       remove.mutate(tag.id, {
                         onSuccess: () => void tags.refetch(),
-                      })
-                    }
-                  >
-                    ×
-                  </Button>
-                )}
+                      }),
+                  })}
+                />
               </li>
             ))}
           </ul>
@@ -89,17 +88,28 @@ export function TagsManager({ projectId, canManage }: TagsManagerProps) {
 
         {canManage && (
           <form onSubmit={submit} className="space-y-2">
-            <Label htmlFor="new-tag">{t('New tag')}</Label>
+            <Label htmlFor="new-tag" className="sr-only">
+              {t('New tag')}
+            </Label>
             <div className="flex gap-2">
               <Input
                 id="new-tag"
                 value={name}
                 maxLength={50}
+                placeholder={t('New tag')}
                 onChange={(event) => setName(event.target.value)}
                 autoComplete="off"
               />
-              <Button type="submit" disabled={create.isPending || !name.trim()}>
-                {create.isPending && <Spinner className="text-current" />}
+              <Button
+                type="submit"
+                className="h-10"
+                disabled={create.isPending || !name.trim()}
+              >
+                {create.isPending ? (
+                  <Spinner className="text-current" />
+                ) : (
+                  <Plus data-icon="inline-start" />
+                )}
                 {t('Add tag')}
               </Button>
             </div>

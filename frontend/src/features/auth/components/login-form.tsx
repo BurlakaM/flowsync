@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { tKey } from '@/i18n/t-key';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowRight, Mail } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { PasswordField } from '@/components/form/password-field';
 import { TextField } from '@/components/form/text-field';
 import { Spinner } from '@/components/spinner';
 import { Button } from '@/components/ui/button';
@@ -49,12 +51,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           label={t('Email')}
           type="email"
           autoComplete="email"
+          icon={<Mail />}
         />
-        <TextField
+        <PasswordField
           control={form.control}
           name="password"
           label={t('Password')}
-          type="password"
           autoComplete="current-password"
         />
       </FieldGroup>
@@ -65,9 +67,15 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         </p>
       )}
 
-      <Button type="submit" className="w-full" disabled={login.isPending}>
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full"
+        disabled={login.isPending}
+      >
         {login.isPending && <Spinner className="text-current" />}
         {t('Sign in')}
+        {!login.isPending && <ArrowRight data-icon="inline-end" />}
       </Button>
     </form>
   );

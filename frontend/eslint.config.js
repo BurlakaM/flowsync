@@ -94,6 +94,11 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}', 'src/testing/**'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
+  // Static scripts served as they are (not bundled) run in the browser as plain scripts.
+  {
+    files: ['public/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
   // Plain configuration files run in Node.
   {
     files: ['*.config.{js,ts}'],
