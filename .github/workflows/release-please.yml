@@ -1,0 +1,21 @@
+name: Release
+
+# Reads the Conventional Commits that reached main and keeps one "Release PR" open: it holds the next version and
+# the CHANGELOG entry. Merging that PR creates the tag (vX.Y.Z) and the GitHub release. It does not deploy:
+# deploying stays a deliberate manual step (the "Deploy to production" workflow).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
