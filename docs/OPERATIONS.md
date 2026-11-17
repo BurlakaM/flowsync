@@ -108,3 +108,28 @@ docker compose exec db psql -U postgres -d flowsync -c "UPDATE outbox_events SET
 
 - `PATCH /tasks/:id` вимагає `version`; якщо хтось зберіг задачу раніше, відповідь `409` (UI показує повідомлення й перезавантажує задачу).
 - Активність і коментарі читаються за курсором (`?limit=&cursor=`); `nextCursor: null` означає останню сторінку.
+
+## Безпека: скани й акаунти
+
+```bash
+./ops/security-scan.sh images    # збирає прод-образи й сканує Trivy: падає на HIGH/CRITICAL, для яких уже є виправлення
+./ops/security-scan.sh secrets   # gitleaks по всій історії git (.gitleaks.toml: відомі хибні спрацювання)
+./ops/security-scan.sh sbom      # CycloneDX-опис складу образів у sbom/ (у CI це артефакт на 90 днів)
+```
+
+У CI те саме робить джоба `security`; `codeql.yml` (статичний аналіз) працює на push, PR і щотижня. Прийняті винятки — у
+`.trivyignore` із причиною й датою перегляду (зараз порожній). Знайшли вразливість в образі: оновіть пакет у `package.json`/Dockerfile,
+а не додавайте в ignore без причини.
+
+**Користувач заблокований** (5 невдалих входів): блокування саме знімається за 15 хв, або користувач скидає пароль («Забули пароль?»).
+Зняти вручну:
+
+```bash
+docker compose exec db psql -U postgres -d flowsync -c "UPDATE users SET locked_until = NULL, failed_login_attempts = 0 WHERE email = 'user@example.com'"
+```
+
+**Листи підтвердження й скидання пароля** — звичайні листи через ту саму чергу (див. «Outbox» і BullMQ вище); у dev їх видно в Mailpit
+(http://localhost:8025). Без налаштованого SMTP листи не йдуть, тож скидання пароля й підтвердження недоступні: у проді SMTP обов'язковий.
+
+**Міграції Prisma 7:** `prisma migrate deploy` береться з `prisma.config.ts` (копіюється в прод-образ). Образ містить CLI Prisma заради
+цієї команди, тому він великий (~1,1 ГБ); якщо це заважатиме, винести міграції в окремий одноразовий образ.

@@ -6,6 +6,8 @@ export class UserResponseDto {
   name!: string;
   email!: string;
   role!: Role;
+  /** Null until the email address is confirmed with the link that was sent to it. */
+  emailVerifiedAt!: Date | null;
   createdAt!: Date;
 }
 

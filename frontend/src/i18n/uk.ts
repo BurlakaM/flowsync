@@ -45,6 +45,44 @@ export const uk: Record<string, string> = {
   'Show older activity': 'Показати давнішу активність',
   'Could not load older activity': 'Не вдалося завантажити давнішу активність',
   'Show more comments': 'Показати більше коментарів',
+  'Forgot your password?': 'Забули пароль?',
+  'If an account exists for that address, a reset link is on its way. It works for one hour.':
+    'Якщо для цієї адреси є акаунт, посилання для скидання вже в дорозі. Воно діє одну годину.',
+  'Send reset link': 'Надіслати посилання',
+  'New password': 'Новий пароль',
+  'Confirm the new password': 'Підтвердіть новий пароль',
+  'Passwords do not match': 'Паролі не збігаються',
+  'Set new password': 'Встановити новий пароль',
+  'We sent a new link. Check your inbox.':
+    'Ми надіслали нове посилання. Перевірте пошту.',
+  'Confirm your email address to receive notification emails. We sent you a link when you signed up.':
+    'Підтвердіть адресу, щоб отримувати сповіщення на пошту. Ми надіслали вам посилання під час реєстрації.',
+  'Send the link again': 'Надіслати посилання ще раз',
+  'Reset your password': 'Скиньте пароль',
+  'Enter your email and we will send you a link to choose a new password.':
+    'Вкажіть email, і ми надішлемо посилання, щоб обрати новий пароль.',
+  'Back to sign in': 'Назад до входу',
+  'Password changed': 'Пароль змінено',
+  'Your password was changed. Sign in with the new one.':
+    'Пароль змінено. Увійдіть із новим.',
+  'This link does not work': 'Це посилання не працює',
+  'The link is incomplete or has expired. Request a new one.':
+    'Посилання неповне або застаріло. Запросіть нове.',
+  'Request a new link': 'Запросити нове посилання',
+  'Choose a new password': 'Оберіть новий пароль',
+  'You will be signed out everywhere and can sign in with the new password.':
+    'Усі ваші сеанси завершаться, а ввійти можна буде з новим паролем.',
+  'Go to FlowSync': 'Перейти до FlowSync',
+  'Email confirmed': 'Email підтверджено',
+  'Your email address is confirmed. Notification emails will reach you now.':
+    'Вашу адресу підтверджено. Тепер сповіщення надходитимуть на пошту.',
+  Continue: 'Продовжити',
+  'Sign in and use "Send the link again" in the banner at the top.':
+    'Увійдіть і скористайтеся кнопкою «Надіслати посилання ще раз» у смузі вгорі.',
+  'Confirm your email address': 'Підтвердіть адресу пошти',
+  'One click and we know this address is yours.':
+    'Один клік, і ми знаємо, що ця адреса ваша.',
+  'Confirm my email': 'Підтвердити мій email',
   'Reload the page': 'Перезавантажити сторінку',
   'Cannot reach the server. Check your connection.':
     'Не вдається зв’язатися із сервером. Перевірте з’єднання.',

@@ -124,7 +124,7 @@ export class NotificationsListener {
       }),
       this.prisma.user.findMany({
         where: { id: { in: fresh } },
-        select: { id: true, email: true },
+        select: { id: true, email: true, emailVerifiedAt: true },
       }),
     ]);
     if (!project) return;
@@ -153,10 +153,14 @@ export class NotificationsListener {
     );
 
     const content = buildEmail(type, data, this.config.appUrl);
+    // Email only goes to addresses whose owner confirmed them: nobody can have mail sent to a stranger
+    // by signing up with that address. The in-app notification above is for everyone.
     await Promise.all(
-      recipients.map((recipient) =>
-        this.mailQueue.enqueue({ to: recipient.email, ...content }),
-      ),
+      recipients
+        .filter((recipient) => recipient.emailVerifiedAt)
+        .map((recipient) =>
+          this.mailQueue.enqueue({ to: recipient.email, ...content }),
+        ),
     );
   }
 }

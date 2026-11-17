@@ -42,6 +42,54 @@ describe('PrismaExceptionFilter', () => {
     );
   });
 
+  it.each([
+    [
+      'the driver adapter of Prisma 7 (names the index)',
+      {
+        driverAdapterError: {
+          cause: {
+            kind: 'UniqueConstraintViolation',
+            table: 'users',
+            constraint: { index: 'users_email_key' },
+          },
+        },
+      },
+      'email',
+    ],
+    [
+      'a composite index',
+      {
+        driverAdapterError: {
+          cause: {
+            table: 'notifications',
+            constraint: { index: 'notifications_event_id_user_id_key' },
+          },
+        },
+      },
+      'event_id_user_id',
+    ],
+    [
+      'fields given by the driver',
+      {
+        driverAdapterError: {
+          cause: { constraint: { fields: ['name', 'projectId'] } },
+        },
+      },
+      'name, projectId',
+    ],
+    ['nothing to go on', {}, 'value'],
+  ])('names the duplicated field for %s', (_case, meta, expected) => {
+    const { host, json } = createHost();
+
+    filter.catch(prismaError('P2002', meta), host);
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: `A record with this ${expected} already exists`,
+      }),
+    );
+  });
+
   it('maps a missing record (P2025) to 404', () => {
     const { host, status } = createHost();
 

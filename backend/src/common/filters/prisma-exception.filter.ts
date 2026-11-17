@@ -41,13 +41,9 @@ export class PrismaExceptionFilter implements ExceptionFilter {
   } {
     switch (exception.code) {
       case 'P2002': {
-        const target = exception.meta?.target;
-        const fields = Array.isArray(target)
-          ? target.join(', ')
-          : String(target ?? 'value');
         return {
           status: HttpStatus.CONFLICT,
-          message: `A record with this ${fields} already exists`,
+          message: `A record with this ${uniqueTarget(exception)} already exists`,
         };
       }
       case 'P2025':
@@ -64,4 +60,39 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         };
     }
   }
+}
+
+/**
+ * Which field was duplicated. With the `pg` driver adapter (Prisma 7) the error names the unique index
+ * (`users_email_key`) instead of the fields, so the field is read from the index name, which Prisma builds as
+ * `<table>_<fields>_key`. Older error shapes (`meta.target`) are still understood.
+ */
+function uniqueTarget(exception: Prisma.PrismaClientKnownRequestError): string {
+  const meta = exception.meta as
+    | {
+        target?: unknown;
+        driverAdapterError?: {
+          cause?: {
+            table?: string;
+            constraint?: { fields?: string[]; index?: string };
+          };
+        };
+      }
+    | undefined;
+
+  if (Array.isArray(meta?.target)) return meta.target.join(', ');
+  if (typeof meta?.target === 'string') return meta.target;
+
+  const cause = meta?.driverAdapterError?.cause;
+  if (cause?.constraint?.fields?.length)
+    return cause.constraint.fields.join(', ');
+  const index = cause?.constraint?.index;
+  if (index) {
+    const withoutTable =
+      cause?.table && index.startsWith(`${cause.table}_`)
+        ? index.slice(cause.table.length + 1)
+        : index;
+    return withoutTable.replace(/_key$/, '');
+  }
+  return 'value';
 }

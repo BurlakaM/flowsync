@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from 'react-router';
 import { AppLayout } from '@/components/layouts/app-layout';
-import { useLogout, useMe } from '@/features/auth';
+import { EmailVerificationBanner, useLogout, useMe } from '@/features/auth';
 import { NotificationsLink } from '@/features/notifications';
 import { useRealtimeSync } from '../realtime/use-realtime-sync';
 
@@ -20,6 +20,7 @@ export default function AppShell() {
         navigate('/login', { replace: true });
       }}
     >
+      <EmailVerificationBanner />
       <Outlet />
     </AppLayout>
   );

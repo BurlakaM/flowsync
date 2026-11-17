@@ -8,7 +8,7 @@ Backend на **NestJS**, frontend на **React**, база **PostgreSQL**, ус�
 
 | Шар | Зараз |
 |---|---|
-| Backend | NestJS 12, Prisma 6.19, Passport JWT, TypeScript 6, Vitest |
+| Backend | NestJS 12, Prisma 7.10, Passport JWT, TypeScript 6, Vitest |
 | Frontend | React 19, Vite, TypeScript, Tailwind 4 + shadcn/ui, TanStack Query, Vitest |
 | БД | PostgreSQL 16 |
 | Runtime | Node.js 24 LTS (`.nvmrc`) |

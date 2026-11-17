@@ -1,7 +1,11 @@
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Role, TaskStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+// The adapter is how Prisma 7 reaches the database; the URL is the same one the migrations use.
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 // Development only: well-known demo accounts. Never used in production (see main()).
 const DEMO_PASSWORD = 'password-123';
@@ -11,7 +15,7 @@ function upsertUser(email: string, name: string, role: Role) {
     prisma.user.upsert({
       where: { email },
       update: {},
-      create: { email, name, role, password },
+      create: { email, name, role, password, emailVerifiedAt: new Date() },
     }),
   );
 }

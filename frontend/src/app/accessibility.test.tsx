@@ -11,6 +11,7 @@ const ann = {
   name: 'Ann',
   email: 'ann@example.test',
   role: 'USER',
+  emailVerifiedAt: '2026-01-01T00:00:00.000Z',
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 const stamp = '2026-01-01T00:00:00.000Z';
@@ -142,6 +143,27 @@ describe('accessibility (axe)', () => {
   it('the sign-up page has no violations', async () => {
     renderApp('/register');
     await screen.findByRole('heading', { name: /create your account/i });
+
+    await expectNoA11yViolations();
+  });
+
+  it('the forgot-password page has no violations', async () => {
+    renderApp('/forgot-password');
+    await screen.findByRole('heading', { name: /reset your password/i });
+
+    await expectNoA11yViolations();
+  });
+
+  it('the reset-password page has no violations', async () => {
+    renderApp(`/reset-password#token=${'a'.repeat(43)}`);
+    await screen.findByRole('heading', { name: /choose a new password/i });
+
+    await expectNoA11yViolations();
+  });
+
+  it('the confirm-email page has no violations', async () => {
+    renderApp(`/verify-email#token=${'a'.repeat(43)}`);
+    await screen.findByRole('button', { name: 'Confirm my email' });
 
     await expectNoA11yViolations();
   });
