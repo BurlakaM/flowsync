@@ -14,7 +14,8 @@ cd "$ROOT_DIR"
 # Git Bash on Windows rewrites /paths in arguments (also the container side of -v); this switches that off.
 export MSYS_NO_PATHCONV=1
 
-VERSION="$(node -p "require('./frontend/node_modules/@playwright/test/package.json').version")"
+# The lockfile, not node_modules: on a fresh CI checkout nothing is installed on the host yet.
+VERSION="$(node -p "require('./frontend/package-lock.json').packages['node_modules/@playwright/test'].version")"
 IMAGE="mcr.microsoft.com/playwright:v${VERSION}-noble"
 MODE="${1:-compare}"
 EXTRA=""
