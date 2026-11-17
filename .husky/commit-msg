@@ -1,0 +1,13 @@
+# Conventional Commits: the changelog and version bumps (release-please) are generated from the messages.
+# Allowed: feat fix perf refactor test docs build ci chore style revert, optional (scope), optional "!" for a breaking change.
+first_line=$(head -n 1 "$1")
+pattern='^(feat|fix|perf|refactor|test|docs|build|ci|chore|style|revert)(\([a-z0-9._-]+\))?!?: .{1,100}$'
+case "$first_line" in
+  Merge*|Revert*|fixup!*|squash!*) exit 0 ;;
+esac
+if ! printf '%s' "$first_line" | grep -Eq "$pattern"; then
+  echo "Commit message does not follow Conventional Commits:"
+  echo "  $first_line"
+  echo "Expected: type(scope): subject   e.g.  feat(tasks): add status filter"
+  exit 1
+fi

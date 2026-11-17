@@ -40,7 +40,9 @@ const taskSelect = {
     orderBy: { createdAt: 'asc' },
   },
   tags: { select: { id: true, name: true }, orderBy: { name: 'asc' } },
-  _count: { select: { comments: true } },
+  // No `_count: { comments }` here on purpose: Prisma turns it into a join with a GROUP BY over the WHOLE
+  // comments table, which costs the same whether one task or twenty are listed (see docs/PERFORMANCE.md).
+  // The counts are asked for separately, for the ids on the page only (`withCommentCounts`).
 } satisfies Prisma.TaskSelect;
 
 const taskDetailsSelect = {
@@ -53,17 +55,17 @@ type TaskRow = Prisma.TaskGetPayload<{ select: typeof taskSelect }>;
 type TaskDetailsRow = Prisma.TaskGetPayload<{
   select: typeof taskDetailsSelect;
 }>;
+type Counted<T> = T & { commentsCount: number };
 
-function toResponse(task: TaskRow): TaskResponseDto {
-  const { assignees, _count, ...fields } = task;
+function toResponse(task: Counted<TaskRow>): TaskResponseDto {
+  const { assignees, ...fields } = task;
   return {
     ...fields,
     assignees: assignees.map((assignee) => assignee.user),
-    commentsCount: _count.comments,
   };
 }
 
-function toDetails(task: TaskDetailsRow): TaskDetailsDto {
+function toDetails(task: Counted<TaskDetailsRow>): TaskDetailsDto {
   const { project, createdBy, ...row } = task;
   return { ...toResponse(row), project, createdBy };
 }
@@ -106,7 +108,14 @@ export class TasksService {
     // The search runs first and narrows the list to the matching ids; access and the other
     // filters still apply to them, so a search can never reveal a task of a foreign project.
     const rankedIds = query.search
-      ? await this.search.rankedIds(query.search, scopeProjectId)
+      ? await this.search.rankedIds(
+          query.search,
+          // The projects the user may see, by the one rule in ProjectsService: the search then ranks and cuts
+          // the top matches among tasks the user can read, not among everyone's.
+          scopeProjectId !== undefined
+            ? [scopeProjectId]
+            : await this.projects.accessibleIds(userId),
+        )
       : undefined;
     if (rankedIds) where.id = { in: rankedIds };
 
@@ -130,7 +139,33 @@ export class TasksService {
       }),
       this.prisma.task.count({ where }),
     ]);
-    return toPage(tasks.map(toResponse), total, query);
+    return toPage(
+      (await this.withCommentCounts(tasks)).map(toResponse),
+      total,
+      query,
+    );
+  }
+
+  /**
+   * Adds the number of comments to the given tasks with ONE grouped query limited to their ids, which the
+   * index on comments(task_id, id) answers without reading the comments themselves.
+   */
+  private async withCommentCounts<T extends { id: number }>(
+    rows: T[],
+  ): Promise<Counted<T>[]> {
+    if (rows.length === 0) return [];
+    const groups = await this.prisma.comment.groupBy({
+      by: ['taskId'],
+      where: { taskId: { in: rows.map((row) => row.id) } },
+      _count: { _all: true },
+    });
+    const counts = new Map(
+      groups.map((group) => [group.taskId, group._count._all]),
+    );
+    return rows.map((row) => ({
+      ...row,
+      commentsCount: counts.get(row.id) ?? 0,
+    }));
   }
 
   /** Best match first: the order comes from the search, so the page is cut from the ranked ids. */
@@ -152,7 +187,9 @@ export class TasksService {
       where: { id: { in: pageIds } },
       select: taskSelect,
     });
-    const byId = new Map(rows.map((row) => [row.id, row]));
+    const byId = new Map(
+      (await this.withCommentCounts(rows)).map((row) => [row.id, row]),
+    );
     const items = pageIds.flatMap((id) => {
       const row = byId.get(id);
       return row ? [toResponse(row)] : [];
@@ -204,7 +241,8 @@ export class TasksService {
       });
       return created;
     });
-    return toDetails(task);
+    // A task that was just made has no comments yet.
+    return toDetails({ ...task, commentsCount: 0 });
   }
 
   async get(userId: number, id: number): Promise<TaskDetailsDto> {
@@ -213,7 +251,7 @@ export class TasksService {
       select: taskDetailsSelect,
     });
     if (!task) throw new NotFoundException('Task not found');
-    return toDetails(task);
+    return toDetails((await this.withCommentCounts([task]))[0]);
   }
 
   async update(
@@ -253,7 +291,7 @@ export class TasksService {
       emit(this.updatedEvent(userId, before, updated));
       return updated;
     });
-    return toDetails(task);
+    return toDetails((await this.withCommentCounts([task]))[0]);
   }
 
   /**

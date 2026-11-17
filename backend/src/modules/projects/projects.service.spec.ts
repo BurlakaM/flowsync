@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import {
   BadRequestException,
   ConflictException,
@@ -22,7 +23,6 @@ function projectRow(overrides: Record<string, unknown> = {}) {
     ownerId: 10,
     createdAt: date,
     updatedAt: date,
-    _count: { tasks: 3 },
     ...overrides,
   };
 }
@@ -40,6 +40,9 @@ describe('ProjectsService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>();
+    // No tasks anywhere unless a test says otherwise.
+    (prisma.task.groupBy as unknown as Mock).mockResolvedValue([] as never);
+    prisma.task.count.mockResolvedValue(0);
     publish.mockReset();
     Object.values(storage).forEach((fn) => fn.mockReset());
     service = new ProjectsService(
@@ -111,14 +114,37 @@ describe('ProjectsService', () => {
         name: 'P',
         ownerId: 10,
       });
-      expect(project).toMatchObject({ myRole: 'OWNER', tasksCount: 3 });
+      // A project that was just made has no tasks, and nothing is counted for it.
+      expect(project).toMatchObject({ myRole: 'OWNER', tasksCount: 0 });
       expect(project).not.toHaveProperty('_count');
+      expect(prisma.task.count).not.toHaveBeenCalled();
     });
   });
 
   describe('list', () => {
     const query = (extra: Partial<QueryProjectsDto> = {}) =>
       Object.assign(new QueryProjectsDto(), { page: 1, limit: 20 }, extra);
+
+    it('counts the tasks of the listed projects only, in one grouped query', async () => {
+      prisma.project.findMany.mockResolvedValue([
+        projectRow({ id: 1 }),
+        projectRow({ id: 2 }),
+      ] as never);
+      prisma.project.count.mockResolvedValue(2);
+      (prisma.task.groupBy as unknown as Mock).mockResolvedValue([
+        { projectId: 2, _count: { _all: 12 } },
+      ] as never);
+
+      const page = await service.list(10, query());
+
+      expect(prisma.task.groupBy).toHaveBeenCalledTimes(1);
+      expect(prisma.task.groupBy).toHaveBeenCalledWith({
+        by: ['projectId'],
+        where: { projectId: { in: [1, 2] } },
+        _count: { _all: true },
+      });
+      expect(page.items.map((item) => item.tasksCount)).toEqual([0, 12]);
+    });
 
     it('marks the role of the caller in every project', async () => {
       prisma.project.findMany.mockResolvedValue([

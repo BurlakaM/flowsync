@@ -1,0 +1,2 @@
+# Fast checks before anything leaves the machine; the full suites run in CI.
+npm --prefix backend run typecheck && npm --prefix frontend run typecheck

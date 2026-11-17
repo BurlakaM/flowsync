@@ -22,7 +22,8 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"prisma/**/*.ts\"",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "openapi:export": "nest build && node dist/openapi-export.js"
+    "openapi:export": "nest build && node dist/openapi-export.js",
+    "test:mutation": "stryker run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1169.0",
@@ -78,6 +79,8 @@
     "@nestjs/cli": "^12",
     "@nestjs/schematics": "^12",
     "@nestjs/testing": "^12",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@swc/core": "^1.16.22",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",

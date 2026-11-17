@@ -41,6 +41,14 @@ export default defineConfig({
         'src/components/ui/**',
       ],
       reporter: ['text', 'lcov'],
+      // A ratchet, not a goal: set a little under the measured values (statements 92, branches 85,
+      // functions 90) so that a change which drops tests fails CI. Raise it when the coverage grows.
+      thresholds: {
+        statements: 88,
+        branches: 80,
+        functions: 85,
+        lines: 88,
+      },
     },
   },
 });

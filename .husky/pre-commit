@@ -1,0 +1,2 @@
+# Lint and format what is staged (see lint-staged.config.mjs).
+npx --no-install lint-staged

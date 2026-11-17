@@ -51,7 +51,7 @@ import { UsersModule } from './modules/users/users.module';
     ThrottlerModule.forRootAsync({
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => ({
-        throttlers: [{ ttl: 60_000, limit: 100 }],
+        throttlers: [{ ttl: 60_000, limit: config.rateLimitPerMinute }],
         errorMessage: 'Too many requests, please try again later',
         // Tests make many requests from one IP; the limits are checked by hand (see the plan).
         skipIf: () => config.isTest,

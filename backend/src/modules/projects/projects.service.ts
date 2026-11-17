@@ -37,7 +37,8 @@ const projectSelect = {
   ownerId: true,
   createdAt: true,
   updatedAt: true,
-  _count: { select: { tasks: true } },
+  // No `_count: { tasks }`: Prisma joins a GROUP BY over the whole tasks table for it, whatever the page size.
+  // The counts come from a separate query limited to the ids on the page (see docs/PERFORMANCE.md).
 } satisfies Prisma.ProjectSelect;
 
 type ProjectRow = Prisma.ProjectGetPayload<{ select: typeof projectSelect }>;
@@ -47,14 +48,18 @@ const memberSelect = {
   user: { select: { id: true, name: true, email: true } },
 } satisfies Prisma.ProjectMemberSelect;
 
-function toResponse(project: ProjectRow, userId: number): ProjectResponseDto {
+function toResponse(
+  project: ProjectRow,
+  userId: number,
+  tasksCount: number,
+): ProjectResponseDto {
   // The storage key stays inside the server.
-  const { _count, image, ...fields } = project;
+  const { image, ...fields } = project;
   return {
     ...fields,
     hasImage: image !== null,
     myRole: project.ownerId === userId ? ProjectRole.OWNER : ProjectRole.MEMBER,
-    tasksCount: _count.tasks,
+    tasksCount,
   };
 }
 
@@ -65,6 +70,33 @@ export class ProjectsService {
     private readonly events: DomainEventsService,
     private readonly storage: StorageService,
   ) {}
+
+  private countTasks(projectId: number): Promise<number> {
+    return this.prisma.task.count({ where: { projectId } });
+  }
+
+  /**
+   * Task counts of several projects in one grouped query limited to their ids (an index-only scan), instead
+   * of a GROUP BY over every task in the database.
+   */
+  private async taskCounts(projectIds: number[]): Promise<Map<number, number>> {
+    if (projectIds.length === 0) return new Map();
+    const groups = await this.prisma.task.groupBy({
+      by: ['projectId'],
+      where: { projectId: { in: projectIds } },
+      _count: { _all: true },
+    });
+    return new Map(groups.map((group) => [group.projectId, group._count._all]));
+  }
+
+  /** Ids of every project the user may see, by the same rule as `accessFilter` (one source of truth). */
+  async accessibleIds(userId: number): Promise<number[]> {
+    const projects = await this.prisma.project.findMany({
+      where: this.accessFilter(userId),
+      select: { id: true },
+    });
+    return projects.map((project) => project.id);
+  }
 
   /** Prisma filter for "projects the user may see": the user owns them or is a member. */
   accessFilter(userId: number): Prisma.ProjectWhereInput {
@@ -105,7 +137,8 @@ export class ProjectsService {
       });
       return created;
     });
-    return toResponse(project, userId);
+    // A project that was just made has no tasks yet.
+    return toResponse(project, userId, 0);
   }
 
   async list(
@@ -128,8 +161,11 @@ export class ProjectsService {
       }),
       this.prisma.project.count({ where }),
     ]);
+    const counts = await this.taskCounts(projects.map((project) => project.id));
     return toPage(
-      projects.map((project) => toResponse(project, userId)),
+      projects.map((project) =>
+        toResponse(project, userId, counts.get(project.id) ?? 0),
+      ),
       total,
       query,
     );
@@ -148,7 +184,7 @@ export class ProjectsService {
 
     const { owner, members, ...summary } = project;
     return {
-      ...toResponse(summary, userId),
+      ...toResponse(summary, userId, await this.countTasks(id)),
       owner: { id: owner.id, name: owner.name },
       members: [
         {
@@ -201,7 +237,7 @@ export class ProjectsService {
       });
       return updated;
     });
-    return toResponse(project, userId);
+    return toResponse(project, userId, await this.countTasks(project.id));
   }
 
   /** Deletes the project together with its tasks, comments and tags. */
@@ -279,7 +315,7 @@ export class ProjectsService {
       return updated;
     });
     if (previous?.image) await this.storage.remove(previous.image);
-    return toResponse(project, userId);
+    return toResponse(project, userId, await this.countTasks(project.id));
   }
 
   /** Owner only. Removing a picture that is not there is not an error. */

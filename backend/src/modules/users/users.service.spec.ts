@@ -60,6 +60,15 @@ describe('UsersService', () => {
 
       expect(prisma.user.create.mock.calls[0][0].select).toBe(userSelect);
       expect(userSelect).not.toHaveProperty('password');
+      // Spelled out: comparing the constant with itself would let a changed field slip through.
+      expect(userSelect).toEqual({
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        emailVerifiedAt: true,
+        createdAt: true,
+      });
     });
   });
 
@@ -199,18 +208,44 @@ describe('UsersService', () => {
       const { data } = prisma.user.update.mock.calls[1][0];
       expect(data.failedLoginAttempts).toBe(0);
       const lockedUntil = (data.lockedUntil as Date).getTime();
-      expect(lockedUntil).toBeGreaterThanOrEqual(before + LOCK_MS);
-      expect(lockedUntil).toBeLessThan(before + LOCK_MS + 5_000);
+      // Literals on purpose: the contract is "15 minutes after 5 failures", not "whatever the constants say".
+      expect(LOCK_MS).toBe(15 * 60 * 1000);
+      expect(MAX_FAILED_LOGINS).toBe(5);
+      expect(lockedUntil).toBeGreaterThanOrEqual(before + 900_000);
+      expect(lockedUntil).toBeLessThan(before + 900_000 + 5_000);
     });
 
     it('forgets the failures after a good sign-in', async () => {
       await service.clearFailedLogins(4);
 
       expect(prisma.user.updateMany).toHaveBeenCalledWith({
-        where: expect.objectContaining({ id: 4 }),
+        // Only rows that have something to clear: a good sign-in must not write to the table every time.
+        where: {
+          id: 4,
+          OR: [
+            { failedLoginAttempts: { gt: 0 } },
+            { lockedUntil: { not: null } },
+          ],
+        },
         data: { failedLoginAttempts: 0, lockedUntil: null },
       });
     });
+  });
+
+  it('counts a failure as one step and locks exactly at the limit, not before', async () => {
+    prisma.user.update.mockResolvedValue({
+      failedLoginAttempts: 4,
+    } as never);
+    expect(await service.recordFailedLogin(4)).toBe(false);
+    expect(prisma.user.update).toHaveBeenCalledTimes(1);
+
+    prisma.user.update.mockReset();
+    prisma.user.update.mockResolvedValueOnce({
+      failedLoginAttempts: 5,
+    } as never);
+    prisma.user.update.mockResolvedValueOnce({} as never);
+    expect(await service.recordFailedLogin(4)).toBe(true);
+    expect(prisma.user.update).toHaveBeenCalledTimes(2);
   });
 
   describe('applyNewPassword', () => {
