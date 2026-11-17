@@ -21,7 +21,7 @@ FlowSync — пет-проєкт, трекер задач у стилі Jira: п
 |---|---|---|
 | Backend | NestJS 12, Prisma 6.19, JWT (Passport), TypeScript 6 (strict), Vitest, Node 24 LTS | + схема БД і модулі за планом (фази 3–4) |
 | БД | PostgreSQL 16, міграції `prisma migrate`, PascalCase-моделі, `enum Role` | те саме |
-| Frontend | React 19, Vite 8, TypeScript (strict), Tailwind 4 + shadcn/ui, TanStack Query, react-router 8, Vitest + MSW | те саме; типи генеруються з OpenAPI, e2e на Playwright |
+| Frontend | React 19, Vite 8, TypeScript (strict), Tailwind 4 + shadcn/ui (дизайн «Aurora», світла й темна теми), TanStack Query, react-router 8, Vitest + MSW | те саме; типи генеруються з OpenAPI, e2e на Playwright |
 | Інфра | Docker Compose (dev-override + прод), nginx-проксі, Redis (черга), Mailpit і S3-сховище в dev, CI з перевірками | деплой на VPS (фаза 8.9, ще не зроблено) |
 
 Репозиторій складається з двох незалежних npm-пакетів: `backend/` і `frontend/` (без монорепо-інструментів). Лише `npm`.

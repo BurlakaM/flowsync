@@ -99,6 +99,15 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
 - Компоненти shadcn додаємо в `components/ui` командою CLI (`npx shadcn@latest add <name>`) й не переписуємо без потреби.
   У новому реєстрі немає компонента `form`: для форм використовуй `field` разом із `react-hook-form`.
 
+**Дизайн «Aurora» (D34)**
+- Кольори — лише токени з `index.css` (`bg-primary`, `text-muted-foreground`, `bg-status-done-soft`…), без hex/oklch у компонентах. Градієнт бренду — `bg-brand-gradient` / `text-brand-gradient`; акцентний текст на поверхні — `text-primary-ink` (у темній темі він світліший за заливку кнопки).
+- Дві теми: клас `.dark` на `<html>` ставить `public/theme-init.js` (до першого малювання; inline-скрипт заборонено CSP) і хук `useTheme`. Токени перемикаються самі, тож `dark:` потрібне лише там, де токена мало (наприклад, прозорі кольори тегів). Новий екран перевіряй в обох темах і на ширині телефона.
+- Статуси — `StatusIcon` і токени `status-*`: сенс несе форма піктограми, а не лише колір. Колір людини, проєкту й тега виводить `lib/identity.ts` (`Avatar`, `TagChip`, `ProjectImage`): не додавай колір у API й не зберігай його.
+- Заголовки — `font-heading` (Manrope; `h1`–`h3` його вже мають), текст — Inter, числа в лічильниках — `tabular-nums`.
+- Випадні списки — `OptionSelect` (`field` для форм, `pill` для фільтрів, `icon` для піктограми); кілька видимих варіантів — `SegmentedControl`. Radix ігнорує `className` на `SelectValue`: стилізуй тригер.
+- Анімації — лише ключові кадри з `index.css`; `prefers-reduced-motion` глобально вимикає їх. Суто декоративне ховай від скрінрідерів (`aria-hidden`).
+- Стани екрана: завантаження — `LoadingState` (скелетони), порожньо — `EmptyState` (з піктограмою), помилка — `ErrorState`.
+
 **Типи**
 - Без `any` і `@ts-ignore`; типи відповідей API беруться з `src/types/api.generated.ts` (генерується з `backend/openapi.json`: `npm run api:types`, файл не редагують). У `features/*/types` лише аліаси на згенеровані схеми й суто UI-типи.
 
@@ -118,7 +127,7 @@ const form = useForm<Values>({ resolver: zodResolver(schema) });
 
 ## Тести
 
-- Vitest + Testing Library: шукай елементи за роллю й підписом (`getByRole`, `getByLabelText`), а не за класами чи `data-testid`.
+- Vitest + Testing Library: шукай елементи за роллю й підписом (`getByRole`, `getByLabelText`), а не за класами чи `data-testid`. Випадний список відкриває й вибирає `chooseOption` із `testing/test-utils.tsx` (Radix Select у jsdom потребує заглушок із `testing/setup.ts`).
 - Мережу мокай через MSW (`testing/mocks`), а не мокай `axios` чи хуки.
 - Покривай: хуки/мутації фіч, форми (валідація, успіх, помилка сервера), захищений маршрут.
 - Рендер у тестах — через `testing/test-utils.tsx` (QueryClient, Router).
