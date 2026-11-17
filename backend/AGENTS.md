@@ -17,6 +17,7 @@ src/
 ├─ database/                prisma.module.ts (global), prisma.service.ts
 ├─ common/                  decorators/ guards/ filters/ pagination/ types/
 ├─ health/                  GET /api/health/live і /ready (= /api/health); публічні, без throttle; Redis лише якщо задано REDIS_URL
+├─ metrics/                 GET /api/metrics (Prometheus): MetricsService, middleware тривалості запитів; gauge-и реєструють самі модулі
 └─ modules/<feature>/
    ├─ dto/                    create-x.dto.ts, update-x.dto.ts, x-response.dto.ts, query-x.dto.ts
    ├─ x.controller.ts
@@ -155,9 +156,15 @@ async list(userId: number, query: PaginationQueryDto) {
 - Пошук задач — `TasksSearchService` (повнотекстовий, `to_tsquery('simple', …)` з префіксами); вираз в індексі `tasks_fts_idx` має збігатися з виразом у запиті.
 - Real-time: шлях `/api/socket.io`; кімнати `project:<id>` і `user:<id>`; доступ перевіряється при підключенні й оновлюється подіями `member.added/removed`, `project.created/deleted`.
 
+**Спостережуваність**
+- Метрики: `MetricsService` (глобальний). Нова метрика даних — `registerGauge` у модулі-власнику (значення читається при scrape); мітки лише з обмеженого набору (ніколи id чи URL).
+- `config/instrument.ts` має лишатись **першим імпортом** `main.ts`: інструментація патчить модулі в момент завантаження.
+- Помилки `5xx` потрапляють у Sentry через `AllExceptionsFilter`; `4xx` не надсилаємо.
+
 **Конфігурація**
 - Усі змінні середовища описані в `config/env.schema.ts` (zod). Нова змінна = рядок у схемі + `.env.example` + README.
 - Читати значення лише через `AppConfigService`; `process.env` поза `config/` та `test/` заборонений.
+  Єдиний виняток — `config/instrument.ts` (OpenTelemetry і Sentry): він виконується до створення контейнера Nest і читає `OTEL_*`/`SENTRY_DSN` напряму.
 - Застосунок не стартує при невалідному env. У production `JWT_SECRET` має бути ≥ 32 символів.
 
 **Дані**

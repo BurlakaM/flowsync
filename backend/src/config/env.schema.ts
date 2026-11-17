@@ -47,6 +47,10 @@ export const envSchema = z
     REDIS_URL: optional(
       z.string().regex(/^rediss?:\/\//, 'must be a Redis URL (redis://...)'),
     ),
+    /** When set, GET /api/metrics requires `Authorization: Bearer <token>`. */
+    METRICS_TOKEN: optional(z.string().min(16)),
+    /** Error reporting. Without a DSN Sentry stays completely off. */
+    SENTRY_DSN: optional(z.url()),
     /** Public address of the frontend: the links in emails point there. */
     APP_URL: z.preprocess(
       blankIsUnset,

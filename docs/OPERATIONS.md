@@ -47,3 +47,30 @@
 
 `./ops/smoke-test.sh <base-url>` перевіряє: liveness, readiness, головну сторінку, SPA-fallback на глибокому посиланні,
 `401` на закритому API, `404` на Swagger, заголовки CSP і `X-Content-Type-Options`. Дає код виходу ≠ 0 при будь-якому провалі.
+
+## Спостережуваність
+
+Три сигнали: **метрики** (що відбувається в цілому), **трейси** (що сталося з одним запитом), **логи** (деталі).
+Їх зв'язує `requestId` і `trace_id`: pino додає `trace_id` у кожен рядок логу, а `X-Request-Id` повертається клієнту й у тілі помилки.
+
+```bash
+# Dev: бекенд шле трейси, Prometheus збирає метрики, Grafana їх показує
+OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 docker compose --profile observability up -d
+```
+
+| Що | Де |
+|---|---|
+| Дашборд «FlowSync API» (RPS, 5xx, p50/p95/p99, повільні маршрути, черга пошти, сокети, event loop, пам'ять) | http://localhost:3001 |
+| Prometheus: цілі й алерти | http://localhost:9090 |
+| Jaeger: трейси (HTTP → Prisma → Redis → BullMQ → Socket.IO в одному trace) | http://localhost:16686 |
+| Сирі метрики | `GET /api/metrics` на backend (:3000); nginx віддає там 404 |
+
+- **Метрики:** `prom-client`; мітка `route` — шаблон маршруту (`/api/projects/:id`), невідомі URL зводяться до `unmatched`:
+  інакше кожен id чи сканер створював би нову часову серію. Черга пошти й сокети читаються в момент scrape, без фонового опитування.
+- **Трейси:** OpenTelemetry (`src/config/instrument.ts`, перший імпорт `main.ts`); вимкнені, доки порожня `OTEL_EXPORTER_OTLP_ENDPOINT`.
+  Prisma має власний інструментатор, BullMQ — `bullmq-otel`: трейс листа тягнеться від HTTP-запиту до воркера.
+- **Помилки:** Sentry (`SENTRY_DSN` для backend, `VITE_SENTRY_DSN` для frontend при збірці). Лише помилки: без трасування й запису сесій.
+  Backend відправляє тільки `5xx`; frontend — винятки маршрутів (не 404/403).
+  **У проді додайте хост DSN у `connect-src` у `frontend/security-headers.conf`**, інакше CSP блокуватиме звіти.
+- `METRICS_TOKEN` додає перевірку bearer-токена на `/api/metrics`, якщо Prometheus стоїть поза Docker-мережею.
+- SLO й алерти: `docs/SLO.md`.

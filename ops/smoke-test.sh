@@ -26,6 +26,7 @@ check "frontend index"              200 "$(status "$BASE/")"
 check "SPA fallback on a deep link" 200 "$(status "$BASE/projects")"
 check "API is closed by default"    401 "$(status "$BASE/api/users/me")"
 check "Swagger is off in production" 404 "$(status "$BASE/api/docs")"
+check "metrics are not public"      404 "$(status "$BASE/api/metrics")"
 
 headers="$(curl -sI --max-time 10 "$BASE/" || true)"
 for h in content-security-policy x-content-type-options; do

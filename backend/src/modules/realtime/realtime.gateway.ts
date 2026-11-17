@@ -11,6 +11,7 @@ import {
   DOMAIN_EVENT,
   type DomainEvent,
 } from '../../common/events/domain-event';
+import { MetricsService } from '../../metrics/metrics.service';
 import { PrismaService } from '../../database/prisma.service';
 import { NOTIFICATIONS_CREATED } from '../notifications/notifications.events';
 import { ProjectsService } from '../projects/projects.service';
@@ -44,9 +45,17 @@ export class RealtimeGateway implements OnGatewayInit {
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
+    private readonly metrics: MetricsService,
   ) {}
 
   afterInit(server: Server): void {
+    this.metrics.registerGauge(
+      {
+        name: 'flowsync_websocket_connections',
+        help: 'Open live-update sockets',
+      },
+      (gauge) => gauge.set(server.sockets.sockets.size),
+    );
     server.use((socket, next) => {
       this.authenticate(socket).then(
         () => next(),

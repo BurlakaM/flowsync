@@ -8,6 +8,7 @@ import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AppConfigService } from './config/app-config.service';
+import { MetricsModule } from './metrics/metrics.module';
 import { AppConfigModule } from './config/config.module';
 import { PrismaModule } from './database/prisma.module';
 import { EventsModule } from './common/events/events.module';
@@ -26,6 +27,7 @@ import { UsersModule } from './modules/users/users.module';
 @Module({
   imports: [
     AppConfigModule,
+    MetricsModule,
     LoggerModule.forRootAsync({
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => ({
@@ -33,9 +35,9 @@ import { UsersModule } from './modules/users/users.module';
           level: config.logLevel,
           genReqId: resolveRequestId,
           redact: ['req.headers.authorization', 'req.headers.cookie'],
-          // Health checks run every few seconds and would drown the real traffic.
+          // Probes and Prometheus scrapes run every few seconds and would drown the real traffic.
           autoLogging: {
-            ignore: (req) => req.url?.endsWith('/health') ?? false,
+            ignore: (req) => /\/(health(\/.*)?|metrics)$/.test(req.url ?? ''),
           },
           ...(config.isDevelopment && {
             transport: {

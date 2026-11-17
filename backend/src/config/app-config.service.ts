@@ -77,6 +77,10 @@ export class AppConfigService {
     return this.config.get('REDIS_URL', { infer: true });
   }
 
+  get metricsToken(): string | undefined {
+    return this.config.get('METRICS_TOKEN', { infer: true });
+  }
+
   get appUrl(): string {
     return this.config.get('APP_URL', { infer: true }).replace(/\/$/, '');
   }

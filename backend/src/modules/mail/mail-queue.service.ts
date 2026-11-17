@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
+import { BullMQOtel } from 'bullmq-otel';
 import { AppConfigService } from '../../config/app-config.service';
+import { MetricsService } from '../../metrics/metrics.service';
 import { MailService, type MailMessage } from './mail.service';
 
 const QUEUE_NAME = 'mail';
@@ -28,6 +30,7 @@ export class MailQueueService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: AppConfigService,
     private readonly mail: MailService,
+    private readonly metrics: MetricsService,
   ) {}
 
   onModuleInit(): void {
@@ -39,15 +42,37 @@ export class MailQueueService implements OnModuleInit, OnModuleDestroy {
     this.connection.on('error', (error) =>
       this.logger.error(`Redis: ${error.message}`),
     );
+    // One trace follows a message from the request that queued it to the worker that sent it.
+    const telemetry = new BullMQOtel({ tracerName: 'flowsync-mail' });
     this.queue = new Queue<MailMessage>(QUEUE_NAME, {
       connection: this.connection,
+      telemetry,
     });
+    const queue = this.queue;
+    this.metrics.registerGauge(
+      {
+        name: 'flowsync_mail_queue_jobs',
+        help: 'Mail jobs in the queue by state; a growing "failed" or "delayed" means the mail server is down',
+        labelNames: ['state'] as const,
+      },
+      async (gauge) => {
+        const counts = await queue.getJobCounts(
+          'waiting',
+          'active',
+          'delayed',
+          'failed',
+        );
+        for (const [state, count] of Object.entries(counts)) {
+          gauge.set({ state }, count);
+        }
+      },
+    );
     this.worker = new Worker<MailMessage>(
       QUEUE_NAME,
       async (job) => {
         await this.mail.send(job.data);
       },
-      { connection: this.connection },
+      { connection: this.connection, telemetry },
     );
     this.worker.on('failed', (job, error) =>
       this.logger.warn(

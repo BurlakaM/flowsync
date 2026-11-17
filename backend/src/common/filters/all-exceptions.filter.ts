@@ -5,6 +5,7 @@ import {
   HttpException,
   Logger,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { Request, Response } from 'express';
 import { buildErrorBody, requestIdOf, requestPath } from './error-response';
 
@@ -39,6 +40,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
 
+    // A no-op while Sentry is not initialised (no SENTRY_DSN). 4xx are the client's mistakes and are not sent.
+    Sentry.captureException(exception);
     this.logger.error(
       exception instanceof Error ? exception.stack : String(exception),
     );
