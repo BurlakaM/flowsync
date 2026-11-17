@@ -47,6 +47,8 @@ export const envSchema = z
     REDIS_URL: optional(
       z.string().regex(/^rediss?:\/\//, 'must be a Redis URL (redis://...)'),
     ),
+    /** Requests per minute per IP before the API answers 429. Raised only for load tests (ops/load/run.sh). */
+    RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(100),
     /** How often the outbox relay looks for undelivered events, in ms. 0 switches the loop off (tests). */
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(0).default(2000),
     /** When set, GET /api/metrics requires `Authorization: Bearer <token>`. */

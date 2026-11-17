@@ -80,3 +80,12 @@ docker-compose.local.yml
 
 sbom/
 .scan-tmp/
+
+# Mutation testing
+/backend/.stryker-tmp/
+/backend/reports/
+.load-out/
+.lighthouseci/
+.lighthouseci-report/
+frontend/test-results/
+frontend/playwright-report/

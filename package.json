@@ -1,0 +1,15 @@
+{
+  "name": "flowsync-hooks",
+  "private": true,
+  "description": "Git hooks only (Husky + lint-staged). The application is the two independent packages in backend/ and frontend/.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

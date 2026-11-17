@@ -93,9 +93,49 @@ jobs:
       - run: npm run api:types
       - run: git diff --exit-code -- src/types/api.generated.ts
       - run: npm run typecheck
-      - run: npm test
+      # Unit tests with the coverage floor from vite.config.ts.
+      - run: npm run test:cov
       # `npm run build` type-checks again and produces the same bundle as the Docker image.
       - run: npm run build
+
+  # Performance, accessibility and best-practice budgets of the public pages (frontend/lighthouserc.json),
+  # measured on the production build. A page that gets heavier or slower than the budget fails the build.
+  lighthouse:
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lighthouse
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: frontend/.lighthouseci-report/
+          retention-days: 14
+
+  # The public pages in both themes and on two screen sizes, compared with the baseline images. It runs in the
+  # Playwright container: screenshots only compare when the fonts and the browser build are the same.
+  visual:
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash ops/visual.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: visual-diff
+          path: frontend/test-results/
+          retention-days: 14
 
   # What npm audit cannot see: the images themselves (base OS, the npm that ships with Node, nginx) and the
   # whole git history. The same script runs locally: ./ops/security-scan.sh all

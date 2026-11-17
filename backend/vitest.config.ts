@@ -17,6 +17,12 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       // Business logic lives in the services: keep it well covered by unit tests.
       thresholds: {
+        // The whole backend, controllers and modules included, is also covered by the e2e suite that this
+        // report does not see: so the global floor is lower than the one for the services.
+        statements: 63,
+        branches: 72,
+        functions: 58,
+        lines: 63,
         'src/modules/**/*.service.ts': {
           statements: 70,
           branches: 70,
