@@ -1,93 +1,93 @@
-# FlowSync — якість із цифрами
+# FlowSync — quality in numbers
 
-Тести, які проходять, ще не доводять, що вони щось перевіряють. Тут зібрано, **чим міряємо якість**, які цифри маємо зараз і де вони
-слабкі. Цифри — станом на 2026-11-17; джерела й команди — у таблиці. Продуктивність винесено в `docs/PERFORMANCE.md`.
+Passing tests do not yet prove that they check anything. This document collects **how we measure quality**, what numbers we have now and where they
+are weak. The numbers are as of 2026-11-17; sources and commands are in the table. Performance is covered separately in `docs/PERFORMANCE.md`.
 
-| Що | Чим | Команда | Зараз |
+| What | With | Command | Now |
 |---|---|---|---|
-| Unit-тести backend | Vitest | `cd backend && npm test` | 333 тести |
-| E2E backend (справжня БД) | Vitest + supertest | `npm run test:e2e` | 251 тест, зокрема два інстанси API з Redis |
-| Unit-тести frontend | Vitest + Testing Library + MSW | `cd frontend && npm test` | 260 тестів (+ axe на кожній сторінці) |
-| Наскрізні сценарії | Playwright, реальний браузер | `npm run test:e2e` | 4 тести: повний шлях, **живі оновлення між двома браузерами**, завантаження зображення |
-| Покриття backend | v8, поріг у `vitest.config.ts` | `npm run test:cov` | рядки 68 %, гілки 78 %, функції 64 % |
-| Покриття frontend | v8, поріг у `vite.config.ts` | `npm run test:cov` | рядки 94 %, гілки 85 %, функції 90 % |
-| **Мутаційний бал** | Stryker | `cd backend && npm run test:mutation` | **78,6 %** (з 70,1 % на старті) |
-| Візуальні регресії | Playwright у Linux-контейнері | `./ops/visual.sh` | 12 знімків: 3 сторінки × 2 теми × 2 екрани |
-| Бюджети продуктивності | Lighthouse CI | `cd frontend && npm run lighthouse` | performance 0,87 · a11y 1,00 · best-practices 1,00 · SEO 1,00 |
-| Навантаження | k6 | `./ops/load/run.sh` | 98 запитів/с, p95 600 мс (було 31 і 2 121) |
-| Безпека образів, секрети, SBOM | Trivy, gitleaks | `./ops/security-scan.sh all` | чисто |
+| Backend unit tests | Vitest | `cd backend && npm test` | 333 tests |
+| Backend E2E (real DB) | Vitest + supertest | `npm run test:e2e` | 251 tests, including two API instances with Redis |
+| Frontend unit tests | Vitest + Testing Library + MSW | `cd frontend && npm test` | 260 tests (+ axe on every page) |
+| End-to-end scenarios | Playwright, a real browser | `npm run test:e2e` | 4 tests: the full path, **live updates between two browsers**, image upload |
+| Backend coverage | v8, threshold in `vitest.config.ts` | `npm run test:cov` | lines 68%, branches 78%, functions 64% |
+| Frontend coverage | v8, threshold in `vite.config.ts` | `npm run test:cov` | lines 94%, branches 85%, functions 90% |
+| **Mutation score** | Stryker | `cd backend && npm run test:mutation` | **78.6%** (up from 70.1% at the start) |
+| Visual regressions | Playwright in a Linux container | `./ops/visual.sh` | 12 snapshots: 3 pages × 2 themes × 2 screens |
+| Performance budgets | Lighthouse CI | `cd frontend && npm run lighthouse` | performance 0.87 · a11y 1.00 · best-practices 1.00 · SEO 1.00 |
+| Load | k6 | `./ops/load/run.sh` | 98 requests/s, p95 600 ms (was 31 and 2,121) |
+| Image security, secrets, SBOM | Trivy, gitleaks | `./ops/security-scan.sh all` | clean |
 
-## Покриття — це «рядок виконано», а не «помилку помітили»
+## Coverage means "the line was executed", not "the error was noticed"
 
-Тест, що виконує рядок, але нічого не перевіряє, дає 100 % покриття й нуль користі. Тому поруч із покриттям є **мутаційне
-тестування**: Stryker вносить у код дрібні зміни («мутанти»: перевернути умову, замінити константу, прибрати виклик) і запускає тести.
-Мутант, якого жоден тест не помітив, — місце, де справжня помилка пройшла б непоміченою.
+A test that executes a line but checks nothing yields 100% coverage and zero value. That is why next to coverage there is **mutation
+testing**: Stryker makes small changes to the code ("mutants": flip a condition, replace a constant, remove a call) and runs the tests.
+A mutant that no test noticed is a place where a real bug would go unnoticed.
 
-Мутаційний бал по файлах (мутуємо лише логіку, де помилка дорога: безпека, дані, події):
+The mutation score by file (we mutate only the logic where a mistake is expensive: security, data, events):
 
-| Файл | Бал | Примітка |
+| File | Score | Note |
 |---|---:|---|
-| `common/pagination/cursor.ts` | 92,9 % | |
-| `modules/auth/auth.service.ts` | 89,5 % | блокування, скидання пароля |
-| `common/casl/app-ability.ts` | 88,6 % | карта прав |
-| `modules/auth/user-tokens.service.ts` | 81,5 % | одноразові токени |
-| `common/events/domain-events.service.ts` | 77,6 % | outbox |
-| `modules/tasks/tasks.service.ts` | 75,2 % | було 60,4 % |
-| `modules/users/users.service.ts` | 75,0 % | було 64,2 % |
+| `common/pagination/cursor.ts` | 92.9% | |
+| `modules/auth/auth.service.ts` | 89.5% | lockout, password reset |
+| `common/casl/app-ability.ts` | 88.6% | the permission map |
+| `modules/auth/user-tokens.service.ts` | 81.5% | one-time tokens |
+| `common/events/domain-events.service.ts` | 77.6% | outbox |
+| `modules/tasks/tasks.service.ts` | 75.2% | was 60.4% |
+| `modules/users/users.service.ts` | 75.0% | was 64.2% |
 
-**Що знайшов Stryker (реальні дірки, а не вигадані):**
+**What Stryker found (real holes, not invented ones):**
 
-- Тест блокування порівнював час блокування з **тією самою константою** (`LOCK_MS`): змінити 15 хвилин на 15 секунд не завалило б жоден тест.
-  Тепер тест перевіряє літерал «15 хвилин після 5 невдач».
-- Тест «відповідь не містить пароля» порівнював `select` із самим собою (`toBe(userSelect)`): прибрати поле з вибірки було б непомітно.
-  Тепер перелік полів записаний явно.
-- Логіка «що саме змінилось у задачі» (імена, статус, теги, виконавці) мала один тест на все; половина умов не перевірялась. Додано
-  тести на кожну умову окремо, зокрема «інший порядок тегів — не зміна».
-- Не було перевірено, що фільтри списку задач діють поодинці, що лічильник береться з тієї ж умови, що й сторінка, що пагінація за релевантністю
-  вирізає правильні id.
+- The lockout test compared the lock duration with **the same constant** (`LOCK_MS`): changing 15 minutes to 15 seconds would not have failed any test.
+  Now the test checks the literal "15 minutes after 5 failures".
+- The "the response does not contain a password" test compared `select` with itself (`toBe(userSelect)`): removing a field from the selection would have gone unnoticed.
+  Now the list of fields is written out explicitly.
+- The logic of "what exactly changed in a task" (names, status, tags, assignees) had a single test for everything; half of the conditions were not checked. Tests were added
+  for each condition separately, including "a different tag order is not a change".
+- It was not verified that the task list filters work individually, that the count is taken from the same condition as the page, that relevance pagination
+  cuts out the right ids.
 
-Поріг `thresholds.break = 70` у `stryker.config.mjs`: прогін падає, якщо бал нижче. Це **храповик**: піднімайте його, коли бал росте.
-У CI Stryker іде щотижня й за вимогою (`mutation.yml`), бо займає кілька хвилин.
+The `thresholds.break = 70` in `stryker.config.mjs`: the run fails if the score is lower. It is a **ratchet**: raise it as the score grows.
+In CI, Stryker runs weekly and on demand (`mutation.yml`), because it takes several minutes.
 
-**Чому не 100 %:** значна частина мутантів, що вижили, — це літерали в `select` (`id: true` → `false`) та тексти повідомлень. Їх ловлять
-e2e-тести з справжньою БД, а Stryker бачить лише unit-тести. Ганятися за 100 % тут означало б писати тести, що дублюють реалізацію.
+**Why not 100%:** a large share of the surviving mutants are literals in `select` (`id: true` → `false`) and message texts. They are caught by
+e2e tests with a real DB, while Stryker sees only unit tests. Chasing 100% here would mean writing tests that duplicate the implementation.
 
-## Пороги покриття — храповики
+## Coverage thresholds are ratchets
 
-Backend: глобально 63/72/58/63 % (рядки/гілки/функції/…), для `*.service.ts` — 70 %. Frontend: 88/80/85/88 %. Значення поставлені трохи
-нижче виміряних, щоб зміна, яка знищила тести, падала в CI, але дрібні коливання — ні. Backend нижчий, бо контролери й модулі покриті
-e2e-тестами, яких звіт покриття не бачить.
+Backend: globally 63/72/58/63% (lines/branches/functions/…), for `*.service.ts` — 70%. Frontend: 88/80/85/88%. The values are set slightly
+below the measured ones, so that a change that destroys tests fails in CI but small fluctuations do not. The backend is lower because controllers and modules are covered
+by e2e tests, which the coverage report does not see.
 
-## Наскрізні сценарії, яких unit-тести не замінять
+## End-to-end scenarios that unit tests cannot replace
 
-- **Живі оновлення** (`e2e/realtime.spec.ts`): два справжні браузери; одна людина змінює дані через API, на екрані іншої вони з'являються
-  **без перезавантаження** (подія → outbox → Socket.IO → проксі → браузер → кеш → екран). Другий тест доводить, що людина без доступу
-  нічого не чує. Unit-тести підмінюють сокет, тож цей шлях ніхто інший не перевіряє.
-- **Завантаження файлу** (`e2e/project-image.spec.ts`): справжній вибір файлу, збереження в S3, показ після перезавантаження, відмова на
-  не-зображення. Тест пропускається (а не падає), якщо в стеку немає сховища.
-- Обмеження: реєстрація й вхід мають ліміт 5/хв, тому тести створюють трьох людей **один раз на воркер** і заходять у браузер через
-  refresh-cookie, а не через форму (`e2e/fixtures.ts`).
+- **Live updates** (`e2e/realtime.spec.ts`): two real browsers; one person changes data through the API, and on the other's screen it appears
+  **without a reload** (event → outbox → Socket.IO → proxy → browser → cache → screen). A second test proves that a person without access
+  hears nothing. Unit tests replace the socket, so nothing else verifies this path.
+- **File upload** (`e2e/project-image.spec.ts`): a real file pick, saving to S3, display after a reload, rejection of a
+  non-image. The test is skipped (not failed) if the stack has no storage.
+- Limitation: registration and sign-in have a 5/min limit, so the tests create three people **once per worker** and enter the browser through the
+  refresh cookie, not through the form (`e2e/fixtures.ts`).
 
-## Візуальні регресії
+## Visual regressions
 
-12 знімків публічних сторінок (вхід, реєстрація, скидання пароля) у світлій і темній темі на екрані комп'ютера й телефона. Знімки залежать від
-шрифтів і ОС, тому їх створюють і порівнюють **лише в офіційному Linux-контейнері Playwright** (`./ops/visual.sh`); у CI та сама команда.
-Свідомий редизайн: `./ops/visual.sh update` і закомітити зміну знімків.
+12 snapshots of public pages (sign-in, registration, password reset) in the light and dark themes on desktop and phone screens. Snapshots depend on
+fonts and the OS, so they are created and compared **only in the official Playwright Linux container** (`./ops/visual.sh`); CI runs the same command.
+A deliberate redesign: `./ops/visual.sh update` and commit the snapshot change.
 
-## Lighthouse: що показало вимірювання
+## Lighthouse: what the measurement showed
 
-Мобільний профіль із симуляцією повільної мережі й слабкого процесора. Бюджети в `frontend/lighthouserc.json`: performance ≥ 0,80, a11y ≥ 0,95,
-best-practices ≥ 0,90, **LCP ≤ 4,2 с**, CLS ≤ 0,1, TBT ≤ 300 мс, скрипти ≤ 500 КБ.
+A mobile profile with simulated slow network and a slow CPU. Budgets are in `frontend/lighthouserc.json`: performance ≥ 0.80, a11y ≥ 0.95,
+best-practices ≥ 0.90, **LCP ≤ 4.2 s**, CLS ≤ 0.1, TBT ≤ 300 ms, scripts ≤ 500 KB.
 
-Виміряно на сторінці входу: performance 0,87, LCP 3,8 с, FCP 1,7 с, TBT 120 мс, CLS 0.
+Measured on the sign-in page: performance 0.87, LCP 3.8 s, FCP 1.7 s, TBT 120 ms, CLS 0.
 
-**Чесно:** LCP 3,8 с — це слабке місце. Елемент LCP — заголовок `h1`, який з'являється лише після завантаження й виконання JS (~245 КБ gzip на
-критичному шляху: ядро 118 КБ + спільний чанк із формами 64 КБ + чанк зі словниками i18n та іконками 63 КБ) і ледачого чанка маршруту. Бюджет 4,2 с
-поставлений **над поточним значенням**, щоб зафіксувати рівень і ловити погіршення. Кандидати на покращення (не робилось):
-ледаче завантаження словника мови, якої користувач не обрав; `preload` шрифтів; не обгортати `h1` анімацією появи.
+**Honestly:** an LCP of 3.8 s is a weak spot. The LCP element is the `h1` heading, which appears only after JS is downloaded and executed (~245 KB gzip on
+the critical path: the core 118 KB + a shared chunk with forms 64 KB + a chunk with i18n dictionaries and icons 63 KB) and the lazy route chunk. The 4.2 s budget
+is set **above the current value** to pin the level and catch regressions. Candidates for improvement (not done):
+lazy-loading the dictionary of a language the user did not choose; font `preload`; not wrapping the `h1` in an entrance animation.
 
-## Husky і хуки
+## Husky and hooks
 
-`pre-commit` (ESLint + Prettier лише для змінених файлів), `commit-msg` (Conventional Commits), `pre-push` (типи). Це перша лінія оборони: помилка
-стилю чи формату повідомлення не доходить до CI. Налаштування — `package.json` у корені (єдина його роль — хуки), `lint-staged.config.mjs` у кожному пакеті,
-каталог `.husky/`.
+`pre-commit` (ESLint + Prettier only for changed files), `commit-msg` (Conventional Commits), `pre-push` (types). This is the first line of defense: a style
+or message-format error does not reach CI. The setup is the root `package.json` (its only role is the hooks), `lint-staged.config.mjs` in each package,
+and the `.husky/` directory.

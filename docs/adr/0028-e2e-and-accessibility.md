@@ -1,13 +1,13 @@
-# 28. E2E та доступність
+# 28. E2E and accessibility
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D28 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D28 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Playwright у `frontend/e2e` проти прод-подібного стеку (локально встановлений Chrome, у CI Chromium); `vitest-axe` у тестах сторінок
+Playwright in `frontend/e2e` against a production-like stack (locally installed Chrome, Chromium in CI); `vitest-axe` in page tests
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Cypress: важчий; окремий пакет `e2e/`: ще один `package.json`
+Cypress: heavier; a separate `e2e/` package: one more `package.json`

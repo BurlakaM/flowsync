@@ -1,13 +1,13 @@
-# 44. Git-хуки
+# 44. Git hooks
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D44 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D44 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Husky + lint-staged: `package.json` у корені існує **лише** заради хуків (`prepare: husky`); конфіг lint-staged лежить у кожному пакеті, тож ESLint і Prettier працюють зі своїми налаштуваннями; `commit-msg` перевіряє Conventional Commits, `pre-push` — типи
+Husky + lint-staged: the root `package.json` exists **only** for the hooks (`prepare: husky`); the lint-staged config lives in each package, so ESLint and Prettier use their own settings; `commit-msg` checks Conventional Commits, `pre-push` checks types
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Нативні git-хуки в `.githooks` (не потребують залежностей, але й не ставляться самі після `git clone`); `simple-git-hooks`; монорепо-інструмент (D15)
+Native git hooks in `.githooks` (no dependencies, but they are not installed automatically after `git clone`); `simple-git-hooks`; a monorepo tool (D15)

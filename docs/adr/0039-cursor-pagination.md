@@ -1,23 +1,23 @@
-# 39. Пагінація зростаючих списків
+# 39. Pagination of growing lists
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D39 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D39 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Курсор (id останнього рядка, `{ items, nextCursor }`, без `total`) для активності й коментарів; індекси `(project_id, id DESC)` і `(task_id, id)`. Решта списків лишається на сторінках
+A cursor (the id of the last row, `{ items, nextCursor }`, no `total`) for activity and comments; indexes `(project_id, id DESC)` and `(task_id, id)`. The remaining lists stay paged
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Offset скрізь (повтори й пропуски, повільний на глибоких сторінках); курсор за `createdAt` (потрібен тай-брейкер, складніший індекс)
+Offset everywhere (repeats and gaps, slow on deep pages); a cursor by `createdAt` (needs a tiebreaker, a more complex index)
 
-## Наслідки
+## Consequences
 
-- Сторінки стрічки активності й коментарів не повторюються й не пропускають записи, поки надходять нові.
-- Без `COUNT(*)` для цих списків: глибока сторінка коштує стільки ж, як перша.
-- Інші списки лишаються на сторінках зі сумою, бо там користувачі переходять за номером.
+- Pages of the activity feed and comments neither repeat nor skip records while new ones arrive.
+- No `COUNT(*)` for these lists: a deep page costs the same as the first.
+- Other lists stay on pages with a total, because users jump by page number there.
 
-## Коли переглянути
+## When to revisit
 
-Якщо списку знову знадобляться «перейти на сторінку N» чи сума, для нього правильний інструмент — offset-пагінація.
+If a list needs "go to page N" or a total again, offset pagination is the right tool for it.

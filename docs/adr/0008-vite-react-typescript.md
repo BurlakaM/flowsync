@@ -1,13 +1,13 @@
-# 8. Збірка фронтенду
+# 8. Frontend build
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D8 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D8 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
 Vite + React 19 + TypeScript (strict)
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-CRA закритий; Next.js не потрібен для дашборда за логіном
+CRA is discontinued; Next.js is not needed for a dashboard behind a login

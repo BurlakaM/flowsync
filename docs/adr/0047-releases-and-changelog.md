@@ -1,13 +1,13 @@
-# 47. Версії й журнал змін
+# 47. Versions and changelog
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D47 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D47 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-release-please (`simple`, один компонент на репозиторій, `extra-files` піднімає версії обох пакетів) і Conventional Commits; деплой лишається ручним
+release-please (`simple`, one component per repository, `extra-files` bumps the versions of both packages) and Conventional Commits; deploy stays manual
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-`semantic-release` (публікує без Release PR, гірше для ручного контролю); ручні теги; версії пакетів окремо (для застосунку, що розгортається разом, зайве)
+`semantic-release` (publishes without a Release PR, worse for manual control); manual tags; separate package versions (overkill for an app deployed as one)

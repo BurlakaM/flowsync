@@ -1,13 +1,13 @@
 # 27. Request id
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D27 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D27 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`X-Request-Id` через `genReqId` у `nestjs-pino` (вхідний заголовок, якщо схожий на id, інакше UUID) і поле `requestId` у тілі помилки
+`X-Request-Id` via `genReqId` in `nestjs-pino` (the incoming header if it looks like an id, otherwise a UUID) and a `requestId` field in the error body
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-`nestjs-cls`: окрема залежність без користі, поки id потрібен лише логам і відповіді
+`nestjs-cls`: a separate dependency with no benefit while the id is only needed by logs and the response

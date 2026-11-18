@@ -1,13 +1,13 @@
-# 45. Мутаційні тести й пороги
+# 45. Mutation tests and thresholds
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D45 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D45 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Stryker + vitest-runner для 7 ключових файлів (безпека, дані, події), раз на тиждень у CI; пороги покриття як «храповики» трохи нижче виміряного; `@vitest/coverage-v8` у frontend
+Stryker + the vitest runner for 7 key files (security, data, events), weekly in CI; coverage thresholds as "ratchets" slightly below the measured value; `@vitest/coverage-v8` in the frontend
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Гнатися за 100 % покриття (дублює реалізацію); мутувати весь backend (години); лише покриття (не відрізняє «виконано» від «перевірено»)
+Chasing 100% coverage (duplicates the implementation); mutating the whole backend (hours); coverage alone (does not distinguish "executed" from "verified")

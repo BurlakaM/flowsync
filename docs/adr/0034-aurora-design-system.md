@@ -1,13 +1,13 @@
-# 34. Дизайн-система
+# 34. Design system
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D34 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D34 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-«Aurora»: oklch-токени в `index.css`, світла («папір», індиго → бірюза) і темна теми з перемикачем (клас `.dark`, вибір у `localStorage`, ранній скрипт із `public/`, бо CSP забороняє inline); шрифти Inter (текст) + Manrope Variable (заголовки, `@fontsource-variable/manrope`, є кирилиця); статуси мають власні кольори й піктограми; колір проєкту, людини й тега виводиться з назви (без нових полів у БД); наявне лого лишається
+"Aurora": oklch tokens in `index.css`, light ("paper", indigo → teal) and dark themes with a switcher (`.dark` class, choice stored in `localStorage`, an early script from `public/` because the CSP forbids inline scripts); fonts Inter (text) + Manrope Variable (headings, `@fontsource-variable/manrope`, includes Cyrillic); statuses have their own colors and icons; the color of a project, person or tag is derived from its name (no new DB fields); the existing logo stays
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Midnight (dark-first) і Paper (serif) — не обрано власником; нове лого — власник відмовився
+Midnight (dark-first) and Paper (serif) — not chosen by the owner; a new logo — the owner declined

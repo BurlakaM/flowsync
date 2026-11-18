@@ -1,22 +1,22 @@
 # 32. Real-time
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D32 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D32 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`@nestjs/websockets` + `socket.io` під `/api/socket.io` (той самий проксі, що й API); авторизація токеном у handshake, кімнати за доступом; події лише повідомляють про зміну, дані клієнт бере через API
+`@nestjs/websockets` + `socket.io` under `/api/socket.io` (the same proxy as the API); authorization by a token in the handshake, rooms by access; events only announce a change, the client fetches data through the API
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-SSE (односторонній, але окремий маршрут); надсилання повних даних у подіях (витік, дублювання прав)
+SSE (one-directional, but a separate route); sending full data in events (leakage, duplicated permissions)
 
-## Наслідки
+## Consequences
 
-- Подія каже «тут щось змінилось», дані клієнт бере через API, тож сокет ніколи не обходить права.
-- Для кількох інстансів API потрібен Redis-адаптер (ADR 40).
+- An event says "something changed here", the client fetches data through the API, so the socket never bypasses permissions.
+- Several API instances need a Redis adapter (ADR 40).
 
-## Коли переглянути
+## When to revisit
 
-Якщо клієнтам знадобляться самі дані в події (великі дошки), надсилати мінімальні різниці після перевірки прав, а не цілі сутності.
+If clients need the data itself in the event (large boards), send minimal diffs after checking permissions rather than whole entities.

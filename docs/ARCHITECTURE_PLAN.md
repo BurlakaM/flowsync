@@ -1,111 +1,111 @@
-# FlowSync — план архітектурного переходу
+# FlowSync — architecture migration plan
 
-> Живий документ. Створено 2026-11-16 за результатами аналізу open-source проєктів на NestJS і React
+> A living document. Created on 2026-11-16 from an analysis of open-source NestJS and React projects
 > (Docmost, Novu, AFFiNE, Teable, Immich, Postiz, Twenty, Vendure, brocoders/nestjs-boilerplate, bulletproof-react).
-> Виконані пункти позначаємо `[x]`, а підсумок кожного кроку додаємо в «Журнал прогресу» внизу.
-> Правила написання коду — у `AGENTS.md`, `backend/AGENTS.md`, `frontend/AGENTS.md`.
+> Completed items are marked `[x]`, and a summary of each step is added to the "Progress log" at the bottom.
+> Code-writing rules are in `AGENTS.md`, `backend/AGENTS.md`, `frontend/AGENTS.md`.
 
-## 1. Мета й принципи
+## 1. Goal and principles
 
-**Мета:** перетворити пет-проєкт на підтримуване застосунок із сучасною архітектурою, безпечним API та
-типізованим фронтендом, не втративши працездатності на жодному кроці.
+**Goal:** turn the pet project into a maintainable application with a modern architecture, a secure API and
+a typed frontend, without losing a working state at any step.
 
-Принципи:
+Principles:
 
-1. **Спершу безпека, потім краса.** Критичні діри закриваємо до будь-якого рефакторингу (фаза 0).
-2. **Маленькі кроки.** Одна фаза — одна гілка `refactor/phase-N-<назва>`; після кожного пункту проєкт збирається й запускається.
-3. **Не ускладнювати.** Беремо практики з великих проєктів, але лише ті, що окупаються на нашому масштабі
-   (без CQRS, hexagonal, GraphQL, Nx).
-4. **Автоматична перевірка.** Усе, що можна перевірити машиною (lint, типи, тести, CI), не перевіряємо очима.
-5. **Рішення записані.** Кожен вибір бібліотеки чи підходу фіксується в розділі 3.
+1. **Security first, beauty second.** Critical holes are closed before any refactoring (phase 0).
+2. **Small steps.** One phase — one branch `refactor/phase-N-<name>`; after every item the project builds and runs.
+3. **Do not overcomplicate.** We take practices from large projects, but only those that pay off at our scale
+   (no CQRS, hexagonal, GraphQL, Nx).
+4. **Automatic checks.** Whatever a machine can verify (lint, types, tests, CI) is not verified by eye.
+5. **Decisions are recorded.** Every choice of a library or approach is fixed in section 3.
 
-## 2. Поточний стан (baseline на 2026-11-16)
+## 2. Current state (baseline on 2026-11-16)
 
-Що вже добре: модульна структура Nest за фічами, Prisma + PostgreSQL 16, DTO з `class-validator`, Docker-стек
-(backend + frontend + db з healthcheck) працює, є CI зі збіркою образів, seed ролей.
+What is already good: a Nest module structure by feature, Prisma + PostgreSQL 16, DTOs with `class-validator`, a Docker stack
+(backend + frontend + db with a healthcheck) that works, CI with image builds, role seeding.
 
-Проблеми (їх і виправляє план):
+Problems (which the plan fixes):
 
-| # | Проблема | Де | Фаза |
+| # | Problem | Where | Phase |
 |---|---|---|---|
-| B1 | `GET /api/users/:email` без авторизації віддає запис користувача разом із хешем пароля | `backend/src/users/users.controller.ts:15` | 0 |
-| B2 | `POST /api/users` повертає хеш пароля у відповіді | `backend/src/users/users.service.ts:14` | 0 |
-| B3 | Клієнт сам обирає `role_id` при реєстрації (можна зареєструватися адміном) | `user.dto.ts`, `users.service.ts:13` | 0 |
-| B4 | `POST /tasks` і `POST /comments` без `JwtAuthGuard`; `user_id` береться з тіла запиту | `tasks.controller.ts:16`, `comments.controller.ts:10` | 0 |
-| B5 | Створення задачі не перевіряє доступ до `project_id` (можна писати в чужий проєкт) | `tasks.service.ts:17` | 0 |
-| B6 | Немає глобального `ValidationPipe`: `POST /users`, `POST /auth/login` не валідуються; у `main.ts` `enableCors()` для всіх origin | `main.ts` | 0 |
-| B7 | Два конкуруючі механізми JWT: кастомний `canActivate` кладе в `request.user` payload (`sub`), а `JwtStrategy.validate` повертає `{userId, username}` і ніколи не використовується | `conception/jwt.auth.guard.ts`, `auth/jwt.strategy.ts` | 0 |
-| B8 | Немає валідації env; `SECRET_KEY` може бути `undefined`; паролі БД захардкоджені в compose | `app.module.ts`, `docker-compose.yml` | 1–2 ✓ |
-| B9 | `prisma db push` при старті контейнера замість міграцій | `docker-compose.yml` | 3 ✓ |
-| B10 | Схема БД: помилка `creared_at`, моделі в `snake_case`, дубль зв'язку task↔tag (`tags` і `task_tags`), немає `updatedAt`, немає індексів на FK, обов'язкові `description`/`image` | `schema.prisma` | 3 ✓ |
-| B11 | `strictNullChecks` і `noImplicitAny` вимкнені, `any` у сервісах | `tsconfig.json` | 2 ✓ |
-| B12 | Nest 10 (актуальна гілка вже 12); Node 20 досяг end-of-life у квітні 2026 | `package.json`, Dockerfile | 1–2 ✓ |
-| B13 | Два lock-файли в backend (`yarn.lock` і `package-lock.json`) | `backend/` | 1 |
-| F1 | Фронтенд на Create React App (закритий проєкт) і чистому JS; логіка fetch прямо в компонентах | `frontend/src/**` | 5 |
-| F2 | Зайві залежності: `jquery`, `react-bootstrap` + `react-bootstrap-v5`, `react-helmet` | `frontend/package.json` | 5 |
-| F3 | `ProtectedRoute` на кожен вхід викликав `POST /auth/validate-token` (закрито у фазі 6: `GET /auth/me`); токен у `localStorage` (закрито у фазі 7: токен у пам'яті + refresh-cookie) | `ProtectedRoute.js` | 6–7 |
-| F4 | `Dashboard` — заглушка, функціоналу задач/проєктів у UI немає | `cabinet/Dashboard.js` | 6 |
-| I1 | nginx без SPA-fallback: оновлення сторінки `/dashboard` у контейнері дає 404; API-URL вшивається при збірці з `frontend/.env` | `frontend/Dockerfile` | 1 |
-| I2 | README описує Vite, папки `back/front` та `docker-compose.override.yml`, яких немає | `README.md` | 1 |
-| I3 | CI пушить образи на кожен push у `main` без lint/тестів; `actions/checkout@v3` | `.github/workflows/ci-cd.yml` | 1 |
-| I4 | Назви пакетів `jira` (backend) і `my-app` (frontend), БД називається `jira` | `package.json`, compose | 1 |
+| B1 | `GET /api/users/:email` without authorization returns the user record together with the password hash | `backend/src/users/users.controller.ts:15` | 0 |
+| B2 | `POST /api/users` returns the password hash in the response | `backend/src/users/users.service.ts:14` | 0 |
+| B3 | The client chooses `role_id` at registration (one can register as an admin) | `user.dto.ts`, `users.service.ts:13` | 0 |
+| B4 | `POST /tasks` and `POST /comments` without `JwtAuthGuard`; `user_id` is taken from the request body | `tasks.controller.ts:16`, `comments.controller.ts:10` | 0 |
+| B5 | Task creation does not check access to `project_id` (one can write to someone else's project) | `tasks.service.ts:17` | 0 |
+| B6 | No global `ValidationPipe`: `POST /users`, `POST /auth/login` are not validated; `main.ts` has `enableCors()` for all origins | `main.ts` | 0 |
+| B7 | Two competing JWT mechanisms: a custom `canActivate` puts the payload (`sub`) in `request.user`, while `JwtStrategy.validate` returns `{userId, username}` and is never used | `conception/jwt.auth.guard.ts`, `auth/jwt.strategy.ts` | 0 |
+| B8 | No env validation; `SECRET_KEY` may be `undefined`; DB passwords are hardcoded in compose | `app.module.ts`, `docker-compose.yml` | 1–2 ✓ |
+| B9 | `prisma db push` on container start instead of migrations | `docker-compose.yml` | 3 ✓ |
+| B10 | DB schema: a `creared_at` typo, `snake_case` models, a duplicated task↔tag link (`tags` and `task_tags`), no `updatedAt`, no indexes on FKs, mandatory `description`/`image` | `schema.prisma` | 3 ✓ |
+| B11 | `strictNullChecks` and `noImplicitAny` are off, `any` in services | `tsconfig.json` | 2 ✓ |
+| B12 | Nest 10 (the current branch is already 12); Node 20 reached end-of-life in April 2026 | `package.json`, Dockerfile | 1–2 ✓ |
+| B13 | Two lock files in the backend (`yarn.lock` and `package-lock.json`) | `backend/` | 1 |
+| F1 | The frontend is on Create React App (a discontinued project) and plain JS; fetch logic directly in components | `frontend/src/**` | 5 |
+| F2 | Unneeded dependencies: `jquery`, `react-bootstrap` + `react-bootstrap-v5`, `react-helmet` | `frontend/package.json` | 5 |
+| F3 | `ProtectedRoute` called `POST /auth/validate-token` on every entry (closed in phase 6: `GET /auth/me`); the token is in `localStorage` (closed in phase 7: token in memory + a refresh cookie) | `ProtectedRoute.js` | 6–7 |
+| F4 | `Dashboard` is a stub, there is no task/project functionality in the UI | `cabinet/Dashboard.js` | 6 |
+| I1 | nginx without an SPA fallback: refreshing the `/dashboard` page in the container gives 404; the API URL is baked in at build time from `frontend/.env` | `frontend/Dockerfile` | 1 |
+| I2 | The README describes Vite, `back/front` folders and a `docker-compose.override.yml` that do not exist | `README.md` | 1 |
+| I3 | CI pushes images on every push to `main` without lint/tests; `actions/checkout@v3` | `.github/workflows/ci-cd.yml` | 1 |
+| I4 | The package names are `jira` (backend) and `my-app` (frontend), the DB is called `jira` | `package.json`, compose | 1 |
 
-## 3. Журнал рішень
+## 3. Decision log
 
-Статус `прийнято` = дефолт, який використовують AI-агенти. Змінити рішення можна, оновивши рядок тут
-і відповідні правила в `AGENTS.md`.
+Status `accepted` = the default used by AI agents. A decision can be changed by updating its row here
+and the corresponding rules in `AGENTS.md`. Expanded versions are in `docs/adr/`.
 
-| # | Тема | Рішення | Альтернативи та чому ні |
+| # | Topic | Decision | Alternatives and why not |
 |---|---|---|---|
-| D1 | Шари backend | Controller → Service → Prisma. Окремий `*.repository.ts` лише коли запит складний або повторюється | Hexagonal (brocoders), use-case класи (Novu): забагато файлів для CRUD |
-| D2 | БД та міграції | PostgreSQL 16 + Prisma, міграції через `prisma migrate` | `db push` лише для швидких експериментів |
-| D3 | Ролі | `enum Role { USER ADMIN }` у моделі `User` замість таблиці `role` | Таблиця ролей виправдана лише з динамічними правами; seed ролей тоді стає непотрібним |
-| D4 | Стиль API | REST + OpenAPI (Swagger), camelCase у JSON | GraphQL: один веб-клієнт, прості сутності |
-| D5 | Валідація | `class-validator` у DTO + глобальний `ValidationPipe`; env через `zod` | `nestjs-zod`: зайва міграція DTO |
-| D6 | Авторизація запитів | Passport JWT; глобальний guard «закрито за замовчуванням» + `@Public()`; ролі через `@Roles()` | Окремі guard-и на кожному маршруті забувають додати (див. B4) |
-| D7 | Доступ до ресурсів | Перевірка членства в проєкті в сервісах; для чужого ресурсу повертаємо 404 | CASL — лише якщо правил стане багато |
-| D8 | Збірка фронтенду | Vite + React 19 + TypeScript (strict) | CRA закритий; Next.js не потрібен для дашборда за логіном |
-| D9 | Роутинг | `react-router` v8 (library mode, lazy-маршрути; `RouterProvider` з `react-router/dom`) | TanStack Router: теж добрий, але менше прикладів у проєктах із цього огляду |
-| D10 | Стан | Серверний стан — TanStack Query v5; клієнтський — `useState`/Context, `zustand` лише для справді глобального | Redux/Recoil: зайве |
-| D11 | UI | Tailwind CSS 4 + shadcn/ui (Radix) | Mantine (як у Docmost): швидший старт, але менше контролю; Bootstrap видаляємо |
-| D12 | Форми | `react-hook-form` + `zod` | Formik: застарів |
-| D13 | Структура фронтенду | Feature-папки за bulletproof-react; заборона імпортів між фічами (ESLint) | Плоска структура CRA |
-| D14 | Контракт front↔back | OpenAPI → згенерований TS-клієнт (`openapi-typescript`), фаза 7 | Спільний пакет типів: потребує монорепо-інструментів |
-| D15 | Репозиторій | Два незалежні пакети, лише `npm`, без Nx/Turborepo | Монорепо-інструменти окупаються з 3+ пакетами |
-| D16 | Тести | Backend і frontend: Vitest (+ supertest, Testing Library, MSW); e2e: Playwright. Backend на Vitest + SWC, бо пакети Nest 12 стали ESM (`import.meta`) і Jest їх не завантажує | Jest: несумісний із Nest 12 |
-| D17 | CI | PR-перевірки (lint, типи, тести, збірка) → деплой лише з `main` після успіху; теги образів `:<sha>` і `:latest` | — |
-| D18 | Compose | `docker-compose.yml` (прод) + `docker-compose.override.yml` (dev, hot-reload); секрети в `.env`, не в репозиторії | — |
-| D19 | Runtime | Node 24 LTS (або 22, якщо залежність не підтримує 24) | Node 20 — EOL. Node 26 уже LTS (з листопада 2026), але CRA на ній не перевірений (backend уже на Nest 12 / Prisma 6.19): повернутися після фази 5 |
-| D20 | TypeScript | `~6.0` зі `strict: true`: `@nestjs/schematics@12` вимагає ≥ 6, а `typescript-eslint` ще не підтримує ≥ 6.1 | TS 5.9 несумісний із Nest 12; TS 7 (нативний) поки не підтримують `typescript-eslint` та частина інструментів |
-| D21 | Логування й захист API | `nestjs-pino` (JSON у production, pretty у dev, токени редагуються), `helmet`, `@nestjs/throttler` (100/хв глобально, 5/хв для логіну й реєстрації), `TRUST_PROXY` за nginx | Власний логер/middleware: дублює готове |
-| D22 | Модель доступу | Власник проєкту — `Project.ownerId`; додаткові учасники — `ProjectMember`; перевірка доступу в сервісах. Ролі користувача — `enum Role` | Власник у `ProjectMember` теж: дублює дані |
-| D23 | Міграції | `prisma migrate` (SQL у репозиторії), у Docker `migrate deploy` на старті; CI перевіряє розбіжність схеми й міграцій | `db push`: не лишає історії й небезпечний для даних |
-| D24 | Права доступу | Єдине джерело правди «хто бачить проєкт» — `ProjectsService` (власник або учасник); сторонній → 404, учасник без права → 403; ADMIN не обходить доступ до проєктів | Глобальний обхід для ADMIN: розширює поверхню атаки; CASL: зайве, правил поки мало |
-| D25 | Типи API на frontend | `openapi-typescript` генерує `src/types/api.generated.ts` із `backend/openapi.json`; у `features/*/types` лише аліаси; CI перевіряє актуальність. Для пакета потрібен `overrides` на peer `typescript` (він заявляє `^5`, у проєкті TS 6) | Типи вручну: розходяться з API без попередження |
-| D26 | Сесія | Access-JWT 15 хв у пам'яті + refresh-токен в `httpOnly` cookie (`SameSite=Strict`, `Path=/api/auth`), ротація, відкликання родини при повторному використанні, у БД лише SHA-256 хеш; `COOKIE_SECURE` для HTTPS | JWT у `localStorage` (XSS краде токен); довгий access-токен |
-| D27 | Request id | `X-Request-Id` через `genReqId` у `nestjs-pino` (вхідний заголовок, якщо схожий на id, інакше UUID) і поле `requestId` у тілі помилки | `nestjs-cls`: окрема залежність без користі, поки id потрібен лише логам і відповіді |
-| D28 | E2E та доступність | Playwright у `frontend/e2e` проти прод-подібного стеку (локально встановлений Chrome, у CI Chromium); `vitest-axe` у тестах сторінок | Cypress: важчий; окремий пакет `e2e/`: ще один `package.json` |
-| D29 | Події й права | Сервіси публікують доменні події (`@nestjs/event-emitter`), на них підписані аудит, сповіщення й real-time; права — `@casl/ability` в одній карті `app-ability.ts` | Виклики підписників напряму з сервісів (зв'язність); use-case класи (зайві абстракції) |
-| D30 | Черга й пошта | BullMQ + Redis (`bullmq`, `ioredis`) і `nodemailer`; без Redis листи йдуть у процесі API, без `SMTP_HOST`+`MAIL_FROM` — не йдуть зовсім і нічого не падає; транспорт підміняється токеном (тести). Без `@nestjs/bullmq`: керуємо `Queue`/`Worker` самі, щоб не підключатись до Redis, коли пошта вимкнена | `@nestjs/bullmq` (з'єднується з Redis завжди); Kafka/RabbitMQ (зайве для одного сервісу) |
-| D31 | Файли | Завантаження через API (`multer`): тип за байтами, до 2 МБ, SVG заборонено; зберігання в S3-сумісному сховищі (`@aws-sdk/client-s3`), віддача лише учасникам проєкту. Dev-сховище — RustFS (образ MinIO більше не публікується безкоштовно) | Presigned URL: сховище мусить бути доступним з браузера, тип файлу не перевіряється сервером |
-| D32 | Real-time | `@nestjs/websockets` + `socket.io` під `/api/socket.io` (той самий проксі, що й API); авторизація токеном у handshake, кімнати за доступом; події лише повідомляють про зміну, дані клієнт бере через API | SSE (односторонній, але окремий маршрут); надсилання повних даних у подіях (витік, дублювання прав) |
-| D33 | i18n і дошка | `i18next` + `react-i18next`, тексти-ключі в коді, словник `uk.ts` із тестом повноти; канбан на `@dnd-kit/core` | Файли JSON із семантичними ключами (легко розійтись із кодом); `react-beautiful-dnd` (не підтримується) |
-| D34 | Дизайн-система | «Aurora»: oklch-токени в `index.css`, світла («папір», індиго → бірюза) і темна теми з перемикачем (клас `.dark`, вибір у `localStorage`, ранній скрипт із `public/`, бо CSP забороняє inline); шрифти Inter (текст) + Manrope Variable (заголовки, `@fontsource-variable/manrope`, є кирилиця); статуси мають власні кольори й піктограми; колір проєкту, людини й тега виводиться з назви (без нових полів у БД); наявне лого лишається | Midnight (dark-first) і Paper (serif) — не обрано власником; нове лого — власник відмовився |
-| D35 | Прод-операції | Скрипти в `ops/` на чистому bash + Docker Compose; `docker-compose.vps.yml` (образи з реєстру + Caddy); бекап `pg_dump` із файлом лічильників рядків і `restore-verify.sh`; деплой вручну (`workflow_dispatch`) з автовідкатом за smoke-тестом; liveness не торкається залежностей, readiness перевіряє БД і Redis (якщо налаштований) | Kubernetes/Ansible/Terraform (зайве для одного VPS); `pgBackRest`/WAL-архів (PITR потрібен, коли дані важливі, а не в пет-проєкті); автодеплой на кожен push (власник хоче керувати моментом) |
-| D36 | Спостережуваність | Метрики — `prom-client` (приватний реєстр, `/api/metrics` закритий nginx-ом і за бажанням `METRICS_TOKEN`); трейси — OpenTelemetry SDK з OTLP/HTTP і окремими інструментаторами (http, express, ioredis, socket.io, pino, Prisma, `bullmq-otel`), увімкнені лише з `OTEL_EXPORTER_OTLP_ENDPOINT`; помилки — Sentry (`@sentry/nestjs`, `@sentry/react`) лише як лічильник помилок, без трасування й запису сесій; dev-стек Prometheus + Grafana + Jaeger у профілі `observability` | `nestjs-otel`/`@willsoto/nestjs-prometheus` (обгортки без виграшу); `auto-instrumentations-node` (десятки зайвих інструментаторів і залежностей); Sentry tracing (два провайдери трасування); Loki/Tempo (більше сервісів, ніж потрібно одному VPS) |
-| D37 | Доставка подій | Transactional outbox (`outbox_events`): подія пишеться в транзакції зміни (`DomainEventsService.transact`), після коміту доставляється одразу, а `OutboxRelayService` підхоплює недоставлене (claim `UPDATE … FOR UPDATE SKIP LOCKED` з lease 30 с, backoff 2^n с, `DEAD` після 8 спроб). Доставка щонайменше один раз, підписники ідемпотентні (`eventId`) | Події в пам'яті (втрата при падінні між записом і публікацією); BullMQ/Kafka як транспорт (Redis необов'язковий, зайва інфраструктура); CDC/Debezium (окремий сервіс); exactly-once (недосяжне без ідемпотентності все одно) |
-| D38 | Конкурентне редагування | Оптимістична конкурентність: `Task.version`, `PATCH` вимагає його, `update where { id, version }` + `increment`, розбіжність → 409 | Пессимістичні блокування (тримають транзакцію, поки людина думає); `updatedAt` як токен (колізії в межах мілісекунди, лишається прив'язка до годинника); `If-Match`/ETag (той самий зміст, гірше для JSON-тіла й OpenAPI) |
-| D39 | Пагінація зростаючих списків | Курсор (id останнього рядка, `{ items, nextCursor }`, без `total`) для активності й коментарів; індекси `(project_id, id DESC)` і `(task_id, id)`. Решта списків лишається на сторінках | Offset скрізь (повтори й пропуски, повільний на глибоких сторінках); курсор за `createdAt` (потрібен тай-брейкер, складніший індекс) |
-| D40 | Кілька інстансів real-time | `@socket.io/redis-adapter` лише з `REDIS_URL`, підключається в `main.ts`; без Redis — один інстанс | Sticky sessions без адаптера (події все одно губляться між інстансами); власна шина |
-| D41 | Акаунт і сесії | Скидання пароля й підтвердження email — одноразові токени з листа (`user_tokens`, SHA-256, 1 год / 24 год, один раз), у `#фрагменті` посилання; відповіді не розкривають існування акаунта; блокування 5 невдач → 15 хв (`429`); зміна/скидання пароля в одній транзакції анулює refresh-токени й видані раніше access-токени (`passwordChangedAt`); листи-сповіщення лише на підтверджені адреси; наявні акаунти вважаються підтвердженими | Токен у query-рядку (потрапляє в логи й `Referer`); автоматичне підтвердження при відкритті посилання (його «спалюють» сканери пошти); блокування лише за IP (обходиться ротацією адрес); блокування без скидання (користувач без виходу) |
-| D42 | Перевірки безпеки | Скрипт `ops/security-scan.sh` у Docker (Trivy для образів, gitleaks для історії, SBOM CycloneDX) — той самий локально й у CI; CodeQL окремим workflow; `npm audit` лишається для залежностей | Лише `npm audit` (не бачить ОС, npm із базового образу й nginx); платні/хмарні сканери (потрібні акаунти) |
-| D43 | Prisma 7 | Prisma 7.10 (стабільна; `latest` у npm указує на 8.0 RC), клієнт через драйвер `pg` (`@prisma/adapter-pg`), `prisma.config.ts` замість `package.json#prisma` і `url` у схемі, генератор `prisma-client-js` лишився | Лишитись на 6.x (вразливість `deepmerge-ts` у CLI без виправлення); Prisma 8 RC (ще не стабільна); новий генератор `prisma-client` (змінює всі імпорти, без виграшу тут) |
-| D44 | Git-хуки | Husky + lint-staged: `package.json` у корені існує **лише** заради хуків (`prepare: husky`); конфіг lint-staged лежить у кожному пакеті, тож ESLint і Prettier працюють зі своїми налаштуваннями; `commit-msg` перевіряє Conventional Commits, `pre-push` — типи | Нативні git-хуки в `.githooks` (не потребують залежностей, але й не ставляться самі після `git clone`); `simple-git-hooks`; монорепо-інструмент (D15) |
-| D45 | Мутаційні тести й пороги | Stryker + vitest-runner для 7 ключових файлів (безпека, дані, події), раз на тиждень у CI; пороги покриття як «храповики» трохи нижче виміряного; `@vitest/coverage-v8` у frontend | Гнатися за 100 % покриття (дублює реалізацію); мутувати весь backend (години); лише покриття (не відрізняє «виконано» від «перевірено») |
-| D46 | Вимірювання продуктивності | k6 у контейнері проти прод-образу й окремої БД із 60 000 задач (`ops/load/`), `RATE_LIMIT_PER_MINUTE` для піднятого ліміту; Lighthouse CI з бюджетами на публічні сторінки; візуальні знімки в офіційному контейнері Playwright (`ops/visual.sh`) | Тести продуктивності на dev-БД з десятком рядків (проблеми не видно); хмарні сервіси (акаунти); знімки на хості (шрифти й ОС роблять їх нестабільними) |
-| D47 | Версії й журнал змін | release-please (`simple`, один компонент на репозиторій, `extra-files` піднімає версії обох пакетів) і Conventional Commits; деплой лишається ручним | `semantic-release` (публікує без Release PR, гірше для ручного контролю); ручні теги; версії пакетів окремо (для застосунку, що розгортається разом, зайве) |
+| D1 | Backend layers | Controller → Service → Prisma. A separate `*.repository.ts` only when a query is complex or reused | Hexagonal (brocoders), use-case classes (Novu): too many files for CRUD |
+| D2 | Database and migrations | PostgreSQL 16 + Prisma, migrations via `prisma migrate` | `db push` only for quick experiments |
+| D3 | Roles | `enum Role { USER ADMIN }` on the `User` model instead of a `role` table | A roles table is only justified with dynamic permissions; role seeding then becomes unnecessary |
+| D4 | API style | REST + OpenAPI (Swagger), camelCase in JSON | GraphQL: a single web client, simple entities |
+| D5 | Validation | `class-validator` in DTOs + a global `ValidationPipe`; env via `zod` | `nestjs-zod`: needless DTO migration |
+| D6 | Request authorization | Passport JWT; a global "closed by default" guard + `@Public()`; roles via `@Roles()` | Per-route guards get forgotten (see B4) |
+| D7 | Resource access | Project membership is checked in services; for someone else's resource we return 404 | CASL — only if the rules become numerous |
+| D8 | Frontend build | Vite + React 19 + TypeScript (strict) | CRA is discontinued; Next.js is not needed for a dashboard behind a login |
+| D9 | Routing | `react-router` v8 (library mode, lazy routes; `RouterProvider` from `react-router/dom`) | TanStack Router: also good, but fewer examples in the projects from this survey |
+| D10 | State | Server state — TanStack Query v5; client state — `useState`/Context, `zustand` only for truly global state | Redux/Recoil: overkill |
+| D11 | UI | Tailwind CSS 4 + shadcn/ui (Radix) | Mantine (as in Docmost): faster start, but less control; Bootstrap is being removed |
+| D12 | Forms | `react-hook-form` + `zod` | Formik: outdated |
+| D13 | Frontend structure | Feature folders following bulletproof-react; imports between features are forbidden (ESLint) | The flat CRA structure |
+| D14 | Front↔back contract | OpenAPI → a generated TS client (`openapi-typescript`), phase 7 | A shared types package: requires monorepo tooling |
+| D15 | Repository | Two independent packages, `npm` only, no Nx/Turborepo | Monorepo tooling pays off with 3+ packages |
+| D16 | Tests | Backend and frontend: Vitest (+ supertest, Testing Library, MSW); e2e: Playwright. The backend uses Vitest + SWC because Nest 12 packages became ESM (`import.meta`) and Jest cannot load them | Jest: incompatible with Nest 12 |
+| D17 | CI | PR checks (lint, types, tests, build) → deploy only from `main` after success; image tags `:<sha>` and `:latest` | — |
+| D18 | Compose | `docker-compose.yml` (prod) + `docker-compose.override.yml` (dev, hot reload); secrets in `.env`, not in the repository | — |
+| D19 | Runtime | Node 24 LTS (or 22 if a dependency does not support 24) | Node 20 is EOL. Node 26 is already LTS (since November 2026), but CRA is not verified on it (the backend is already on Nest 12 / Prisma 6.19): return to it after phase 5 |
+| D20 | TypeScript | `~6.0` with `strict: true`: `@nestjs/schematics@12` requires ≥ 6, and `typescript-eslint` does not yet support ≥ 6.1 | TS 5.9 is incompatible with Nest 12; TS 7 (native) is not yet supported by `typescript-eslint` and some tooling |
+| D21 | Logging and API protection | `nestjs-pino` (JSON in production, pretty in dev, tokens redacted), `helmet`, `@nestjs/throttler` (100/min globally, 5/min for login and registration), `TRUST_PROXY` behind nginx | A custom logger/middleware: duplicates what already exists |
+| D22 | Access model | The project owner is `Project.ownerId`; additional participants are `ProjectMember`; access is checked in services. User roles are `enum Role` | The owner also in `ProjectMember`: duplicates data |
+| D23 | Migrations | `prisma migrate` (SQL in the repository), `migrate deploy` on start in Docker; CI checks for drift between schema and migrations | `db push`: leaves no history and is dangerous for data |
+| D24 | Access rights | A single source of truth for "who can see a project" — `ProjectsService` (owner or member); an outsider → 404, a member without the right → 403; ADMIN does not bypass project access | A global bypass for ADMIN: widens the attack surface; CASL: overkill, few rules so far |
+| D25 | API types on the frontend | `openapi-typescript` generates `src/types/api.generated.ts` from `backend/openapi.json`; `features/*/types` hold only aliases; CI checks that it is up to date. The package needs an `overrides` entry for its `typescript` peer (it declares `^5`, the project uses TS 6) | Hand-written types: drift from the API without warning |
+| D26 | Session | A 15-minute access JWT in memory + a refresh token in an `httpOnly` cookie (`SameSite=Strict`, `Path=/api/auth`), rotation, family revocation on reuse, only a SHA-256 hash in the DB; `COOKIE_SECURE` for HTTPS | JWT in `localStorage` (XSS steals the token); a long-lived access token |
+| D27 | Request id | `X-Request-Id` via `genReqId` in `nestjs-pino` (the incoming header if it looks like an id, otherwise a UUID) and a `requestId` field in the error body | `nestjs-cls`: a separate dependency with no benefit while the id is only needed by logs and the response |
+| D28 | E2E and accessibility | Playwright in `frontend/e2e` against a production-like stack (locally installed Chrome, Chromium in CI); `vitest-axe` in page tests | Cypress: heavier; a separate `e2e/` package: one more `package.json` |
+| D29 | Events and permissions | Services publish domain events (`@nestjs/event-emitter`); audit, notifications and real-time subscribe to them; permissions — `@casl/ability` in a single map, `app-ability.ts` | Calling subscribers directly from services (coupling); use-case classes (needless abstractions) |
+| D30 | Queue and mail | BullMQ + Redis (`bullmq`, `ioredis`) and `nodemailer`; without Redis, mail is sent inside the API process; without `SMTP_HOST` + `MAIL_FROM`, it is not sent at all and nothing fails; the transport can be replaced via a token (tests). No `@nestjs/bullmq`: we manage `Queue`/`Worker` ourselves so as not to connect to Redis when mail is disabled | `@nestjs/bullmq` (always connects to Redis); Kafka/RabbitMQ (overkill for a single service) |
+| D31 | Files | Uploads through the API (`multer`): type detected from the bytes, up to 2 MB, SVG forbidden; stored in S3-compatible storage (`@aws-sdk/client-s3`), served only to project members. Dev storage is RustFS (the MinIO image is no longer published for free) | Presigned URLs: the storage must be reachable from the browser, and the server does not verify the file type |
+| D32 | Real-time | `@nestjs/websockets` + `socket.io` under `/api/socket.io` (the same proxy as the API); authorization by a token in the handshake, rooms by access; events only announce a change, the client fetches data through the API | SSE (one-directional, but a separate route); sending full data in events (leakage, duplicated permissions) |
+| D33 | i18n and the board | `i18next` + `react-i18next`, text-as-key in code, a `uk.ts` dictionary with a completeness test; the kanban board on `@dnd-kit/core` | JSON files with semantic keys (easy to drift from the code); `react-beautiful-dnd` (unmaintained) |
+| D34 | Design system | "Aurora": oklch tokens in `index.css`, light ("paper", indigo → teal) and dark themes with a switcher (`.dark` class, choice stored in `localStorage`, an early script from `public/` because the CSP forbids inline scripts); fonts Inter (text) + Manrope Variable (headings, `@fontsource-variable/manrope`, includes Cyrillic); statuses have their own colors and icons; the color of a project, person or tag is derived from its name (no new DB fields); the existing logo stays | Midnight (dark-first) and Paper (serif) — not chosen by the owner; a new logo — the owner declined |
+| D35 | Production operations | Scripts in `ops/` in plain bash + Docker Compose; `docker-compose.vps.yml` (images from a registry + Caddy); `pg_dump` backup with a row-count file and `restore-verify.sh`; manual deploy (`workflow_dispatch`) with automatic rollback on a smoke test; liveness does not touch dependencies, readiness checks the DB and Redis (if configured) | Kubernetes/Ansible/Terraform (overkill for one VPS); `pgBackRest`/WAL archiving (PITR is needed when the data matters, not in a pet project); auto-deploy on every push (the owner wants to control the moment) |
+| D36 | Observability | Metrics — `prom-client` (a private registry, `/api/metrics` closed by nginx and optionally by `METRICS_TOKEN`); traces — the OpenTelemetry SDK with OTLP/HTTP and individual instrumentations (http, express, ioredis, socket.io, pino, Prisma, `bullmq-otel`), enabled only with `OTEL_EXPORTER_OTLP_ENDPOINT`; errors — Sentry (`@sentry/nestjs`, `@sentry/react`) only as an error counter, without tracing or session replay; a dev Prometheus + Grafana + Jaeger stack in the `observability` profile | `nestjs-otel`/`@willsoto/nestjs-prometheus` (wrappers with no gain); `auto-instrumentations-node` (dozens of unneeded instrumentations and dependencies); Sentry tracing (two tracing providers); Loki/Tempo (more services than one VPS needs) |
+| D37 | Event delivery | Transactional outbox (`outbox_events`): the event is written in the change's transaction (`DomainEventsService.transact`), delivered immediately after commit, and `OutboxRelayService` picks up anything undelivered (claim `UPDATE … FOR UPDATE SKIP LOCKED` with a 30 s lease, 2^n s backoff, `DEAD` after 8 attempts). At-least-once delivery; subscribers are idempotent (`eventId`) | In-memory events (lost if the process dies between the write and the publish); BullMQ/Kafka as the transport (Redis is optional, extra infrastructure); CDC/Debezium (a separate service); exactly-once (unachievable without idempotency anyway) |
+| D38 | Concurrent editing | Optimistic concurrency: `Task.version`, `PATCH` requires it, `update where { id, version }` + `increment`, a mismatch → 409 | Pessimistic locks (hold a transaction while a person thinks); `updatedAt` as a token (collisions within a millisecond, still tied to the clock); `If-Match`/ETag (the same meaning, worse for JSON bodies and OpenAPI) |
+| D39 | Pagination of growing lists | A cursor (the id of the last row, `{ items, nextCursor }`, no `total`) for activity and comments; indexes `(project_id, id DESC)` and `(task_id, id)`. The remaining lists stay paged | Offset everywhere (repeats and gaps, slow on deep pages); a cursor by `createdAt` (needs a tiebreaker, a more complex index) |
+| D40 | Real-time across several instances | `@socket.io/redis-adapter` only with `REDIS_URL`, wired in `main.ts`; without Redis — a single instance | Sticky sessions without an adapter (events are still lost between instances); a custom bus |
+| D41 | Account and sessions | Password reset and email verification are one-time tokens from an email (`user_tokens`, SHA-256, 1 h / 24 h, single use), placed in the link's `#fragment`; responses do not reveal whether an account exists; lockout after 5 failures for 15 min (`429`); a password change/reset in one transaction invalidates refresh tokens and previously issued access tokens (`passwordChangedAt`); notification emails go only to verified addresses; existing accounts are considered verified | A token in the query string (ends up in logs and `Referer`); automatic verification when the link is opened (mail scanners "burn" it); lockout by IP only (bypassed by rotating addresses); lockout without a reset (a user with no way out) |
+| D42 | Security scans | The `ops/security-scan.sh` script in Docker (Trivy for images, gitleaks for history, a CycloneDX SBOM) — the same locally and in CI; CodeQL as a separate workflow; `npm audit` remains for dependencies | `npm audit` alone (does not see the OS, the npm from the base image, or nginx); paid/cloud scanners (need accounts) |
+| D43 | Prisma 7 | Prisma 7.10 (stable; `latest` on npm points to 8.0 RC), the client through the `pg` driver (`@prisma/adapter-pg`), `prisma.config.ts` instead of `package.json#prisma` and `url` in the schema, the `prisma-client-js` generator is kept | Stay on 6.x (an unfixed `deepmerge-ts` vulnerability in the CLI); Prisma 8 RC (not yet stable); the new `prisma-client` generator (changes all imports, no gain here) |
+| D44 | Git hooks | Husky + lint-staged: the root `package.json` exists **only** for the hooks (`prepare: husky`); the lint-staged config lives in each package, so ESLint and Prettier use their own settings; `commit-msg` checks Conventional Commits, `pre-push` checks types | Native git hooks in `.githooks` (no dependencies, but they are not installed automatically after `git clone`); `simple-git-hooks`; a monorepo tool (D15) |
+| D45 | Mutation tests and thresholds | Stryker + the vitest runner for 7 key files (security, data, events), weekly in CI; coverage thresholds as "ratchets" slightly below the measured value; `@vitest/coverage-v8` in the frontend | Chasing 100% coverage (duplicates the implementation); mutating the whole backend (hours); coverage alone (does not distinguish "executed" from "verified") |
+| D46 | Performance measurement | k6 in a container against the production image and a separate DB with 60,000 tasks (`ops/load/`), `RATE_LIMIT_PER_MINUTE` for a raised limit; Lighthouse CI with budgets for public pages; visual snapshots in the official Playwright container (`ops/visual.sh`) | Performance tests on a dev DB with a dozen rows (the problems are invisible); cloud services (accounts); snapshots on the host (fonts and the OS make them unstable) |
+| D47 | Versions and changelog | release-please (`simple`, one component per repository, `extra-files` bumps the versions of both packages) and Conventional Commits; deploy stays manual | `semantic-release` (publishes without a Release PR, worse for manual control); manual tags; separate package versions (overkill for an app deployed as one) |
 
-## 4. Цільова архітектура
+## 4. Target architecture
 
 ### Backend
 
@@ -134,293 +134,294 @@ backend/
 └─ test/ { e2e/*.e2e-spec.ts, utils/ }
 ```
 
-Модулі спілкуються лише через експортовані сервіси; циклічні залежності (`forwardRef`) заборонені.
+Modules talk only through exported services; circular dependencies (`forwardRef`) are forbidden.
 
 ### Frontend
 
 ```
 frontend/src/
-├─ app/         main.tsx, app.tsx, provider.tsx, router.tsx, routes/ (lazy-сторінки)
+├─ app/         main.tsx, app.tsx, provider.tsx, router.tsx, routes/ (lazy pages)
 ├─ assets/
 ├─ components/  ui/ (shadcn), layouts/, errors/
-├─ config/      env.ts (zod-парсинг import.meta.env)
-├─ features/    auth/, projects/, tasks/, comments/   (кожна: api/, components/, hooks/, types/, index.ts)
-├─ hooks/       спільні хуки
+├─ config/      env.ts (zod parsing of import.meta.env)
+├─ features/    auth/, projects/, tasks/, comments/   (each: api/, components/, hooks/, types/, index.ts)
+├─ hooks/       shared hooks
 ├─ lib/         api-client.ts, query-client.ts, auth-storage.ts, utils.ts
 ├─ testing/     setup.ts, test-utils.tsx, mocks/ (MSW)
 └─ types/
 ```
 
-Напрямок імпортів: `shared (components, hooks, lib, config, types)` → `features` → `app`.
-Фічі не імпортують одна одну: їх складають разом у `app/routes`.
+Import direction: `shared (components, hooks, lib, config, types)` → `features` → `app`.
+Features do not import each other: they are assembled together in `app/routes`.
 
-## 5. Фази
+## 5. Phases
 
-Розмір: **S** — до пів дня, **M** — 1–2 дні, **L** — 3+ дні. Фази 0→1 виконуємо строго по черзі,
-далі backend (2–4) і frontend (5–6) можна вести паралельно, якщо контракт `/auth/login` та
-`/auth/validate-token` лишається стабільним до фази 6.
+Size: **S** — up to half a day, **M** — 1–2 days, **L** — 3+ days. Phases 0→1 are done strictly in order,
+after that the backend (2–4) and frontend (5–6) can be done in parallel, provided the `/auth/login` and
+`/auth/validate-token` contract stays stable until phase 6.
 
-### Фаза 0 — Критичні виправлення безпеки (backend) · розмір M
+### Phase 0 — Critical security fixes (backend) · size M
 
-Гілка `refactor/phase-0-security`. Закриває B1–B7. **Статус: виконано 2026-11-16** (не закомічено).
+Branch `refactor/phase-0-security`. Closes B1–B7. **Status: done 2026-11-16** (not committed).
 
-- [x] 0.1 Написати e2e-тести (supertest) на бажану поведінку: реєстрація, логін, `GET /tasks` без токена → 401, створення задачі в чужому проєкті → 404, відповіді не містять `password` (до фази 2.8 тести йдуть на dev-БД у Docker з унікальними email і прибиранням створених даних)
-- [x] 0.2 Прибрати `password` з усіх відповідей (`select` у сервісі користувачів)
-- [x] 0.3 Реєстрація не приймає `role_id` (400 через `forbidNonWhitelisted`): завжди роль `user`
-- [x] 0.4 Видалити публічний `GET /users/:email`; додати захищений `GET /users/me`
-- [x] 0.5 `JwtAuthGuard` на `POST /tasks`, `POST /comments`; `user_id` з токена; прибрати `user_id` з `TasksDto`/`CommentsDto`
-- [x] 0.6 У `createTask` перевіряти, що користувач — власник проєкту; для чужого → `NotFoundException`. Так само для коментарів: коментувати можна лише задачу, яку бачиш (створив, призначена тобі або з твого проєкту)
-- [x] 0.7 Глобальний `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` у `main.ts`; прибрати локальні `@UsePipes`
-- [x] 0.8 Один механізм JWT: `AuthGuard('jwt')` + `JwtStrategy.validate` повертає `{ id, email }`; видалити кастомний `canActivate`; замінити `user.sub` на `user.id`
-- [x] 0.9 CORS лише для origin із конфігурації (`CORS_ORIGINS`, за замовчуванням локальні фронтенди); застосунок не стартує без `SECRET_KEY`. Перевірено на Docker-образі без `.env`. Локально Prisma сама підвантажує `backend/.env` у `process.env`, тому автотест цієї вимоги не має сенсу, а повноцінна валідація env — завдання 2.3
+- [x] 0.1 Write e2e tests (supertest) for the desired behavior: registration, login, `GET /tasks` without a token → 401, creating a task in someone else's project → 404, responses do not contain `password` (until phase 2.8 the tests run against the dev DB in Docker with unique emails and cleanup of created data)
+- [x] 0.2 Remove `password` from all responses (`select` in the users service)
+- [x] 0.3 Registration does not accept `role_id` (400 via `forbidNonWhitelisted`): always the `user` role
+- [x] 0.4 Remove the public `GET /users/:email`; add a protected `GET /users/me`
+- [x] 0.5 `JwtAuthGuard` on `POST /tasks`, `POST /comments`; `user_id` from the token; remove `user_id` from `TasksDto`/`CommentsDto`
+- [x] 0.6 In `createTask` check that the user is the project owner; for someone else's → `NotFoundException`. The same for comments: you can comment only on a task you can see (you created it, it is assigned to you, or it is in your project)
+- [x] 0.7 A global `ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })` in `main.ts`; remove local `@UsePipes`
+- [x] 0.8 One JWT mechanism: `AuthGuard('jwt')` + `JwtStrategy.validate` returns `{ id, email }`; delete the custom `canActivate`; replace `user.sub` with `user.id`
+- [x] 0.9 CORS only for origins from the config (`CORS_ORIGINS`, local frontends by default); the app does not start without `SECRET_KEY`. Verified on a Docker image without `.env`. Locally Prisma itself loads `backend/.env` into `process.env`, so an automated test of this requirement is pointless, and full env validation is task 2.3
 
-**Готово, коли:** усі e2e з 0.1 зелені; `curl /api/users/x@y.z` → 404/401; реєстрація з `role_id` → 400, а без нього створює роль `user`;
-`POST /api/tasks` без токена → 401.
+**Done when:** all the e2e tests from 0.1 are green; `curl /api/users/x@y.z` → 404/401; registration with `role_id` → 400, and without it creates the `user` role;
+`POST /api/tasks` without a token → 401.
 
-### Фаза 1 — Репозиторій, інфраструктура, CI · розмір M
+### Phase 1 — Repository, infrastructure, CI · size M
 
-Гілка `refactor/phase-1-infra`. Закриває B8, B12 (частково), B13, I1–I4. **Статус: виконано 2026-11-16** (не закомічено), крім необов'язкового 1.10.
+Branch `refactor/phase-1-infra`. Closes B8, B12 (partly), B13, I1–I4. **Status: done 2026-11-16** (not committed), except the optional 1.10.
 
-- [x] 1.1 Лише npm: видалити `backend/yarn.lock`; перейменувати пакети на `flowsync-backend` / `flowsync-frontend`
-- [x] 1.2 Node 24 LTS (або 22) у Dockerfile, CI та `.nvmrc`; `engines` (`>=22`) у `package.json`. Додано `.gitattributes` (`eol=lf`)
-- [x] 1.3 `.env.example` у корені, `backend/`, `frontend/`; секрети compose — через `${POSTGRES_PASSWORD}` з кореневого `.env`; БД перейменувати з `jira` на `flowsync`
-- [x] 1.4 Compose: `docker-compose.yml` (прод) + `docker-compose.override.yml` (dev: bind mounts, `nest start --watch`, dev-сервер фронтенду); `Dockerfile` з цілями `dev`/`build`/`prod`; прибрати суфікс `_prod` з імен контейнерів
-- [x] 1.5 `frontend/nginx.conf`: SPA-fallback `try_files $uri /index.html` і проксі `/api/` → `backend:3000`; frontend звертається до `/api` (same-origin, без CORS)
-- [x] 1.6 Docker: запуск від непривілегійованого користувача (`node`, `nginx-unprivileged`); healthcheck backend поки TCP-перевіркою порту (після фази 2 — `/api/health`). У прод-образі backend лишаються dev-залежності, бо старт виконує `prisma db push` і seed; фаза 3 це прибере
-- [x] 1.7 ESLint 9 (flat config) + Prettier у backend; у frontend поки лише Prettier (`react-scripts` прив'язаний до ESLint 8, flat-конфіг додається в 5.7). Скрипти `lint`, `format:check`; старий код відформатовано, 3 попередження про `any` лишаються до фази 4
-- [x] 1.8 CI `ci.yml` (PR і push; backend ще й e2e на Postgres-сервісі; для збірки CRA виставлено `CI=false`, бо старий код має попередження, прибрати в 5.x): backend — install, lint, typecheck, test, build, `prisma validate`; frontend — lint, test, build; `docker build` обох образів. Окремий `deploy.yml` лише для `main` після успіху CI; теги `:<sha>` + `:latest`; актуальні major-версії дій на листопад 2026 (checkout v7, setup-node v7, buildx v4, login v4, build-push v7); кеш Buildx
+- [x] 1.1 npm only: delete `backend/yarn.lock`; rename the packages to `flowsync-backend` / `flowsync-frontend`
+- [x] 1.2 Node 24 LTS (or 22) in the Dockerfile, CI and `.nvmrc`; `engines` (`>=22`) in `package.json`. Added `.gitattributes` (`eol=lf`)
+- [x] 1.3 `.env.example` in the root, `backend/`, `frontend/`; compose secrets via `${POSTGRES_PASSWORD}` from the root `.env`; rename the DB from `jira` to `flowsync`
+- [x] 1.4 Compose: `docker-compose.yml` (prod) + `docker-compose.override.yml` (dev: bind mounts, `nest start --watch`, the frontend dev server); a `Dockerfile` with `dev`/`build`/`prod` targets; remove the `_prod` suffix from container names
+- [x] 1.5 `frontend/nginx.conf`: an SPA fallback `try_files $uri /index.html` and a `/api/` → `backend:3000` proxy; the frontend calls `/api` (same-origin, no CORS)
+- [x] 1.6 Docker: run as an unprivileged user (`node`, `nginx-unprivileged`); the backend healthcheck is a TCP port check for now (after phase 2 — `/api/health`). The production backend image keeps dev dependencies because startup runs `prisma db push` and the seed; phase 3 will remove this
+- [x] 1.7 ESLint 9 (flat config) + Prettier in the backend; only Prettier in the frontend for now (`react-scripts` is tied to ESLint 8, the flat config is added in 5.7). Scripts `lint`, `format:check`; the old code is formatted, 3 warnings about `any` remain until phase 4
+- [x] 1.8 CI `ci.yml` (PRs and pushes; the backend also runs e2e on a Postgres service; for the CRA build `CI=false` is set because the old code has warnings, remove in 5.x): backend — install, lint, typecheck, test, build, `prisma validate`; frontend — lint, test, build; `docker build` of both images. A separate `deploy.yml` only for `main` after CI success; tags `:<sha>` + `:latest`; the current major versions of actions as of November 2026 (checkout v7, setup-node v7, buildx v4, login v4, build-push v7); a Buildx cache
 - [x] 1.9 Dependabot (npm, docker, github-actions)
-- [ ] 1.10 Husky + lint-staged (pre-commit: prettier + eslint для змінених файлів) — необов'язково; відкладено: потрібен кореневий `package.json`, а CI уже ловить те саме
-- [x] 1.11 Оновити `README.md`: реальні папки, команди, порти (`5433` для Postgres), змінні середовища
+- [ ] 1.10 Husky + lint-staged (pre-commit: prettier + eslint for changed files) — optional; postponed: it needs a root `package.json`, and CI already catches the same
+- [x] 1.11 Update `README.md`: real folders, commands, ports (`5433` for Postgres), environment variables
 
-**Готово, коли:** `docker compose up --build` запускає прод-подібний стек; `docker compose up` з override дає hot-reload;
-оновлення `/dashboard` у браузері не дає 404; CI зелений на PR.
+**Done when:** `docker compose up --build` starts a production-like stack; `docker compose up` with the override gives hot reload;
+refreshing `/dashboard` in the browser does not give a 404; CI is green on a PR.
 
-### Фаза 2 — Фундамент backend · розмір L
+### Phase 2 — Backend foundation · size L
 
-Гілка `refactor/phase-2-backend-foundation`. Закриває B8, B11, B12. **Статус: виконано 2026-11-16** (не закомічено).
+Branch `refactor/phase-2-backend-foundation`. Closes B8, B11, B12. **Status: done 2026-11-16** (not committed).
 
-- [x] 2.1 Оновити Nest послідовно по одній major-версії (10 → 11 → 12) за офіційними migration guide; Prisma — до актуальної 6.x (мінімум 6.2 заради `omit`); перехід на Prisma 7 — окремим кроком за їхнім гайдом. Після кожного кроку: тести зелені
-- [x] 2.2 Реструктуризація каталогів: `conception/` → `common/*`; `prisma.service.ts` → `database/` (глобальний `PrismaModule`); фічі → `modules/*`; видалити власний `ParseIntPipe` на користь вбудованого
-- [x] 2.3 `config/`: zod-схема env (`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGINS`, `PORT`, `NODE_ENV`); застосунок падає на старті при помилці; типізований `AppConfigService`; `SECRET_KEY` → `JWT_SECRET` (оновити `.env.example` і compose)
-- [x] 2.4 `common/`: `@CurrentUser()`, `@Public()`, `@Roles()`, глобальний `JwtAuthGuard` (APP_GUARD) і `RolesGuard`; `AllExceptionsFilter` з єдиним форматом помилок; `PrismaExceptionFilter` (P2002 → 409, P2025 → 404, P2003 → 409); `PaginationQueryDto` і `paginate()`
-- [x] 2.5 Swagger на `/api/docs` (не в production) із Nest CLI plugin
-- [x] 2.6 `helmet`, `@nestjs/throttler` (жорсткіше для `/auth/*`), `enableShutdownHooks()`, `/api/health` (`@nestjs/terminus`), логування через `nestjs-pino` (JSON)
-- [x] 2.7 TypeScript: одразу повний `strict: true` (у TS 6 він увімкнений за замовчуванням); виправити помилки
-- [x] 2.8 Тестова інфраструктура: окрема БД для e2e (сервіс у compose під profile `test`), helper очищення БД, `jest-mock-extended` для unit-тестів сервісів
+- [x] 2.1 Upgrade Nest one major version at a time (10 → 11 → 12) following the official migration guides; Prisma — to the current 6.x (at least 6.2 for `omit`); the move to Prisma 7 is a separate step following their guide. After every step: tests green
+- [x] 2.2 Directory restructuring: `conception/` → `common/*`; `prisma.service.ts` → `database/` (a global `PrismaModule`); features → `modules/*`; delete the custom `ParseIntPipe` in favor of the built-in one
+- [x] 2.3 `config/`: a zod env schema (`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CORS_ORIGINS`, `PORT`, `NODE_ENV`); the app fails at startup on an error; a typed `AppConfigService`; `SECRET_KEY` → `JWT_SECRET` (update `.env.example` and compose)
+- [x] 2.4 `common/`: `@CurrentUser()`, `@Public()`, `@Roles()`, a global `JwtAuthGuard` (APP_GUARD) and `RolesGuard`; `AllExceptionsFilter` with a single error format; `PrismaExceptionFilter` (P2002 → 409, P2025 → 404, P2003 → 409); `PaginationQueryDto` and `paginate()`
+- [x] 2.5 Swagger at `/api/docs` (not in production) with the Nest CLI plugin
+- [x] 2.6 `helmet`, `@nestjs/throttler` (stricter for `/auth/*`), `enableShutdownHooks()`, `/api/health` (`@nestjs/terminus`), logging via `nestjs-pino` (JSON)
+- [x] 2.7 TypeScript: full `strict: true` right away (enabled by default in TS 6); fix the errors
+- [x] 2.8 Test infrastructure: a separate DB for e2e (a service in compose under the `test` profile), a DB cleanup helper, `jest-mock-extended` for service unit tests
 
-**Готово, коли:** застосунок не стартує з некоректним env; `GET /api/health` → 200; Swagger відкривається;
-помилки Prisma повертають осмислені коди; `npm run lint && npm test && npm run test:e2e` зелені.
+**Done when:** the app does not start with an invalid env; `GET /api/health` → 200; Swagger opens;
+Prisma errors return meaningful codes; `npm run lint && npm test && npm run test:e2e` are green.
 
-**Що вийшло інакше, ніж планувалось:**
-- Nest 10 → 11 → 12 пройдено двома кроками з тестами між ними. `@nestjs/schematics@12` вимагає **TypeScript ≥ 6**, тож TS піднято до 6.0 (D20); TS 6 змінив дефолти (`strict`, `types`, `rootDir`, `baseUrl`), конфіги відкориговано.
-- Пакети Nest 12 — ESM (`import.meta`), **Jest їх не завантажує**, тож backend-тести переведено на **Vitest + SWC** (D16); `jest`, `ts-jest`, `ts-node` прибрано, seed запускається через `tsx`.
-- `@eslint/js` закріплено на 9.x (10.x вимагає ESLint 10): це була прихована помилка фази 1.
-- `JwtStrategy` читає користувача з БД на кожен запит (потрібна роль для `RolesGuard` і відсікання токенів видалених користувачів). Ролі поки рядки таблиці `role` (`common/types/role.type.ts`), у фазі 3 стануть enum.
-- Помилка `path` у тілі 404 виправлена через `originalUrl` (знайдено e2e-тестом).
-- Rate limit у `NODE_ENV=test` вимкнений; його поведінку перевірено вручну (5 спроб/хв, підміна `X-Forwarded-For` не обходить ліміт).
-- Не зроблено в межах фази: `pino` request id (`nestjs-cls`) і Sentry (фаза 7), міграція на Prisma 7.
+**What turned out differently than planned:**
+- Nest 10 → 11 → 12 was done in two steps with tests in between. `@nestjs/schematics@12` requires **TypeScript ≥ 6**, so TS was raised to 6.0 (D20); TS 6 changed defaults (`strict`, `types`, `rootDir`, `baseUrl`), and the configs were adjusted.
+- Nest 12 packages are ESM (`import.meta`), **Jest cannot load them**, so the backend tests were moved to **Vitest + SWC** (D16); `jest`, `ts-jest`, `ts-node` were removed, and the seed runs through `tsx`.
+- `@eslint/js` was pinned to 9.x (10.x requires ESLint 10): this was a hidden phase 1 bug.
+- `JwtStrategy` reads the user from the DB on every request (the role is needed for `RolesGuard` and to reject tokens of deleted users). Roles are still rows of the `role` table (`common/types/role.type.ts`), and become an enum in phase 3.
+- The `path` error in the 404 body was fixed via `originalUrl` (found by an e2e test).
+- The rate limit is disabled in `NODE_ENV=test`; its behavior was verified manually (5 attempts/min, spoofing `X-Forwarded-For` does not bypass the limit).
+- Not done within the phase: a `pino` request id (`nestjs-cls`) and Sentry (phase 7), the migration to Prisma 7.
 
-### Фаза 3 — Модель даних і міграції · розмір M
+### Phase 3 — Data model and migrations · size M
 
-Закриває B9, B10. **Статус: виконано 2026-11-16** (не закомічено). **Фази 3 і 4 ведемо в одній гілці** `refactor/phase-3-4-domain` (перейменування полів ламає сервіси), але окремими комітами.
+Closes B9, B10. **Status: done 2026-11-16** (not committed). **Phases 3 and 4 are done in one branch** `refactor/phase-3-4-domain` (renaming fields breaks services), but in separate commits.
 
-- [x] 3.1 Переписати `schema.prisma`: моделі PascalCase з `@@map("snake_case_plural")`, поля camelCase з `@map`; `createdAt`/`updatedAt`; `enum Role` (D3), `enum TaskStatus` (`TODO`, `IN_PROGRESS`, `DONE`); один неявний m:n між `Task` і `Tag` (видалити `task_tags`); призначення виконавців — `TaskAssignee` із складеним ключем; `ProjectMember` (доступ до проєкту); індекси на всіх FK; політики `onDelete`; `description`/`image` необов'язкові
-- [x] 3.2 `prisma migrate dev --name init`; закомітити `prisma/migrations` (дані тестові, тому міграція даних не потрібна)
-- [x] 3.3 Compose: `prisma migrate deploy` замість `db push` (крок у команді запуску; `prisma` CLI переміщено в `dependencies`, прод-образ збирається без dev-залежностей)
-- [x] 3.4 `prisma/seed.ts`: демо-дані (admin, user, проєкт, кілька задач) — ідемпотентно, лише dev
+- [x] 3.1 Rewrite `schema.prisma`: PascalCase models with `@@map("snake_case_plural")`, camelCase fields with `@map`; `createdAt`/`updatedAt`; `enum Role` (D3), `enum TaskStatus` (`TODO`, `IN_PROGRESS`, `DONE`); a single implicit m:n between `Task` and `Tag` (remove `task_tags`); assignees — `TaskAssignee` with a composite key; `ProjectMember` (project access); indexes on all FKs; `onDelete` policies; `description`/`image` optional
+- [x] 3.2 `prisma migrate dev --name init`; commit `prisma/migrations` (the data is test data, so no data migration is needed)
+- [x] 3.3 Compose: `prisma migrate deploy` instead of `db push` (a step in the start command; the `prisma` CLI moved to `dependencies`, the production image is built without dev dependencies)
+- [x] 3.4 `prisma/seed.ts`: demo data (admin, user, project, a few tasks) — idempotent, dev only
 
-**Готово, коли:** `prisma migrate reset` + seed відпрацьовують на чистій БД; `prisma validate` проходить; CI запускає міграції на тестовій БД.
+**Done when:** `prisma migrate reset` + seed work on a clean DB; `prisma validate` passes; CI runs migrations on a test DB.
 
-**Що вийшло інакше, ніж планувалось:**
-- Нова схема несумісна зі старими таблицями, а `migrate dev` на БД, створеній `db push`, пропонує `reset`. Щоб нічого не втратити, старий `flowsync` лише **перейменовано** у `flowsync_backup_phase2` (там 2 тестові користувачі), а міграції застосовано до нової порожньої `flowsync`. Резервну БД можна видалити: `DROP DATABASE flowsync_backup_phase2;`.
-- Доступ до проєкту: власник = `Project.ownerId`, інші учасники — `ProjectMember` (власник не дублюється). Теги належать проєкту (`@@unique([projectId, name])`). `onDelete`: власник проєкту `Restrict`, автор задачі/коментаря `SetNull`, дочірні сутності `Cascade`.
-- Контракт API змінився: поля запитів і відповідей тепер camelCase (`projectId`, `taskId`, `createdById`, `authorId`, відповідь користувача: `role: "USER"` замість `role_id`, `createdAt`). `/auth/login` і `/auth/validate-token` не змінювались.
-- Роль як `enum` прибрала таблицю `role` і seed ролей; реєстрація більше не залежить від даних у БД.
-- Додано перевірку в CI: `prisma migrate diff ... --exit-code` падає, якщо `schema.prisma` змінили без міграції (перевірено позитивно й негативно).
-- e2e-тести тепер застосовують міграції (`migrate deploy`) замість `db push`, тож самі перевіряють коректність міграцій.
-- Не зроблено: `package.json#prisma` (конфіг seed) у Prisma 7 застаріває, тоді потрібен `prisma.config.ts`; це частина окремого кроку міграції на Prisma 7.
+**What turned out differently than planned:**
+- The new schema is incompatible with the old tables, and `migrate dev` on a DB created by `db push` proposes a `reset`. To lose nothing, the old `flowsync` was only **renamed** to `flowsync_backup_phase2` (it has 2 test users), and the migrations were applied to a new empty `flowsync`. The backup DB can be deleted: `DROP DATABASE flowsync_backup_phase2;`.
+- Project access: the owner = `Project.ownerId`, other members are `ProjectMember` (the owner is not duplicated). Tags belong to a project (`@@unique([projectId, name])`). `onDelete`: the project owner `Restrict`, the author of a task/comment `SetNull`, child entities `Cascade`.
+- The API contract changed: request and response fields are now camelCase (`projectId`, `taskId`, `createdById`, `authorId`, the user response: `role: "USER"` instead of `role_id`, `createdAt`). `/auth/login` and `/auth/validate-token` did not change.
+- The role as an `enum` removed the `role` table and role seeding; registration no longer depends on data in the DB.
+- A CI check was added: `prisma migrate diff ... --exit-code` fails if `schema.prisma` was changed without a migration (verified positively and negatively).
+- The e2e tests now apply migrations (`migrate deploy`) instead of `db push`, so they verify the migrations' correctness themselves.
+- Not done: `package.json#prisma` (the seed config) is deprecated in Prisma 7, which then needs a `prisma.config.ts`; this is part of the separate Prisma 7 migration step.
 
-### Фаза 4 — Модулі backend · розмір L · **виконано 2026-11-16** (не закомічено)
+### Phase 4 — Backend modules · size L · **done 2026-11-16** (not committed)
 
-Порядок: **auth → users → projects → tasks → comments → tags**. У кожному модулі виконати чекліст:
-DTO (`Create`/`Update`/`Response`/`Query`), тонкий контролер, сервіс із перевіркою доступу, Swagger-декоратори,
-unit-тести сервісу, e2e (401 / 400 / 404 / успіх), видалення старого коду.
+Order: **auth → users → projects → tasks → comments → tags**. In each module complete the checklist:
+DTOs (`Create`/`Update`/`Response`/`Query`), a thin controller, a service with an access check, Swagger decorators,
+service unit tests, e2e (401 / 400 / 404 / success), removal of old code.
 
-- [x] 4.1 **auth:** `POST /auth/register` (роль завжди `USER`), `POST /auth/login`, `GET /auth/me`; `bcrypt`-cost з конфігурації; троттлінг логіну; `validate-token` лишається як deprecated до фази 6
-- [x] 4.2 **users:** `GET/PATCH /users/me`; адмінський `GET /users` (`@Roles('ADMIN')`)
-- [x] 4.3 **projects:** CRUD; список лише проєктів, де користувач — учасник; власник керує учасниками
-- [x] 4.4 **tasks:** `GET/POST /projects/:projectId/tasks`, `GET/PATCH/DELETE /tasks/:id`; фільтри (статус, виконавець, тег), пагінація, сортування; призначення виконавців
-- [x] 4.5 **comments:** список/створення у задачі; редагування й видалення лише автором
-- [x] 4.6 **tags:** CRUD у межах проєкту
-- [x] 4.7 Поріг покриття сервісів тестами ≥ 70% (`strict: true` уже ввімкнено у фазі 2)
-- [x] 4.8 Експортувати `openapi.json` скриптом `npm run openapi:export`
+- [x] 4.1 **auth:** `POST /auth/register` (the role is always `USER`), `POST /auth/login`, `GET /auth/me`; a `bcrypt` cost from the config; login throttling; `validate-token` stays as deprecated until phase 6
+- [x] 4.2 **users:** `GET/PATCH /users/me`; an admin `GET /users` (`@Roles('ADMIN')`)
+- [x] 4.3 **projects:** CRUD; the list contains only projects where the user is a member; the owner manages members
+- [x] 4.4 **tasks:** `GET/POST /projects/:projectId/tasks`, `GET/PATCH/DELETE /tasks/:id`; filters (status, assignee, tag), pagination, sorting; assigning assignees
+- [x] 4.5 **comments:** list/create in a task; editing and deleting only by the author
+- [x] 4.6 **tags:** CRUD within a project
+- [x] 4.7 Service test coverage threshold ≥ 70% (`strict: true` was already enabled in phase 2)
+- [x] 4.8 Export `openapi.json` with the `npm run openapi:export` script
 
-**Готово, коли:** немає жодного ендпоїнта без guard (крім `@Public()`); жодна відповідь не містить `password`; у коді немає `any`; усі e2e зелені.
+**Done when:** there is no endpoint without a guard (except `@Public()`); no response contains `password`; there is no `any` in the code; all e2e tests are green.
 
-**Що вийшло інакше або додатково:**
-- Реалізовано 30 ендпоїнтів (список у README). Реєстрація переїхала на `POST /auth/register`; `POST /users` видалено (фронтенд його не викликав). `POST /tasks` і `POST /comments` замінені вкладеними маршрутами. `/auth/login` (поле `access_token`) і `/auth/validate-token` не змінені до фази 6.
-- Модель доступу (D24): проєкт бачать власник і учасники, стороннім він «не існує» (404); учасник без права отримує 403. Роль ADMIN дає лише `GET /users`, але не доступ до чужих проєктів.
-- Права: учасники створюють і редагують задачі, коментарі й теги; проєкт, склад і видалення тегів — лише власник; задачу видаляє автор або власник; коментар редагує лише автор, видаляє автор або власник (модерація).
-- `PATCH /tasks/:id`: `assigneeIds` і `tagIds`, якщо передані, замінюють поточні набори (порожній масив очищає); виконавці мають бути учасниками проєкту, теги — з того ж проєкту (інакше 400).
-- `GET /tasks` — задачі всіх доступних проєктів із тими ж фільтрами, що й вкладений `GET /projects/:id/tasks`.
-- Гігієна вводу: `@Trim()`, `@NormalizeEmail()` (email регістронезалежний, дубль → 409), пароль ≤ 72 символів (ліміт bcrypt), `BCRYPT_ROUNDS` у конфігу.
-- `openapi.json` експортується без БД (режим Nest `preview`) і перевіряється в CI; це основа для типізованого клієнта у фазі 7. У CI також увімкнено поріг покриття сервісів.
-- Тести: 101 unit (поріг покриття сервісів 70% проходить) і 117 e2e (матриця «власник / учасник / сторонній / без токена»). Перевірка мутацією: вимкнення перевірки власника ламає 3 unit і 3 e2e тести.
-- Не зроблено: refresh-токени (фаза 7), ролі учасників проєкту вище `OWNER`/`MEMBER`, пошук користувачів для запрошення, м'яке видалення.
+**What turned out differently or additionally:**
+- 30 endpoints were implemented (the list is in the README). Registration moved to `POST /auth/register`; `POST /users` was removed (the frontend did not call it). `POST /tasks` and `POST /comments` were replaced by nested routes. `/auth/login` (the `access_token` field) and `/auth/validate-token` are unchanged until phase 6.
+- The access model (D24): a project is visible to its owner and members, to outsiders it "does not exist" (404); a member without the right gets 403. The ADMIN role only gives `GET /users`, not access to other people's projects.
+- Permissions: members create and edit tasks, comments and tags; the project, its membership and tag deletion — only the owner; a task is deleted by its author or the owner; a comment is edited only by its author and deleted by the author or the owner (moderation).
+- `PATCH /tasks/:id`: `assigneeIds` and `tagIds`, if passed, replace the current sets (an empty array clears); assignees must be project members, tags must be from the same project (otherwise 400).
+- `GET /tasks` — tasks of all accessible projects with the same filters as the nested `GET /projects/:id/tasks`.
+- Input hygiene: `@Trim()`, `@NormalizeEmail()` (email is case-insensitive, a duplicate → 409), password ≤ 72 characters (the bcrypt limit), `BCRYPT_ROUNDS` in the config.
+- `openapi.json` is exported without a DB (Nest `preview` mode) and checked in CI; this is the basis for the typed client in phase 7. The service coverage threshold was also enabled in CI.
+- Tests: 101 unit (the 70% service coverage threshold passes) and 117 e2e (the "owner / member / outsider / no token" matrix). Mutation check: disabling the owner check breaks 3 unit and 3 e2e tests.
+- Not done: refresh tokens (phase 7), project member roles above `OWNER`/`MEMBER`, user search for invitations, soft delete.
 
-### Фаза 5 — Фундамент frontend · розмір L
+### Phase 5 — Frontend foundation · size L
 
-Гілка `refactor/phase-5-frontend-foundation`. Закриває F1, F2.
+Branch `refactor/phase-5-frontend-foundation`. Closes F1, F2.
 
-- [x] 5.1 Новий проєкт Vite + React 19 + TypeScript (strict) замість CRA; перенесено лише логотип; видалено `react-scripts`, `jquery`, `react-bootstrap*`, `react-helmet`, `web-vitals`
-- [x] 5.2 Створити структуру з розділу 4, alias `@/`
-- [x] 5.3 Tailwind CSS 4 + shadcn/ui; базові компоненти (Button, Input, Label, Card, Dialog, Field замість Form)
-- [x] 5.4 `config/env.ts` (zod над `import.meta.env`), `VITE_API_URL=/api`; dev-proxy Vite `/api` → backend
-- [x] 5.5 `lib/api-client.ts` (axios: baseURL, Authorization з `auth-storage`, 401 → вихід), `lib/query-client.ts`
-- [x] 5.6 `app/router.tsx` на `react-router` v8: lazy-маршрути, захищена гілка, error boundary, 404
-- [x] 5.7 ESLint (typescript-eslint, react-hooks, jsx-a11y) + правило `no-restricted-imports` для меж між фічами; Prettier
-- [x] 5.8 Vitest + Testing Library + MSW; `test-utils.tsx` з провайдерами
-- [x] 5.9 Dockerfile (збірка → nginx) і dev-режим у compose; CI frontend: format, lint, typecheck, test, build (без `CI=false`)
+- [x] 5.1 A new Vite + React 19 + TypeScript (strict) project instead of CRA; only the logo was carried over; removed `react-scripts`, `jquery`, `react-bootstrap*`, `react-helmet`, `web-vitals`
+- [x] 5.2 Create the structure from section 4, the `@/` alias
+- [x] 5.3 Tailwind CSS 4 + shadcn/ui; base components (Button, Input, Label, Card, Dialog, Field instead of Form)
+- [x] 5.4 `config/env.ts` (zod over `import.meta.env`), `VITE_API_URL=/api`; a Vite dev proxy `/api` → backend
+- [x] 5.5 `lib/api-client.ts` (axios: baseURL, Authorization from `auth-storage`, 401 → sign out), `lib/query-client.ts`
+- [x] 5.6 `app/router.tsx` on `react-router` v8: lazy routes, a protected branch, an error boundary, 404
+- [x] 5.7 ESLint (typescript-eslint, react-hooks, jsx-a11y) + a `no-restricted-imports` rule for boundaries between features; Prettier
+- [x] 5.8 Vitest + Testing Library + MSW; `test-utils.tsx` with providers
+- [x] 5.9 A Dockerfile (build → nginx) and a dev mode in compose; frontend CI: format, lint, typecheck, test, build (without `CI=false`)
 
-**Готово, коли:** `npm run dev` (і в compose) дає HMR; `npm run build`, `lint`, `test` зелені; сторінка логіну працює через проксі.
+**Done when:** `npm run dev` (and in compose) gives HMR; `npm run build`, `lint`, `test` are green; the login page works through the proxy.
 
-### Фаза 6 — Фічі frontend · розмір L
+### Phase 6 — Frontend features · size L
 
-Порядок: **auth → каркас (layout, навігація) → projects → tasks → comments**. Для кожної фічі:
-`api/` (функції запитів, query keys, хуки), `components/`, `types/`, тести, нуль імпортів з інших фіч.
+Order: **auth → shell (layout, navigation) → projects → tasks → comments**. For each feature:
+`api/` (request functions, query keys, hooks), `components/`, `types/`, tests, zero imports from other features.
 
-- [x] 6.1 **auth:** `useLogin`, `useRegister` (форма реєстрації й автовхід), `useMe` (`GET /auth/me` замість `validate-token`), єдиний модуль `lib/auth-storage.ts`, `ProtectedRoute` на базі `useMe`
-- [x] 6.2 Layout: шапка, навігація, обробка завантаження/помилок/порожнього стану
-- [x] 6.3 **projects:** список, створення, редагування, видалення
-- [x] 6.4 **tasks:** список із фільтрами в URL, створення/редагування (Dialog + форма), зміна статусу, призначення; за бажанням — канбан
-- [x] 6.5 **comments:** потік коментарів у задачі
-- [x] 6.6 Видалити старий код CRA (`Login.js`, `ProtectedRoute.js`, `AuthForm*.js` тощо) і `validate-token` у backend
+- [x] 6.1 **auth:** `useLogin`, `useRegister` (a registration form and auto sign-in), `useMe` (`GET /auth/me` instead of `validate-token`), a single `lib/auth-storage.ts` module, a `ProtectedRoute` based on `useMe`
+- [x] 6.2 Layout: a header, navigation, handling of loading/error/empty states
+- [x] 6.3 **projects:** list, create, edit, delete
+- [x] 6.4 **tasks:** a list with filters in the URL, create/edit (Dialog + form), status change, assignment; optionally a kanban
+- [x] 6.5 **comments:** a comment stream in a task
+- [x] 6.6 Delete the old CRA code (`Login.js`, `ProtectedRoute.js`, `AuthForm*.js`, etc.) and `validate-token` in the backend
 
-**Готово, коли:** користувач проходить шлях логін → проєкт → задача → коментар у UI; тести фіч зелені; старих `.js`-файлів немає.
+**Done when:** a user goes through sign in → project → task → comment in the UI; the feature tests are green; there are no old `.js` files.
 
-### Фаза 7 — Контракт, якість, безпека · розмір M–L
+### Phase 7 — Contract, quality, security · size M–L
 
-- [x] 7.1 Генерація TS-типів із `openapi.json` (`openapi-typescript`); CI перевіряє актуальність згенерованого (`npm run api:types`)
-- [x] 7.2 Посилення авторизації: короткий access-токен (15 хв) у пам'яті + refresh-токен в `httpOnly` cookie з ротацією й відкликанням (`RefreshToken` у БД)
-- [x] 7.3 Playwright e2e (реєстрація → проєкт → задача → коментар → перезавантаження → вихід) у CI поверх compose
-- [x] 7.4 Спостережуваність: request id (`X-Request-Id`, у логах і тілі помилки; без `nestjs-cls`, див. D27), структуровані логи (pino); Sentry не додавався
-- [x] 7.5 Безпека: CSP та заголовки в nginx, `npm audit` у CI, перевірка залежностей Dependabot
-- [x] 7.6 Доступність: `axe` у тестах ключових сторінок
+- [x] 7.1 Generate TS types from `openapi.json` (`openapi-typescript`); CI checks that the generated output is current (`npm run api:types`)
+- [x] 7.2 Stronger authorization: a short access token (15 min) in memory + a refresh token in an `httpOnly` cookie with rotation and revocation (`RefreshToken` in the DB)
+- [x] 7.3 Playwright e2e (registration → project → task → comment → reload → sign out) in CI on top of compose
+- [x] 7.4 Observability: a request id (`X-Request-Id`, in logs and the error body; without `nestjs-cls`, see D27), structured logs (pino); Sentry was not added
+- [x] 7.5 Security: CSP and headers in nginx, `npm audit` in CI, dependency checks by Dependabot
+- [x] 7.6 Accessibility: `axe` in tests of key pages
 
-### Фаза 8 — Беклог (за бажанням, без порядку)
+### Phase 8 — Backlog (optional, in no particular order)
 
-- [x] 8.1 drag-and-drop канбан (`@dnd-kit/core`): перемикач «Список / Дошка», зміна статусу перетягуванням (оптимістично), запасний шлях — вибір статусу на картці
-- [x] 8.2 повнотекстовий пошук (PostgreSQL FTS: назва, опис, коментарі; префікси; сортування за релевантністю)
-- [x] 8.3 CASL для тонких прав (`common/casl/app-ability.ts`)
-- [x] 8.4 журнал аудиту й доменні події (`GET /projects/:id/activity`; події — основа для 8.5, 8.6 і «use-case класів»)
-- [x] 8.5 черга й сповіщення: BullMQ + Redis, сповіщення в застосунку, листи через nodemailer; без налаштованої пошти й без Redis усе працює (заглушки в `.env.example`)
-- [x] 8.6 синхронізація в реальному часі (Nest gateway + socket.io)
+- [x] 8.1 a drag-and-drop kanban (`@dnd-kit/core`): a "List / Board" switch, status change by dragging (optimistic), a fallback — choosing the status on the card
+- [x] 8.2 full-text search (PostgreSQL FTS: title, description, comments; prefixes; relevance sorting)
+- [x] 8.3 CASL for fine-grained permissions (`common/casl/app-ability.ts`)
+- [x] 8.4 an audit log and domain events (`GET /projects/:id/activity`; events are the basis for 8.5, 8.6 and "use-case classes")
+- [x] 8.5 a queue and notifications: BullMQ + Redis, in-app notifications, emails via nodemailer; without configured mail and without Redis everything works (stubs in `.env.example`)
+- [x] 8.6 real-time synchronization (a Nest gateway + socket.io)
 - [x] 8.7 i18n (uk/en)
-- [x] 8.8 завантаження файлів (зображення проєкту, S3-сумісне сховище)
-- [ ] 8.9 деплой на VPS (Caddy/Traefik): **не робилось за вказівкою власника**
-- [x] 8.10 use-case класи: окремо не створювались; складні сценарії розв'язано доменними подіями (8.4), без абстракцій «про запас»
+- [x] 8.8 file uploads (a project image, S3-compatible storage)
+- [ ] 8.9 deploy to a VPS (Caddy/Traefik): **not done at the owner's instruction**
+- [x] 8.10 use-case classes: not created separately; complex scenarios are solved with domain events (8.4), with no "just in case" abstractions
 
-### Фаза 9 — Редизайн frontend «Aurora» (D34) · розмір L · **виконано 2026-11-17** (не закомічено)
+### Phase 9 — "Aurora" frontend redesign (D34) · size L · **done 2026-11-17** (not committed)
 
-Лише frontend: API, схема БД і контракт не змінюються. Нові тексти — одразу в `uk.ts`; кожен пункт закінчується зеленими lint/typecheck/тестами й перевіркою в браузері.
+Frontend only: the API, DB schema and contract do not change. New texts go into `uk.ts` right away; each item ends with green lint/typecheck/tests and a check in the browser.
 
-- [x] 9.1 токени теми (oklch), Manrope, тіні й радіуси; темна тема й перемикач у шапці (`public/theme-init.js` проти мигтіння)
-- [x] 9.2 базові компоненти (Button, Input, Card, Badge, Select) і нові Avatar, StatusIcon, Skeleton, кольори тегів і проєктів із назви
-- [x] 9.3 логін і реєстрація: split-screen із живою мініатюрою дошки (картка «пливе» зі To do в Done)
-- [x] 9.4 шапка (липка, прозора) і список проєктів
-- [x] 9.5 сторінка проєкту: шапка, вкладки статусів із лічильниками, список, дошка, права колонка (учасники, теги), стрічка активності
-- [x] 9.6 сторінка задачі, сповіщення, діалоги, порожні стани й скелетони
-- [x] 9.7 тести (оновити, додати для нового), переклади, axe, перевірка в браузері (світла й темна, мобільна ширина)
+- [x] 9.1 theme tokens (oklch), Manrope, shadows and radii; a dark theme and a switcher in the header (`public/theme-init.js` against flicker)
+- [x] 9.2 base components (Button, Input, Card, Badge, Select) and new Avatar, StatusIcon, Skeleton, tag and project colors derived from the name
+- [x] 9.3 sign in and registration: a split screen with a live mini board (a card "floats" from To do to Done)
+- [x] 9.4 the header (sticky, translucent) and the project list
+- [x] 9.5 the project page: a header, status tabs with counters, a list, a board, a right column (members, tags), an activity feed
+- [x] 9.6 the task page, notifications, dialogs, empty states and skeletons
+- [x] 9.7 tests (update, add for the new), translations, axe, a browser check (light and dark, mobile width)
 
-### Фаза 10 — Прод-готовність (локальна частина) · розмір M · **виконано 2026-11-17**, крім VPS (не закомічено)
+### Phase 10 — Production readiness (the local part) · size M · **done 2026-11-17**, except the VPS (not committed)
 
-Деплой на VPS не робиться, доки власник не скаже (8.9). Усе, що можна зробити й перевірити локально, готове; опис — `docs/OPERATIONS.md`.
+The deploy to a VPS is not done until the owner says so (8.9). Everything that can be done and verified locally is ready; the description is in `docs/OPERATIONS.md`.
 
-- [x] 10.1 `GET /api/health/live` і `/api/health/ready` (БД + Redis, якщо задано `REDIS_URL`), `/api/health` лишається readiness
-- [x] 10.2 `ops/backup.sh` (дамп + лічильники, повтор при змінах під час дампу, ротація) і `ops/restore-verify.sh` (відновлення в тимчасову БД, звірка рядків і міграцій)
-- [x] 10.3 `ops/smoke-test.sh` (health, SPA-fallback, 401, Swagger вимкнений, заголовки безпеки)
-- [x] 10.4 `docker-compose.vps.yml` + `ops/Caddyfile` (HTTPS, health-aware проксі), `ops/deploy.sh` з бекапом і автовідкатом, ручний workflow `deploy-prod.yml`
-- [ ] 10.5 (лише на VPS, коли скаже власник) налаштувати сервер, секрети GitHub, cron бекапів, перший деплой, перевірити відкат на живому сервері
-- [ ] 10.6 (лише на VPS) копіювати бекапи поза сервер
+- [x] 10.1 `GET /api/health/live` and `/api/health/ready` (DB + Redis if `REDIS_URL` is set), `/api/health` remains the readiness check
+- [x] 10.2 `ops/backup.sh` (a dump + counts, a retry on changes during the dump, rotation) and `ops/restore-verify.sh` (a restore into a temporary DB, a check of rows and migrations)
+- [x] 10.3 `ops/smoke-test.sh` (health, SPA fallback, 401, Swagger disabled, security headers)
+- [x] 10.4 `docker-compose.vps.yml` + `ops/Caddyfile` (HTTPS, a health-aware proxy), `ops/deploy.sh` with a backup and automatic rollback, a manual `deploy-prod.yml` workflow
+- [ ] 10.5 (VPS only, when the owner says so) set up the server, GitHub secrets, backup cron, the first deploy, verify the rollback on a live server
+- [ ] 10.6 (VPS only) copy backups off the server
 
-### Фаза 11 — Спостережуваність · розмір M · **виконано 2026-11-17**, крім джерельних карт Sentry (не закомічено)
+### Phase 11 — Observability · size M · **done 2026-11-17**, except Sentry source maps (not committed)
 
-- [x] 11.1 OpenTelemetry: трейси HTTP → Prisma → BullMQ → WebSocket в одному trace (Jaeger у dev)
-- [x] 11.2 `/metrics` (Prometheus): latency, помилки, глибина черги, кількість сокетів; дашборд Grafana в dev-compose
-- [x] 11.3 Sentry (frontend і backend). Джерельні карти (source maps) **не робились**: потрібен акаунт і auth-токен Sentry
-- [ ] 11.5 (з VPS) доставка алертів: Alertmanager або Grafana alerting, Sentry-проєкт, source maps
-- [x] 11.4 `docs/SLO.md`: 3 SLO й алерти на них (`ops/observability/alerts.yml`, перевірено `promtool`)
+- [x] 11.1 OpenTelemetry: traces HTTP → Prisma → BullMQ → WebSocket in one trace (Jaeger in dev)
+- [x] 11.2 `/metrics` (Prometheus): latency, errors, queue depth, number of sockets; a Grafana dashboard in the dev compose
+- [x] 11.3 Sentry (frontend and backend). Source maps were **not done**: they need a Sentry account and an auth token
+- [ ] 11.5 (from the VPS) alert delivery: Alertmanager or Grafana alerting, a Sentry project, source maps
+- [x] 11.4 `docs/SLO.md`: 3 SLOs and alerts for them (`ops/observability/alerts.yml`, verified with `promtool`)
 
-### Фаза 12 — Надійність подій і конкурентність · розмір L · **виконано 2026-11-17** (не закомічено)
+### Phase 12 — Event reliability and concurrency · size L · **done 2026-11-17** (not committed)
 
-- [x] 12.1 Transactional outbox: подія пишеться в БД у тій самій транзакції, воркер публікує (зараз події в пам'яті й губляться при падінні)
-- [x] 12.2 Ідемпотентні споживачі, retry з backoff, dead-letter черга
-- [x] 12.3 Optimistic concurrency для задач (`version`, `409 Conflict`, UI показує конфлікт)
-- [x] 12.4 Redis-адаптер Socket.IO (кілька інстансів API)
-- [x] 12.5 Cursor-пагінація для активності й коментарів
-- [x] 12.6 Тест падіння між записом і публікацією події
+- [x] 12.1 A transactional outbox: the event is written to the DB in the same transaction, a worker publishes it (events are currently in memory and are lost on a crash)
+- [x] 12.2 Idempotent consumers, retry with backoff, a dead-letter queue
+- [x] 12.3 Optimistic concurrency for tasks (`version`, `409 Conflict`, the UI shows the conflict)
+- [x] 12.4 A Socket.IO Redis adapter (several API instances)
+- [x] 12.5 Cursor pagination for activity and comments
+- [x] 12.6 A test of a crash between the write and the event publish
 
-### Фаза 13 — Безпека другого рівня · розмір M · **виконано 2026-11-17**, крім 2FA (не закомічено)
+### Phase 13 — Second-level security · size M · **done 2026-11-17**, except 2FA (not committed)
 
-- [x] 13.1 Скидання пароля й підтвердження email (на наявній черзі)
-- [x] 13.2 Зміна пароля відкликає refresh-токени й access-токени; блокування акаунта після 5 невдалих входів
-- [ ] 13.2b опційно TOTP 2FA: **не робилось** (потрібні сторінка налаштувань безпеки, бібліотека TOTP, коди відновлення; у UI поки немає й зміни пароля)
-- [x] 13.3 CodeQL, Trivy для образів, secret scanning, SBOM
-- [x] 13.4 Оновлення до Prisma 7 (закрити high-вразливість CLI)
-- [x] 13.5 `docs/THREAT_MODEL.md` (STRIDE, 1 сторінка)
+- [x] 13.1 Password reset and email verification (on the existing queue)
+- [x] 13.2 A password change revokes refresh tokens and access tokens; account lockout after 5 failed sign-ins
+- [ ] 13.2b optional TOTP 2FA: **not done** (it needs a security settings page, a TOTP library, recovery codes; the UI does not yet even have a password change)
+- [x] 13.3 CodeQL, Trivy for images, secret scanning, SBOM
+- [x] 13.4 Upgrade to Prisma 7 (close the high-severity CLI vulnerability)
+- [x] 13.5 `docs/THREAT_MODEL.md` (STRIDE, 1 page)
 
-### Фаза 14 — Якість із цифрами · розмір M · **виконано 2026-11-17** (не закомічено)
+### Phase 14 — Quality in numbers · size M · **done 2026-11-17** (not committed)
 
-- [x] 14.1 Поріг покриття в CI (backend і frontend); mutation testing (Stryker) для 7 ключових файлів, бал 70,1 % → 78,6 %, тижнева джоба `mutation.yml`
-- [x] 14.2 k6 навантажувальний тест, `EXPLAIN ANALYZE` повільних запитів, виправлення N+1; до/після в `docs/`
-- [x] 14.3 Playwright для сокетів і завантаження файлів; візуальні снапшоти обох тем
-- [x] 14.4 Lighthouse CI з бюджетом
-- [x] 14.5 Husky + lint-staged (відкладений 1.10)
+- [x] 14.1 A coverage threshold in CI (backend and frontend); mutation testing (Stryker) for 7 key files, a score of 70.1% → 78.6%, a weekly `mutation.yml` job
+- [x] 14.2 A k6 load test, `EXPLAIN ANALYZE` of slow queries, fixing N+1; before/after in `docs/`
+- [x] 14.3 Playwright for sockets and file upload; visual snapshots of both themes
+- [x] 14.4 Lighthouse CI with a budget
+- [x] 14.5 Husky + lint-staged (the postponed 1.10)
 
-### Фаза 15 — Документація рішень · розмір S · **виконано 2026-11-17** (не закомічено)
+### Phase 15 — Decision documentation · size S · **done 2026-11-17** (not committed)
 
-- [x] 15.1 `docs/adr/`: ADR для D1–D35 («що відкинули і чому»)
-- [x] 15.2 C4-діаграми (контекст, контейнери), runbook «що робити, коли…», `CONTRIBUTING.md`
-- [x] 15.3 release-please: версії й CHANGELOG із Conventional Commits
+- [x] 15.1 `docs/adr/`: ADRs for D1–D35 ("what was rejected and why")
+- [x] 15.2 C4 diagrams (context, containers), a "what to do when…" runbook, `CONTRIBUTING.md`
+- [x] 15.3 release-please: versions and CHANGELOG from Conventional Commits
 
-## 6. Definition of Done (для кожного пункту)
+## 6. Definition of Done (for every item)
 
-1. Код у цільовій структурі й за правилами з `AGENTS.md`.
-2. `npm run lint`, типи (`tsc --noEmit`), тести пройдені в змінених пакетах.
-3. Нова поведінка покрита тестом (backend: unit сервісу + e2e ендпоїнта; frontend: тест компонента/хука).
-4. Docker-стек збирається й запускається (`docker compose up -d --build`), ручна перевірка зміненого сценарію.
-5. Прибрано старий код, який замінено; немає закоментованого коду та `console.log`.
-6. Відмічено `[x]` у цьому плані; рішення, що змінилися, відображені в журналі рішень.
+1. The code is in the target structure and follows the rules in `AGENTS.md`.
+2. `npm run lint`, types (`tsc --noEmit`), tests pass in the changed packages.
+3. The new behavior is covered by a test (backend: a service unit test + an endpoint e2e; frontend: a component/hook test).
+4. The Docker stack builds and starts (`docker compose up -d --build`), with a manual check of the changed scenario.
+5. The old code that was replaced is removed; there is no commented-out code or `console.log`.
+6. `[x]` is ticked in this plan; decisions that changed are reflected in the decision log.
 
-## 7. Ризики
+## 7. Risks
 
-| Ризик | Мітигація |
+| Risk | Mitigation |
 |---|---|
-| Оновлення Nest/Prisma ламає залежності | По одній major-версії, перед кожною — зелені тести та гілка; перевірка peer-залежностей `@nestjs/*` |
-| Перейменування схеми ламає всі сервіси | Фази 3–4 в одній гілці, міграція модуль за модулем; БД містить лише тестові дані |
-| Зміна контракту API (snake_case → camelCase) ламає фронтенд | Стабільні `/auth/login` і `/auth/validate-token` до фази 6; решту UI ще не використовує |
-| Рефакторинг без тестів | Фаза 0.1 і правило «кожен модуль із e2e» |
-| Занадто великий обсяг | Кожну фазу можна зупинити після «Готово, коли»; фаза 8 — лише за бажанням |
+| Upgrading Nest/Prisma breaks dependencies | One major version at a time, green tests and a branch before each; check the `@nestjs/*` peer dependencies |
+| Renaming the schema breaks all services | Phases 3–4 in one branch, a module-by-module migration; the DB holds only test data |
+| An API contract change (snake_case → camelCase) breaks the frontend | A stable `/auth/login` and `/auth/validate-token` until phase 6; the rest is not yet used by the UI |
+| Refactoring without tests | Phase 0.1 and the rule "every module with e2e" |
+| Too large a scope | Each phase can be stopped after its "Done when"; phase 8 is optional |
 
-## 8. Журнал прогресу
+## 8. Progress log
 
-| Дата | Фаза / пункт | Що зроблено | Примітки |
+| Date | Phase / item | What was done | Notes |
 |---|---|---|---|
-| 2026-11-16 | Підготовка | Docker на D:, перехід MySQL → PostgreSQL, seed ролей, `.dockerignore`, цей план | Безпекові дірки B1–B7 були відкриті |
-| 2026-11-16 | Фаза 0 (0.1–0.9) | Закрито B1–B7: немає `password` у відповідях, роль не приймається, `/users/me` замість `/users/:email`, guard і токен-автор у tasks/comments, перевірка доступу, глобальний `ValidationPipe`, один механізм JWT (`AuthGuard('jwt')`), CORS за списком, `JwtModule.registerAsync`. 20 e2e-тестів зелені (`test/e2e/security.e2e-spec.ts`), живі перевірки в Docker | Додано `src/common/` (`@CurrentUser`, `AuthenticatedUser`) і `src/app.setup.ts`. Видалено зламаний шаблонний `test/app.e2e-spec.ts`. `validate-token` лишається до фази 6 |
-| 2026-11-16 | Фаза 1 (1.1–1.9, 1.11) | npm-only і назви пакетів, Node 24, `.env.example` ×3, БД `jira` → `flowsync` (`ALTER DATABASE`, дані збережено), compose dev/прод + `Dockerfile` з цілями `dev`/`build`/`prod`, nginx (SPA-fallback, проксі `/api`, заголовки безпеки), непривілегійовані користувачі, healthcheck-и, ESLint 9 + Prettier, CI (`ci.yml`) і деплой після CI (`deploy.yml`), Dependabot, новий README. Перевірено: lint/typecheck, 20 e2e, dev-режим із hot reload, прод-режим (200 на `/dashboard`, 401 через проксі, порти API/БД закриті) | Не комітилось. Видалено зламаний `App.test.js` (шаблон CRA). У CI frontend-збірка з `CI=false`. 1.10 (Husky) відкладено. Для `deploy.yml` (`workflow_run`) файл має бути в `main` |
-| 2026-11-16 | Фаза 2 (2.1–2.8) | Nest 10 → 11 → 12.5, TypeScript 6.0, Prisma 6.19, Vitest 5 + SWC замість Jest, `tsx` для seed. Структура `config/ database/ common/ health/ modules/`; zod-валідація env (`SECRET_KEY` → `JWT_SECRET`, у production ≥ 32 символів); глобальні `JwtAuthGuard` (`@Public`), `RolesGuard` (`@Roles`), throttler; `AllExceptionsFilter` + `PrismaExceptionFilter` з єдиним тілом помилки; пагінація; Swagger `/api/docs`; `helmet`; `nestjs-pino`; `/api/health` (його ж тепер використовує Docker healthcheck); `strict: true`; окрема тестова БД (`db_test`, профіль `test`). Перевірено: lint/типи/збірка, 42 unit, 26 e2e, dev- і прод-режим у Docker (проксі, 404 на Swagger у prod, rate limit, fail-fast на короткому секреті) | Не комітилось. Потрібно: `JWT_SECRET` ≥ 32 символів для прод-режиму (у локальному `.env` зараз 19). Хостовий Node 22.22.0 нижче вимоги `@nestjs/schematics` (≥ 22.22.3 / 24.15): у Docker і CI Node 24 |
-| 2026-11-16 | Фаза 3 (3.1–3.4) | Нова `schema.prisma`: PascalCase-моделі з `@@map`, `createdAt`/`updatedAt`, `enum Role` і `TaskStatus`, `ProjectMember`, `TaskAssignee` зі складеним ключем, теги проєкту, неявний m:n Task–Tag, індекси на всіх FK, явні `onDelete`. Міграція `init`, `migrate deploy` у Docker, `prisma` CLI в `dependencies` і прод-образ без dev-залежностей, перевірка розбіжності схеми в CI, демо-seed (dev) замість seed ролей. Сервіси, DTO й тести переведені на нову модель. Перевірено: lint/типи, 42 unit, 27 e2e (міграції на свіжій БД), seed двічі, чиста БД, dev і прод у Docker | Не комітилось. Старі дані збережено в `flowsync_backup_phase2`. Контракт API змінився (camelCase). Продовження — фаза 4 у цій самій гілці |
-| 2026-11-16 | Фаза 4 (4.1–4.8) | Модулі auth, users, projects (з учасниками), tasks (фільтри, пагінація, сортування, виконавці, теги), comments, tags; 30 ендпоїнтів, response DTO й Swagger, нормалізація вводу, `BCRYPT_ROUNDS`, поріг покриття сервісів, `npm run openapi:export` + перевірка актуальності в CI. Перевірено: lint/типи/збірка, 101 unit, 117 e2e, мутація, живий сценарій у Docker на демо-даних і на новому потоці | Не комітилось. Контракт API змінився (frontend використовує лише `/auth/login` і `/auth/validate-token`, вони не змінені). Далі — фаза 5 (frontend) |
-| 2026-11-16 | Фаза 5 (5.1–5.9) | Старий CRA видалено; Vite 8 + React 19 + TS strict, Tailwind 4 + shadcn/ui, TanStack Query, react-router 8 (lazy-маршрути, error boundary, 404), `config/env.ts`, `api-client` (Bearer, 401 → вихід), ESLint із межами фіч, Vitest + MSW (47 тестів), Dockerfile (nginx, непривілегійований), dev-режим у compose з HMR, CI frontend із lint/typecheck/test/build. Раніше за план зроблено частину 6.1: `useLogin`, `useMe`, `ProtectedRoute`, `LoginForm`. Перевірено: format, lint, `tsc -b`, тести, `npm run build`, dev (проксі, логін демо-акаунтом у браузері, HMR) і прод (nginx :8080, SPA-fallback, `/api`, логін, користувач nginx) | Не комітилось. Відхилення: shadcn `field` замість `form`, `background.jpg` і PWA-ресурси не переносились, frontend вимагає Node ≥ 22.22 (react-router 8), MSW 3. Dependabot-PR до старого CRA `package.json` стануть неактуальними. Межі фіч не ловлять відносні імпорти (`../../x`) |
-| 2026-11-16 | Фаза 6 (6.1–6.6) | Фічі auth (реєстрація з автовходом), projects (список із пошуком і сторінками в URL, створення/редагування/видалення, учасники), tasks (фільтри, сортування й сторінка в URL, форма з виконавцями й тегами, зміна статусу, теги проєкту), comments (додати, редагувати, видалити з модерацією власника); шапка з навігацією, спільні стани loading/error/empty, діалог підтвердження, пагінація. `validate-token` видалено з backend (код, тести, `openapi.json`). Перевірено: frontend format/lint/typecheck, 104 тести; backend lint/типи, 99 unit, 116 e2e | Не комітилось. Фічі не імпортують одна одну: дані між ними (учасники проєкту → виконавці, лічильники) передає сторінка в `app/routes`. Канбан не робився (за бажанням). Поле `access_token` не перейменовано |
-| 2026-11-16 | Фаза 7 (7.1–7.6) | Типи frontend генеруються з `openapi.json` (CI перевіряє), додано `LoginResponseDto`. Сесія: access-токен 15 хв у пам'яті, refresh-токен в `httpOnly` cookie з ротацією, відкликанням родини при повторному використанні й хешем у БД (міграція `add_refresh_tokens`), `POST /auth/refresh` і `/auth/logout`; frontend відновлює сесію після перезавантаження й оновлює токен на 401 одним спільним запитом. `X-Request-Id` у логах, заголовку й тілі помилки. nginx: CSP, Permissions-Policy, кеш `/assets/` (раніше був застарілий `/static/`), `npm audit` у CI. Playwright e2e (джоба `e2e` у CI), axe у тестах 5 сторінок і 2 діалогів. Перевірено: frontend format/lint/typecheck, 115+ тестів, build; backend lint/типи, 119 unit, 134 e2e; Playwright проти прод-стеку на :8080; сесія, перезавантаження й вихід у браузері (dev) | Не комітилось. Відхилення: без `nestjs-cls` (D27). Відомо: `prisma` CLI 6.x має high-вразливість (виправлення лише в Prisma 7), тому CI блокує лише critical у backend; зміна пароля поки не відкликає refresh-токени; усі користувачі мусять увійти заново (токени в `localStorage` більше не діють) |
-| 2026-11-16 | Фаза 8 (8.1–8.8, 8.10) | Канбан-дошка; повнотекстовий пошук (GIN-індекси, релевантність); CASL; журнал аудиту + доменні події + стрічка активності; сповіщення (дзвінок, API, листи через BullMQ/Redis і nodemailer із заглушками в `.env.example`); real-time (Socket.IO, кімнати за доступом, оновлення кешу, проксі в nginx); i18n uk/en з тестом повноти; зображення проєкту (S3-сумісне сховище, тип за байтами). Міграції `add_fulltext_search`, `add_audit_log`, `add_notifications`. Перевірено: backend lint/типи, 225 unit, 201 e2e (з реальними сокетами); frontend lint/типи, 209 тестів; наживо: лист доходить у Mailpit через BullMQ і повторюється після відновлення пошти, завантаження в S3, оновлення дошки й дзвінка без перезавантаження (dev і прод через nginx), Playwright на прод-стеку | Не комітилось. Відхилення: зображення завантажуються через API, а не presigned URL (D31); без `nestjs-cls`/`@nestjs/bullmq`; MinIO замінено RustFS (образ недоступний). **8.9 (деплой на VPS) не робилось.** Пошук тепер за початком слова (`ELT` не знайде `Delta`). Поле `image` прибрано з API проєкту (замість нього `hasImage`). Кінцеві точки сокета й завантаження не покриті Playwright |
-| 2026-11-17 | Фаза 9 (9.1–9.7) | Редизайн «Aurora»: oklch-токени, світла й темна теми з перемикачем (`public/theme-init.js`), Manrope для заголовків; нові Avatar, StatusIcon, TagChip, SegmentedControl, Skeleton, OptionSelect (shadcn Select замість native); логін і реєстрація — split-screen із живою мініатюрою дошки; липка шапка, картки проєктів із генерованими обкладинками; сторінка проєкту (шапка з прогресом, вкладки статусів із лічильниками, список, дошка, права колонка, стрічка активності як таймлайн); сторінка задачі з панеллю деталей; сповіщення, діалоги, скелетони. Перевірено: format, lint, typecheck, 228 тестів, build; Playwright e2e проти dev-стеку (:5173); у браузері світла й темна теми, ширина телефона | Не комітилось. Бекенд і контракт не змінювались. Додано `@fontsource-variable/manrope`. Прод-подібний стек локально не стартує через короткий `JWT_SECRET` у `.env` (відомо з фази 2), тому e2e на :8080 не запускався. Тести: `asyncUtilTimeout` 5 с і `testTimeout` 15 с проти плаваючих збоїв на холодному старті |
-| 2026-11-17 | Фаза 10 (10.1–10.4) | Liveness/readiness (Redis лише якщо налаштований), `ops/backup.sh` + `restore-verify.sh`, `smoke-test.sh`, `docker-compose.vps.yml` із Caddy, `deploy.sh` з бекапом і автовідкатом, ручний `deploy-prod.yml`, `docs/OPERATIONS.md`. Перевірено: unit/e2e health, бекап і відновлення на dev-БД (12 таблиць, 5 міграцій), негативний тест (підроблений лічильник → провал, тимчасова БД прибирається), `docker compose config` оверлею, `caddy validate`, smoke-тест на dev-стеку | Не комітилось. Не перевірено: `deploy.sh` і відкат на живому сервері, `deploy-prod.yml` у GitHub, smoke-тест на прод-подібному стеку (nginx-заголовки; локально прод-стек не стартує через короткий `JWT_SECRET`). 10.5–10.6 чекають на власника |
-| 2026-11-17 | Фаза 11 (11.1–11.4) | `/api/metrics` (prom-client: тривалість запитів за шаблоном маршруту, черга пошти, сокети, процес), OpenTelemetry-трейси (`config/instrument.ts`), `bullmq-otel`, Sentry у backend (фільтр 5xx) і frontend (`RouteError`), профіль `observability` (Prometheus, Grafana з дашбордом, Jaeger), правила алертів, `docs/SLO.md`, розділ у `docs/OPERATIONS.md`, nginx ховає `/api/metrics`. Логи Prometheus/health більше не засмічують pino. Перевірено: backend lint/типи, 241 unit, e2e метрик і health, frontend lint/типи, тести; наживо: один trace «POST коментаря → Prisma → Socket.IO → BullMQ add/process» у Jaeger, цільовий хост `up` і 5 правил `ok` у Prometheus, дашборд Grafana з реальними даними, `promtool`, Sentry-подія доходить до фейкового приймача, прод-образ nginx (CSP, 404 на `/api/metrics`) | Не комітилось. Нові залежності: backend `prom-client`, `@opentelemetry/*`, `@prisma/instrumentation`, `bullmq-otel`, `@sentry/nestjs`; frontend `@sentry/react`. Не перевірено: реальний Sentry-сервер (лише фейковий приймач), помилка frontend у Sentry, доставка алертів, повторна збірка прод-стека з `JWT_SECRET`. Express-інструментатор не створює span-ів (Express 5/ESM), а Nest-контролерів у трейсі немає: HTTP-span → Prisma працює. `npm audit` не змінював |
-| 2026-11-17 | Фаза 12 (12.1–12.6) | Outbox: `DomainEventsService.transact` (запис + подія в одній транзакції), `OutboxRelayService` (claim `SKIP LOCKED` + lease, backoff, DEAD), ідемпотентні підписники (унікальні `eventId` в аудиті й `(eventId, userId)` у сповіщеннях; підписники більше не ковтають помилки). 16 місць публікації в 4 сервісах переведені. Версії задач (`version`, 409). Redis-адаптер Socket.IO (`RedisIoAdapter`). Cursor-пагінація активності й коментарів (frontend: `useInfiniteQuery`, «Показати більше»). Метрики й алерти outbox. Міграції `add_task_version`, `add_outbox`, `cursor_pagination_indexes`. Перевірено: backend lint/типи, 265 unit, 223 e2e (з Redis): падіння після коміту (до claim і під час доставки + закінчення lease), retry і DEAD, повторна доставка, відкат транзакції, 4 паралельні воркери, 4 паралельні PATCH (1×200, 3×409), два інстанси API з реальними сокетами (і контрольний тест без адаптера), курсор без повторів при нових записах; frontend lint/типи, 234 тести, поріг покриття (`test:cov`), Playwright e2e на dev-стеку, наживо в dev: PATCH з актуальною й застарілою версією (200/409), курсор активності, outbox `DONE` і метрики | Не комітилось. **Ламає API:** `PATCH /tasks/:id` вимагає `version`; `GET …/activity` і `GET …/comments` повертають `{ items, nextCursor }` без `meta`. Нова залежність `@socket.io/redis-adapter`. Не перевірено: навантаження outbox, прод-подібний стек, `RedisIoAdapter` з реальним Redis-кластером/Sentinel. Відомо: `audit_logs` і `notifications` мають nullable `event_id` (старі рядки без нього); конфлікт у формі редагування не пропонує злиття, лише показує помилку й оновлює дані |
-| 2026-11-17 | Фаза 13 (13.1–13.5) | Скидання пароля й підтвердження email (backend: `UserTokensService`, 4 ендпоїнти, листи з токеном у `#фрагменті`; frontend: сторінки `/forgot-password`, `/reset-password`, `/verify-email`, смуга «підтвердіть адресу»); блокування акаунта (5 невдач → 15 хв), однаковий час відповіді для невідомого email; зміна й скидання пароля анулюють усі сесії (refresh-токени + `passwordChangedAt` для access); листи-сповіщення лише на підтверджені адреси. `ops/security-scan.sh` (Trivy, gitleaks, SBOM), джоба `security` і `codeql.yml` у CI; Trivy знайшов реальні вразливості в базових образах (npm у Node-образі, пакети Alpine в nginx): виправлено в Dockerfile. Prisma 6.19 → 7.10 (`pg`-адаптер, `prisma.config.ts`), `.trivyignore` порожній. `docs/THREAT_MODEL.md`. Міграції `add_account_security` (наявних користувачів позначено підтвердженими). Заодно виправлено помилку фази 10: скрипти `ops/*.sh` лежали в git без прапора виконання (на Linux `./ops/deploy.sh` не запустився б), тепер режим 100755. Перевірено: backend lint/типи/format, 308 unit, 251 e2e (28 нових на безпеку акаунта; два інстанси з Redis), frontend lint/типи/format, 257 тестів (axe для 3 нових сторінок); наживо в dev: лист у Mailpit, підтвердження й скидання через браузер (токен прибрано з адреси), трейси Prisma 7 у Jaeger, Playwright; Trivy: прод-образи без виправних HIGH/CRITICAL, gitleaks: 58 комітів чисто (одне хибне спрацювання в allowlist), SBOM 616 + 70 компонентів; прод-образ backend із Prisma 7 стартує й проходить `migrate deploy` | Не комітилось. **Ламає API:** `UserResponseDto` має `emailVerifiedAt`; з'явилися `/auth/forgot-password`, `/reset-password`, `/verify-email`, `/resend-verification`. Нові залежності: `@prisma/adapter-pg`, `pg`, `@types/pg`. **Не робилось: TOTP 2FA** (див. 13.2b). Не перевірено: `codeql.yml` і джоба `security` на GitHub (локально перевірено скрипт), реальна доставка листів (лише Mailpit і фейковий транспорт), продуктивність Prisma 7 під навантаженням (фаза 14). Прод-образ backend виріс до ~1,1 ГБ (CLI Prisma 7 важчий): якщо заважатиме, винести міграції в окремий образ |
-| 2026-11-17 | Фаза 14 (14.1–14.5) | **Продуктивність:** k6 на 60 000 задач і 180 000 коментарів знайшов, що `_count` у Prisma читає всю таблицю на кожен запит (`HashAggregate` по 180 000 рядків); лічильники тепер окремим `groupBy` для id сторінки (задачі й проєкти); пошук розбито на `UNION` двох GIN-індексів (744 → 180 мс) і обмежено доступними проєктами (заодно виправлено вибір топ-1000 серед чужих задач); N+1 немає (2–3 запити на читання). Пропускна здатність 31 → 98 запитів/с, p95 2 121 → 600 мс (`docs/PERFORMANCE.md`). **Якість:** пороги покриття (backend 63/72/58/63, frontend 88/80/85/88); Stryker 70,1 → 78,6 % (7 файлів), тести виправлено там, де вони порівнювали константу із собою; Playwright: живі оновлення між двома браузерами, завантаження файлу, 12 візуальних знімків у Linux-контейнері; Lighthouse CI з бюджетами (виявив LCP 3,8 с на мобільному профілі); Husky + lint-staged + перевірка формату комітів (`docs/QUALITY.md`). Нові залежності: `@stryker-mutator/core`, `@stryker-mutator/vitest-runner` (backend); `@vitest/coverage-v8`, `@lhci/cli` (frontend); `husky`, `lint-staged` (корінь). Змінна `RATE_LIMIT_PER_MINUTE`. Перевірено: backend lint/типи/format, 333 unit, 251 e2e; frontend lint/типи/format, 260 тестів, Playwright 4/4 на dev-стеку, візуальні знімки стабільні між двома прогонами, `lhci` проходить; наживо k6 до і після | Не комітилось. **Не зроблено:** пошук ще 871 мс p95 (кандидат: збережена колонка `tsvector`, не міряли) і запис 400–515 мс p95 (кілька комітів на запит, див. ADR 37); LCP 3,8 с (бюджет 4,2 с лише фіксує рівень). Знімки й k6-числа відтворювані лише на тій самій машині. `mutation.yml`, `visual`/`lighthouse` джоби на GitHub не запускались |
-| 2026-11-17 | Фаза 15 (15.1–15.3) | `docs/adr/` (47 ADR із журналу рішень + індекс, 16 із розділами «Наслідки» й «Коли переглянути»), `docs/ARCHITECTURE.md` (C4: контекст, контейнери, компоненти, послідовність нового коментаря, розгортання; усі 5 діаграм Mermaid перевірено рендером), `docs/RUNBOOK.md` (10 сценаріїв: ознака → перевірка → дія), `CONTRIBUTING.md`, release-please (`release-please-config.json`, маніфест, workflow; версії обох пакетів і `CHANGELOG.md`), D44–D47 | Не комітилось. Не перевірено: workflow `release-please` на GitHub (потрібен запуск на `main`). Версія 0.1.0 умовна |
+| 2026-11-16 | Preparation | Docker on D:, the move from MySQL to PostgreSQL, role seeding, `.dockerignore`, this plan | Security holes B1–B7 were open |
+| 2026-11-16 | Phase 0 (0.1–0.9) | Closed B1–B7: no `password` in responses, the role is not accepted, `/users/me` instead of `/users/:email`, a guard and a token author in tasks/comments, an access check, a global `ValidationPipe`, one JWT mechanism (`AuthGuard('jwt')`), CORS by list, `JwtModule.registerAsync`. 20 e2e tests green (`test/e2e/security.e2e-spec.ts`), live checks in Docker | Added `src/common/` (`@CurrentUser`, `AuthenticatedUser`) and `src/app.setup.ts`. Removed the broken template `test/app.e2e-spec.ts`. `validate-token` stays until phase 6 |
+| 2026-11-16 | Phase 1 (1.1–1.9, 1.11) | npm-only and package names, Node 24, `.env.example` ×3, the DB `jira` → `flowsync` (`ALTER DATABASE`, data preserved), dev/prod compose + a `Dockerfile` with `dev`/`build`/`prod` targets, nginx (SPA fallback, `/api` proxy, security headers), unprivileged users, healthchecks, ESLint 9 + Prettier, CI (`ci.yml`) and deploy after CI (`deploy.yml`), Dependabot, a new README. Verified: lint/typecheck, 20 e2e, dev mode with hot reload, prod mode (200 on `/dashboard`, 401 through the proxy, API/DB ports closed) | Not committed. Removed the broken `App.test.js` (a CRA template). In CI the frontend build uses `CI=false`. 1.10 (Husky) postponed. For `deploy.yml` (`workflow_run`) the file must be in `main` |
+| 2026-11-16 | Phase 2 (2.1–2.8) | Nest 10 → 11 → 12.5, TypeScript 6.0, Prisma 6.19, Vitest 5 + SWC instead of Jest, `tsx` for the seed. The structure `config/ database/ common/ health/ modules/`; zod env validation (`SECRET_KEY` → `JWT_SECRET`, ≥ 32 characters in production); global `JwtAuthGuard` (`@Public`), `RolesGuard` (`@Roles`), throttler; `AllExceptionsFilter` + `PrismaExceptionFilter` with a single error body; pagination; Swagger `/api/docs`; `helmet`; `nestjs-pino`; `/api/health` (now also used by the Docker healthcheck); `strict: true`; a separate test DB (`db_test`, the `test` profile). Verified: lint/types/build, 42 unit, 26 e2e, dev and prod mode in Docker (proxy, 404 on Swagger in prod, rate limit, fail-fast on a short secret) | Not committed. Needed: `JWT_SECRET` ≥ 32 characters for prod mode (the local `.env` currently has 19). The host Node 22.22.0 is below the `@nestjs/schematics` requirement (≥ 22.22.3 / 24.15): Docker and CI use Node 24 |
+| 2026-11-16 | Phase 3 (3.1–3.4) | A new `schema.prisma`: PascalCase models with `@@map`, `createdAt`/`updatedAt`, `enum Role` and `TaskStatus`, `ProjectMember`, `TaskAssignee` with a composite key, project tags, an implicit m:n Task–Tag, indexes on all FKs, explicit `onDelete`. The `init` migration, `migrate deploy` in Docker, the `prisma` CLI in `dependencies` and a production image without dev dependencies, a schema drift check in CI, a demo seed (dev) instead of role seeding. Services, DTOs and tests moved to the new model. Verified: lint/types, 42 unit, 27 e2e (migrations on a fresh DB), the seed twice, a clean DB, dev and prod in Docker | Not committed. The old data is kept in `flowsync_backup_phase2`. The API contract changed (camelCase). Continued in phase 4 in the same branch |
+| 2026-11-16 | Phase 4 (4.1–4.8) | The modules auth, users, projects (with members), tasks (filters, pagination, sorting, assignees, tags), comments, tags; 30 endpoints, response DTOs and Swagger, input normalization, `BCRYPT_ROUNDS`, a service coverage threshold, `npm run openapi:export` + an up-to-date check in CI. Verified: lint/types/build, 101 unit, 117 e2e, mutation, a live scenario in Docker on demo data and on a new flow | Not committed. The API contract changed (the frontend uses only `/auth/login` and `/auth/validate-token`, which are unchanged). Next — phase 5 (frontend) |
+| 2026-11-16 | Phase 5 (5.1–5.9) | The old CRA was removed; Vite 8 + React 19 + TS strict, Tailwind 4 + shadcn/ui, TanStack Query, react-router 8 (lazy routes, an error boundary, 404), `config/env.ts`, `api-client` (Bearer, 401 → sign out), ESLint with feature boundaries, Vitest + MSW (47 tests), a Dockerfile (nginx, unprivileged), a dev mode in compose with HMR, frontend CI with lint/typecheck/test/build. Part of 6.1 was done ahead of the plan: `useLogin`, `useMe`, `ProtectedRoute`, `LoginForm`. Verified: format, lint, `tsc -b`, tests, `npm run build`, dev (proxy, signing in with a demo account in the browser, HMR) and prod (nginx :8080, SPA fallback, `/api`, sign in, the nginx user) | Not committed. Deviations: shadcn `field` instead of `form`, `background.jpg` and PWA assets were not carried over, the frontend requires Node ≥ 22.22 (react-router 8), MSW 3. Dependabot PRs against the old CRA `package.json` become obsolete. The feature boundaries do not catch relative imports (`../../x`) |
+| 2026-11-16 | Phase 6 (6.1–6.6) | The features auth (registration with auto sign-in), projects (a list with search and pages in the URL, create/edit/delete, members), tasks (filters, sorting and page in the URL, a form with assignees and tags, status change, project tags), comments (add, edit, delete with owner moderation); a header with navigation, shared loading/error/empty states, a confirmation dialog, pagination. `validate-token` was removed from the backend (code, tests, `openapi.json`). Verified: frontend format/lint/typecheck, 104 tests; backend lint/types, 99 unit, 116 e2e | Not committed. Features do not import each other: data between them (project members → assignees, counters) is passed by the page in `app/routes`. The kanban was not done (optional). The `access_token` field was not renamed |
+| 2026-11-16 | Phase 7 (7.1–7.6) | Frontend types are generated from `openapi.json` (CI checks), `LoginResponseDto` added. Session: a 15-min access token in memory, a refresh token in an `httpOnly` cookie with rotation, family revocation on reuse and a hash in the DB (the migration `add_refresh_tokens`), `POST /auth/refresh` and `/auth/logout`; the frontend restores the session after a reload and refreshes the token on a 401 with one shared request. `X-Request-Id` in logs, the header and the error body. nginx: CSP, Permissions-Policy, caching of `/assets/` (previously a stale `/static/`), `npm audit` in CI. Playwright e2e (the `e2e` job in CI), axe in tests of 5 pages and 2 dialogs. Verified: frontend format/lint/typecheck, 115+ tests, build; backend lint/types, 119 unit, 134 e2e; Playwright against the prod stack on :8080; the session, reload and sign-out in a browser (dev) | Not committed. Deviations: no `nestjs-cls` (D27). Known: the `prisma` CLI 6.x has a high-severity vulnerability (fixed only in Prisma 7), so CI blocks only critical in the backend; a password change does not yet revoke refresh tokens; all users must sign in again (the `localStorage` tokens no longer work) |
+| 2026-11-16 | Phase 8 (8.1–8.8, 8.10) | A kanban board; full-text search (GIN indexes, relevance); CASL; an audit log + domain events + an activity feed; notifications (a bell, API, emails via BullMQ/Redis and nodemailer with stubs in `.env.example`); real-time (Socket.IO, rooms by access, cache updates, an nginx proxy); i18n uk/en with a completeness test; a project image (S3-compatible storage, type by bytes). Migrations `add_fulltext_search`, `add_audit_log`, `add_notifications`. Verified: backend lint/types, 225 unit, 201 e2e (with real sockets); frontend lint/types, 209 tests; live: an email reaches Mailpit through BullMQ and is retried after mail recovers, an upload to S3, board and bell updates without a reload (dev and prod through nginx), Playwright on the prod stack | Not committed. Deviations: images are uploaded through the API, not presigned URLs (D31); no `nestjs-cls`/`@nestjs/bullmq`; MinIO replaced with RustFS (the image is unavailable). **8.9 (deploy to a VPS) was not done.** Search is now prefix-based (`ELT` will not find `Delta`). The `image` field was removed from the project API (replaced by `hasImage`). The socket and upload endpoints are not covered by Playwright |
+| 2026-11-17 | Phase 9 (9.1–9.7) | The "Aurora" redesign: oklch tokens, light and dark themes with a switcher (`public/theme-init.js`), Manrope for headings; new Avatar, StatusIcon, TagChip, SegmentedControl, Skeleton, OptionSelect (the shadcn Select instead of native); sign in and registration — a split screen with a live mini board; a sticky header, project cards with generated covers; the project page (a header with progress, status tabs with counters, a list, a board, a right column, an activity feed as a timeline); a task page with a details panel; notifications, dialogs, skeletons. Verified: format, lint, typecheck, 228 tests, build; Playwright e2e against the dev stack (:5173); in a browser the light and dark themes, phone width | Not committed. The backend and contract did not change. Added `@fontsource-variable/manrope`. The production-like stack does not start locally because of a short `JWT_SECRET` in `.env` (known since phase 2), so e2e on :8080 was not run. Tests: `asyncUtilTimeout` 5 s and `testTimeout` 15 s against flaky failures on a cold start |
+| 2026-11-17 | Phase 10 (10.1–10.4) | Liveness/readiness (Redis only if configured), `ops/backup.sh` + `restore-verify.sh`, `smoke-test.sh`, `docker-compose.vps.yml` with Caddy, `deploy.sh` with a backup and automatic rollback, a manual `deploy-prod.yml`, `docs/OPERATIONS.md`. Verified: unit/e2e health, a backup and restore on the dev DB (12 tables, 5 migrations), a negative test (a forged counter → failure, the temporary DB is cleaned up), `docker compose config` of the overlay, `caddy validate`, a smoke test on the dev stack | Not committed. Not verified: `deploy.sh` and rollback on a live server, `deploy-prod.yml` on GitHub, a smoke test on a production-like stack (nginx headers; the prod stack does not start locally because of a short `JWT_SECRET`). 10.5–10.6 wait for the owner |
+| 2026-11-17 | Phase 11 (11.1–11.4) | `/api/metrics` (prom-client: request duration by route template, the mail queue, sockets, the process), OpenTelemetry traces (`config/instrument.ts`), `bullmq-otel`, Sentry in the backend (a 5xx filter) and the frontend (`RouteError`), the `observability` profile (Prometheus, Grafana with a dashboard, Jaeger), alert rules, `docs/SLO.md`, a section in `docs/OPERATIONS.md`, nginx hides `/api/metrics`. Prometheus/health logs no longer clutter pino. Verified: backend lint/types, 241 unit, metrics and health e2e, frontend lint/types, tests; live: one trace "POST comment → Prisma → Socket.IO → BullMQ add/process" in Jaeger, the target host `up` and 5 rules `ok` in Prometheus, a Grafana dashboard with real data, `promtool`, a Sentry event reaches a fake receiver, the production nginx image (CSP, 404 on `/api/metrics`) | Not committed. New dependencies: backend `prom-client`, `@opentelemetry/*`, `@prisma/instrumentation`, `bullmq-otel`, `@sentry/nestjs`; frontend `@sentry/react`. Not verified: a real Sentry server (only a fake receiver), a frontend error in Sentry, alert delivery, rebuilding the prod stack with a proper `JWT_SECRET`. The Express instrumentation creates no spans (Express 5/ESM), and there are no Nest controllers in the trace: HTTP span → Prisma works. I did not change `npm audit` |
+| 2026-11-17 | Phase 12 (12.1–12.6) | The outbox: `DomainEventsService.transact` (a write + an event in one transaction), `OutboxRelayService` (a `SKIP LOCKED` claim + lease, backoff, DEAD), idempotent subscribers (unique `eventId` in audit and `(eventId, userId)` in notifications; subscribers no longer swallow errors). 16 publish sites in 4 services were converted. Task versions (`version`, 409). The Socket.IO Redis adapter (`RedisIoAdapter`). Cursor pagination of activity and comments (frontend: `useInfiniteQuery`, "Show more"). Outbox metrics and alerts. Migrations `add_task_version`, `add_outbox`, `cursor_pagination_indexes`. Verified: backend lint/types, 265 unit, 223 e2e (with Redis): a crash after commit (before the claim and during delivery + lease expiry), retry and DEAD, redelivery, a transaction rollback, 4 parallel workers, 4 parallel PATCHes (1×200, 3×409), two API instances with real sockets (and a control test without the adapter), a cursor with no repeats under new writes; frontend lint/types, 234 tests, the coverage threshold (`test:cov`), Playwright e2e on the dev stack, live in dev: a PATCH with a current and a stale version (200/409), the activity cursor, outbox `DONE` and metrics | Not committed. **Breaks the API:** `PATCH /tasks/:id` requires `version`; `GET …/activity` and `GET …/comments` return `{ items, nextCursor }` without `meta`. A new dependency `@socket.io/redis-adapter`. Not verified: outbox load, a production-like stack, `RedisIoAdapter` with a real Redis cluster/Sentinel. Known: `audit_logs` and `notifications` have a nullable `event_id` (old rows without it); a conflict in the edit form does not offer a merge, it only shows an error and refreshes the data |
+| 2026-11-17 | Phase 13 (13.1–13.5) | Password reset and email verification (backend: `UserTokensService`, 4 endpoints, emails with the token in the `#fragment`; frontend: the pages `/forgot-password`, `/reset-password`, `/verify-email`, a "verify your address" bar); account lockout (5 failures → 15 min), the same response time for an unknown email; a password change and reset invalidate all sessions (refresh tokens + `passwordChangedAt` for access); notification emails only to verified addresses. `ops/security-scan.sh` (Trivy, gitleaks, SBOM), the `security` job and `codeql.yml` in CI; Trivy found real vulnerabilities in the base images (npm in the Node image, Alpine packages in nginx): fixed in the Dockerfile. Prisma 6.19 → 7.10 (the `pg` adapter, `prisma.config.ts`), an empty `.trivyignore`. `docs/THREAT_MODEL.md`. The migration `add_account_security` (existing users marked as verified). Also fixed a phase 10 bug: the `ops/*.sh` scripts were in git without the executable flag (on Linux `./ops/deploy.sh` would not have run), now mode 100755. Verified: backend lint/types/format, 308 unit, 251 e2e (28 new for account security; two instances with Redis), frontend lint/types/format, 257 tests (axe for 3 new pages); live in dev: an email in Mailpit, verification and reset through a browser (the token removed from the address), Prisma 7 traces in Jaeger, Playwright; Trivy: the prod images have no fixable HIGH/CRITICAL, gitleaks: 58 commits clean (one false positive in the allowlist), SBOM 616 + 70 components; the production backend image with Prisma 7 starts and passes `migrate deploy` | Not committed. **Breaks the API:** `UserResponseDto` has `emailVerifiedAt`; `/auth/forgot-password`, `/reset-password`, `/verify-email`, `/resend-verification` appeared. New dependencies: `@prisma/adapter-pg`, `pg`, `@types/pg`. **Not done: TOTP 2FA** (see 13.2b). Not verified: `codeql.yml` and the `security` job on GitHub (the script was verified locally), real email delivery (only Mailpit and a fake transport), Prisma 7 performance under load (phase 14). The production backend image grew to ~1.1 GB (the Prisma 7 CLI is heavier): if that gets in the way, move migrations to a separate image |
+| 2026-11-17 | Phase 14 (14.1–14.5) | **Performance:** k6 on 60,000 tasks and 180,000 comments found that `_count` in Prisma reads the whole table on every request (a `HashAggregate` over 180,000 rows); the counters are now a separate `groupBy` for the page's ids (tasks and projects); search was split into a `UNION` of two GIN indexes (744 → 180 ms) and limited to accessible projects (which also fixed the top-1000 selection among other people's tasks); there is no N+1 (2–3 queries per read). Throughput 31 → 98 requests/s, p95 2,121 → 600 ms (`docs/PERFORMANCE.md`). **Quality:** coverage thresholds (backend 63/72/58/63, frontend 88/80/85/88); Stryker 70.1 → 78.6% (7 files), tests fixed where they compared a constant with itself; Playwright: live updates between two browsers, file upload, 12 visual snapshots in a Linux container; Lighthouse CI with budgets (it found an LCP of 3.8 s on the mobile profile); Husky + lint-staged + a commit format check (`docs/QUALITY.md`). New dependencies: `@stryker-mutator/core`, `@stryker-mutator/vitest-runner` (backend); `@vitest/coverage-v8`, `@lhci/cli` (frontend); `husky`, `lint-staged` (root). The `RATE_LIMIT_PER_MINUTE` variable. Verified: backend lint/types/format, 333 unit, 251 e2e; frontend lint/types/format, 260 tests, Playwright 4/4 on the dev stack, visual snapshots stable across two runs, `lhci` passes; live k6 before and after | Not committed. **Not done:** search is still 871 ms p95 (a candidate: a stored `tsvector` column, not measured) and writes 400–515 ms p95 (several commits per request, see ADR 37); LCP 3.8 s (the 4.2 s budget only pins the level). Snapshots and k6 numbers are reproducible only on the same machine. The `mutation.yml`, `visual`/`lighthouse` jobs on GitHub were not run |
+| 2026-11-17 | Phase 15 (15.1–15.3) | `docs/adr/` (47 ADRs from the decision log + an index, 16 with "Consequences" and "When to revisit" sections), `docs/ARCHITECTURE.md` (C4: context, containers, components, the new-comment sequence, deployment; all 5 Mermaid diagrams verified by rendering), `docs/RUNBOOK.md` (10 scenarios: symptom → check → action), `CONTRIBUTING.md`, release-please (`release-please-config.json`, a manifest, a workflow; the versions of both packages and `CHANGELOG.md`), D44–D47 | Not committed. Not verified: the `release-please` workflow on GitHub (it needs a run on `main`). Version 0.1.0 is nominal |
+| 2026-11-18 | Documentation language | All Markdown documentation (README, CONTRIBUTING, AGENTS, `docs/`, ADRs) was translated from Ukrainian to English at the owner's request | The app's UI dictionary (`uk.ts`) stays Ukrainian; conversation with the owner stays Ukrainian |

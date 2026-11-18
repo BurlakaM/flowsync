@@ -1,23 +1,23 @@
-# 36. Спостережуваність
+# 36. Observability
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D36 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D36 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Метрики — `prom-client` (приватний реєстр, `/api/metrics` закритий nginx-ом і за бажанням `METRICS_TOKEN`); трейси — OpenTelemetry SDK з OTLP/HTTP і окремими інструментаторами (http, express, ioredis, socket.io, pino, Prisma, `bullmq-otel`), увімкнені лише з `OTEL_EXPORTER_OTLP_ENDPOINT`; помилки — Sentry (`@sentry/nestjs`, `@sentry/react`) лише як лічильник помилок, без трасування й запису сесій; dev-стек Prometheus + Grafana + Jaeger у профілі `observability`
+Metrics — `prom-client` (a private registry, `/api/metrics` closed by nginx and optionally by `METRICS_TOKEN`); traces — the OpenTelemetry SDK with OTLP/HTTP and individual instrumentations (http, express, ioredis, socket.io, pino, Prisma, `bullmq-otel`), enabled only with `OTEL_EXPORTER_OTLP_ENDPOINT`; errors — Sentry (`@sentry/nestjs`, `@sentry/react`) only as an error counter, without tracing or session replay; a dev Prometheus + Grafana + Jaeger stack in the `observability` profile
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-`nestjs-otel`/`@willsoto/nestjs-prometheus` (обгортки без виграшу); `auto-instrumentations-node` (десятки зайвих інструментаторів і залежностей); Sentry tracing (два провайдери трасування); Loki/Tempo (більше сервісів, ніж потрібно одному VPS)
+`nestjs-otel`/`@willsoto/nestjs-prometheus` (wrappers with no gain); `auto-instrumentations-node` (dozens of unneeded instrumentations and dependencies); Sentry tracing (two tracing providers); Loki/Tempo (more services than one VPS needs)
 
-## Наслідки
+## Consequences
 
-- Метрики, трейси й звіти про помилки суто опційні: без endpoint-а чи DSN відповідний код не працює.
-- Один trace проходить HTTP, Prisma, Redis, BullMQ і Socket.IO; логи мають `trace_id`.
-- Sentry лише рахує помилки, тож не конкурує з OpenTelemetry за трасувальник.
+- Metrics, traces and error reports are purely optional: without an endpoint or DSN the corresponding code does not run.
+- A single trace spans HTTP, Prisma, Redis, BullMQ and Socket.IO; logs carry `trace_id`.
+- Sentry only counts errors, so it does not compete with OpenTelemetry for the tracer.
 
-## Коли переглянути
+## When to revisit
 
-Якщо логи треба шукати централізовано, додати Loki (поля `requestId`/`trace_id` уже є в кожному рядку).
+If logs need centralized search, add Loki (the `requestId`/`trace_id` fields are already in every line).

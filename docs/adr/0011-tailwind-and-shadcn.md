@@ -1,13 +1,13 @@
 # 11. UI
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D11 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D11 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
 Tailwind CSS 4 + shadcn/ui (Radix)
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Mantine (як у Docmost): швидший старт, але менше контролю; Bootstrap видаляємо
+Mantine (as in Docmost): faster start, but less control; Bootstrap is being removed

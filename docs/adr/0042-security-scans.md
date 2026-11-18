@@ -1,13 +1,13 @@
-# 42. Перевірки безпеки
+# 42. Security scans
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D42 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D42 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Скрипт `ops/security-scan.sh` у Docker (Trivy для образів, gitleaks для історії, SBOM CycloneDX) — той самий локально й у CI; CodeQL окремим workflow; `npm audit` лишається для залежностей
+The `ops/security-scan.sh` script in Docker (Trivy for images, gitleaks for history, a CycloneDX SBOM) — the same locally and in CI; CodeQL as a separate workflow; `npm audit` remains for dependencies
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Лише `npm audit` (не бачить ОС, npm із базового образу й nginx); платні/хмарні сканери (потрібні акаунти)
+`npm audit` alone (does not see the OS, the npm from the base image, or nginx); paid/cloud scanners (need accounts)

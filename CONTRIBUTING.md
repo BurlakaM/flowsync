@@ -1,109 +1,109 @@
-# Як працювати над FlowSync
+# How to work on FlowSync
 
-Цей файл — для людей (і для вас через пів року). Правила для AI-агентів — у `AGENTS.md`; вони узгоджені з цим файлом.
-Якщо щось тут суперечить коду, виправте те, що неправильне, і скажіть про це в PR.
+This file is for people (and for you half a year from now). The rules for AI agents are in `AGENTS.md`; they are consistent with this file.
+If something here contradicts the code, fix whichever is wrong and say so in the PR.
 
-## Швидкий старт
+## Quick start
 
-Потрібні Docker (Compose v2) і Node ≥ 22.22 (рекомендовано 24, `.nvmrc`).
+You need Docker (Compose v2) and Node ≥ 22.22 (24 recommended, `.nvmrc`).
 
 ```bash
-cp .env.example .env && cp backend/.env.example backend/.env && cp frontend/.env.example frontend/.env   # і заповнити секрети
-docker compose up -d --build        # увесь dev-стек: backend, frontend, Postgres, Redis, Mailpit, S3
-npm install                         # у корені: лише git-хуки (Husky); застосунок — це backend/ і frontend/ окремо
+cp .env.example .env && cp backend/.env.example backend/.env && cp frontend/.env.example frontend/.env   # and fill in the secrets
+docker compose up -d --build        # the whole dev stack: backend, frontend, Postgres, Redis, Mailpit, S3
+npm install                         # in the root: only git hooks (Husky); the app is backend/ and frontend/ separately
 ```
 
-Адреси: застосунок `http://localhost:5173`, API `http://localhost:3000/api`, пошта (Mailpit) `http://localhost:8025`.
-Демо-акаунти: `admin@flowsync.test` і `user@flowsync.test`, пароль `password-123` (лише для розробки).
+Addresses: the app `http://localhost:5173`, the API `http://localhost:3000/api`, mail (Mailpit) `http://localhost:8025`.
+Demo accounts: `admin@flowsync.test` and `user@flowsync.test`, password `password-123` (for development only).
 
-## Структура
+## Structure
 
-Два незалежні npm-пакети без монорепо-інструментів (ADR 15): `backend/` (NestJS) і `frontend/` (React). Корінь має лише `package.json`
-для git-хуків. Огляд — `docs/ARCHITECTURE.md`; рішення й чому — `docs/adr/`; правила коду — `backend/AGENTS.md` і `frontend/AGENTS.md`.
+Two independent npm packages with no monorepo tooling (ADR 15): `backend/` (NestJS) and `frontend/` (React). The root has only a `package.json`
+for git hooks. Overview — `docs/ARCHITECTURE.md`; decisions and why — `docs/adr/`; code rules — `backend/AGENTS.md` and `frontend/AGENTS.md`.
 
-## Процес зміни
+## The change process
 
-1. Гілка від `main`: `feat/<назва>`, `fix/<назва>`, `refactor/<назва>`, `docs/<назва>`.
-2. Малі кроки: один логічний крок — один коміт. Не змішуйте рефакторинг із новою поведінкою.
-3. Пишіть тест разом із кодом (див. «Тести»). Нова перевірка безпеки без тесту не вважається виконаною.
-4. Перед PR запустіть те, що запустить CI (нижче). Хуки зроблять частину за вас.
-5. PR малий і з поясненням **чому**, а не лише що. Нове рішення, що змінює архітектуру, — це ще й новий ADR.
+1. A branch from `main`: `feat/<name>`, `fix/<name>`, `refactor/<name>`, `docs/<name>`.
+2. Small steps: one logical step — one commit. Do not mix refactoring with new behavior.
+3. Write the test together with the code (see "Tests"). A new security check without a test is not considered done.
+4. Before a PR, run what CI will run (below). The hooks will do part of it for you.
+5. A PR is small and explains **why**, not just what. A new decision that changes the architecture is also a new ADR.
 
-### Повідомлення комітів: Conventional Commits
+### Commit messages: Conventional Commits
 
-Формат `type(scope): subject`. Це не формальність: з повідомлень **автоматично** будуються версії й `CHANGELOG.md` (release-please),
-а хук `commit-msg` відхиляє повідомлення, що не відповідають формату.
+The format is `type(scope): subject`. This is not a formality: versions and `CHANGELOG.md` are built **automatically** from the messages (release-please),
+and the `commit-msg` hook rejects messages that do not match the format.
 
-| type | коли | у версії |
+| type | when | in the version |
 |---|---|---|
-| `feat` | нова можливість для користувача | minor |
-| `fix` | виправлення помилки | patch |
-| `perf` | прискорення без зміни поведінки | patch |
-| `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `style` | усе інше | без змін версії |
-| `feat!`, `fix!` або `BREAKING CHANGE:` у тілі | несумісна зміна API чи поведінки | major (поки `0.x` — minor) |
+| `feat` | a new user-facing capability | minor |
+| `fix` | a bug fix | patch |
+| `perf` | a speedup with no behavior change | patch |
+| `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `style` | everything else | no version change |
+| `feat!`, `fix!` or `BREAKING CHANGE:` in the body | an incompatible change to the API or behavior | major (while `0.x` — minor) |
 
-Приклади: `feat(tasks): add status filter`, `fix(auth): refuse tokens issued before a password change`, `perf(search): use both GIN indexes`.
-Мова: ідентифікатори, гілки, коміти й назви тестів — англійською; документація й спілкування — українською.
+Examples: `feat(tasks): add status filter`, `fix(auth): refuse tokens issued before a password change`, `perf(search): use both GIN indexes`.
+Language: identifiers, branches, commits and test names are in English; documentation is in English as well; conversation with the owner is in Ukrainian.
 
-## Що запускати
+## What to run
 
 ```bash
-# backend (з папки backend/)
+# backend (from the backend/ folder)
 npm run lint && npm run typecheck && npm run format:check
-npm test                  # unit; npm run test:cov додає поріг покриття
-docker compose --profile test up -d db_test && npm run test:e2e     # e2e на окремій БД (є й тест двох інстансів: TEST_REDIS_URL=redis://localhost:6380)
-npm run test:mutation     # Stryker: чи впали б тести, якби код був неправильний (кілька хвилин)
-npm run openapi:export    # після зміни API: оновити openapi.json
+npm test                  # unit; npm run test:cov adds the coverage threshold
+docker compose --profile test up -d db_test && npm run test:e2e     # e2e on a separate DB (there is a two-instance test too: TEST_REDIS_URL=redis://localhost:6380)
+npm run test:mutation     # Stryker: would the tests fail if the code were wrong (a few minutes)
+npm run openapi:export    # after an API change: update openapi.json
 
-# frontend (з папки frontend/)
+# frontend (from the frontend/ folder)
 npm run lint && npm run typecheck && npm run format:check
-npm run test:cov          # Vitest з порогом покриття
-npm run api:types         # після зміни openapi.json: оновити згенеровані типи
-npm run test:e2e          # Playwright (спершу стек; локально проти dev: E2E_BASE_URL=http://localhost:5173)
-./ops/visual.sh           # візуальні знімки публічних сторінок у контейнері (update — прийняти новий вигляд)
-npm run lighthouse        # бюджети продуктивності
+npm run test:cov          # Vitest with the coverage threshold
+npm run api:types         # after changing openapi.json: update the generated types
+npm run test:e2e          # Playwright (the stack first; locally against dev: E2E_BASE_URL=http://localhost:5173)
+./ops/visual.sh           # visual snapshots of public pages in a container (update — accept the new look)
+npm run lighthouse        # performance budgets
 
-# безпека й продуктивність (з кореня)
-./ops/security-scan.sh all    # Trivy образів, gitleaks історії, SBOM
-./ops/load/run.sh             # навантажувальний тест k6 на копії з 60 000 задач
+# security and performance (from the root)
+./ops/security-scan.sh all    # Trivy for images, gitleaks for history, SBOM
+./ops/load/run.sh             # a k6 load test on a copy with 60,000 tasks
 ```
 
-Git-хуки (Husky, ставляться командою `npm install` у корені):
+Git hooks (Husky, installed by `npm install` in the root):
 
-- `pre-commit` — ESLint і Prettier **лише для змінених файлів** (lint-staged);
-- `commit-msg` — перевірка формату Conventional Commits;
-- `pre-push` — типи backend і frontend.
+- `pre-commit` — ESLint and Prettier **only for changed files** (lint-staged);
+- `commit-msg` — checks the Conventional Commits format;
+- `pre-push` — backend and frontend types.
 
-Хуки допомагають, але не замінюють CI: перевіряйте повний набір самі. Не обходьте хуки (`--no-verify`) без вагомої причини.
+Hooks help but do not replace CI: run the full set yourself. Do not bypass the hooks (`--no-verify`) without a good reason.
 
-## Тести: що й навіщо
+## Tests: what and why
 
-- **Unit** (поруч із кодом): кожен публічний метод сервісу, guard-и, фільтри; Prisma мокається.
-- **E2E backend**: кожен ендпоїнт — без токена (401), некоректне тіло (400), чужий ресурс (404), успіх; справжній `AppModule` і БД.
-- **Frontend**: компоненти й хуки з MSW; доступність через axe на кожній сторінці й діалозі.
-- **Playwright**: наскрізні сценарії у браузері, зокрема живі оновлення між двома браузерами та завантаження файлу.
-- **Мутаційні тести** і **поріг покриття** — щоб тести справді щось перевіряли (`docs/QUALITY.md`).
+- **Unit** (next to the code): every public service method, guards, filters; Prisma is mocked.
+- **Backend E2E**: every endpoint — without a token (401), an invalid body (400), someone else's resource (404), success; the real `AppModule` and DB.
+- **Frontend**: components and hooks with MSW; accessibility via axe on every page and dialog.
+- **Playwright**: end-to-end scenarios in a browser, including live updates between two browsers and file upload.
+- **Mutation tests** and the **coverage threshold** — so that tests actually check something (`docs/QUALITY.md`).
 
-Тест описує поведінку, а не реалізацію: `it('returns 404 when the task belongs to another project')`.
+A test describes behavior, not implementation: `it('returns 404 when the task belongs to another project')`.
 
-## Бази даних і міграції
+## Databases and migrations
 
-Схема змінюється через `npx prisma migrate dev --name <verb_noun>` у `backend/`; нову міграцію комітять разом зі `schema.prisma`.
-**Вже закомічену міграцію не редагують.** Міграції пишемо сумісними назад (спершу додати, потім у наступному релізі прибрати),
-бо відкіт образу не скасовує міграцій (`docs/OPERATIONS.md`). Деструктивні команди (`migrate reset`, `down -v`) — лише на dev-БД і свідомо.
+The schema changes through `npx prisma migrate dev --name <verb_noun>` in `backend/`; a new migration is committed together with `schema.prisma`.
+**An already committed migration is not edited.** Migrations are written to be backward compatible (first add, then remove in the next release),
+because rolling back an image does not undo migrations (`docs/OPERATIONS.md`). Destructive commands (`migrate reset`, `down -v`) — only on a dev DB and deliberately.
 
-## Безпека
+## Security
 
-- Секрети лише в `.env` (не комітяться), змінні проходять через `backend/src/config/env.schema.ts`.
-- Новий публічний маршрут: `@Public()` + коментар причини + ліміт частоти + тест «без токена» (`docs/THREAT_MODEL.md`).
-- Знайшли вразливість — не відкривайте публічну issue, напишіть власнику напряму.
+- Secrets only in `.env` (not committed); variables go through `backend/src/config/env.schema.ts`.
+- A new public route: `@Public()` + a reason comment + a rate limit + a "no token" test (`docs/THREAT_MODEL.md`).
+- If you find a vulnerability, do not open a public issue; write to the owner directly.
 
-## Релізи
+## Releases
 
-Версії й `CHANGELOG.md` створює **release-please** з історії комітів: коли в `main` потрапляють `feat`/`fix`, бот відкриває «Release PR»;
-злиття цього PR створює тег `vX.Y.Z` і запис у журналі змін. Вручну версії не міняють. Деплой на сервер — окрема ручна дія
-(workflow «Deploy to production», `docs/OPERATIONS.md`), а не наслідок релізу.
+Versions and `CHANGELOG.md` are created by **release-please** from the commit history: when `feat`/`fix` land in `main`, the bot opens a "Release PR";
+merging that PR creates the `vX.Y.Z` tag and a changelog entry. Versions are not changed by hand. Deploying to the server is a separate manual action
+(the "Deploy to production" workflow, `docs/OPERATIONS.md`), not a consequence of a release.
 
-## Коли щось ламається
+## When something breaks
 
-`docs/RUNBOOK.md`: ознаки, що перевірити, що робити.
+`docs/RUNBOOK.md`: symptoms, what to check, what to do.

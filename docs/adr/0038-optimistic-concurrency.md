@@ -1,23 +1,23 @@
-# 38. Конкурентне редагування
+# 38. Concurrent editing
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D38 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D38 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Оптимістична конкурентність: `Task.version`, `PATCH` вимагає його, `update where { id, version }` + `increment`, розбіжність → 409
+Optimistic concurrency: `Task.version`, `PATCH` requires it, `update where { id, version }` + `increment`, a mismatch → 409
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Пессимістичні блокування (тримають транзакцію, поки людина думає); `updatedAt` як токен (колізії в межах мілісекунди, лишається прив'язка до годинника); `If-Match`/ETag (той самий зміст, гірше для JSON-тіла й OpenAPI)
+Pessimistic locks (hold a transaction while a person thinks); `updatedAt` as a token (collisions within a millisecond, still tied to the clock); `If-Match`/ETag (the same meaning, worse for JSON bodies and OpenAPI)
 
-## Наслідки
+## Consequences
 
-- Двоє людей, що редагують одну задачу, ніколи не затруть одне одного мовчки: другий отримує 409 і бачить новішу версію.
-- Перевірка й запис — один SQL-оператор, тож два паралельні запити не можуть обидва виграти (перевірено чотирма одночасно).
-- Клієнт мусить слати `version` при кожному оновленні: свідома несумісна зміна.
+- Two people editing the same task never silently overwrite each other: the second gets a 409 and sees the newer version.
+- The check and the write are a single SQL statement, so two parallel requests cannot both win (verified with four at once).
+- The client must send `version` with every update: a deliberate breaking change.
 
-## Коли переглянути
+## When to revisit
 
-Інтерфейс злиття (по полях) замінив би просте «перезавантажте й повторіть».
+A merge UI (per field) would replace the simple "reload and retry".

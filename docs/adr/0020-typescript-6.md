@@ -1,13 +1,13 @@
 # 20. TypeScript
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D20 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D20 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`~6.0` зі `strict: true`: `@nestjs/schematics@12` вимагає ≥ 6, а `typescript-eslint` ще не підтримує ≥ 6.1
+`~6.0` with `strict: true`: `@nestjs/schematics@12` requires ≥ 6, and `typescript-eslint` does not yet support ≥ 6.1
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-TS 5.9 несумісний із Nest 12; TS 7 (нативний) поки не підтримують `typescript-eslint` та частина інструментів
+TS 5.9 is incompatible with Nest 12; TS 7 (native) is not yet supported by `typescript-eslint` and some tooling

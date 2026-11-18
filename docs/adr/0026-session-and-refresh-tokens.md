@@ -1,24 +1,24 @@
-# 26. Сесія
+# 26. Session
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D26 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D26 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Access-JWT 15 хв у пам'яті + refresh-токен в `httpOnly` cookie (`SameSite=Strict`, `Path=/api/auth`), ротація, відкликання родини при повторному використанні, у БД лише SHA-256 хеш; `COOKIE_SECURE` для HTTPS
+A 15-minute access JWT in memory + a refresh token in an `httpOnly` cookie (`SameSite=Strict`, `Path=/api/auth`), rotation, family revocation on reuse, only a SHA-256 hash in the DB; `COOKIE_SECURE` for HTTPS
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-JWT у `localStorage` (XSS краде токен); довгий access-токен
+JWT in `localStorage` (XSS steals the token); a long-lived access token
 
-## Наслідки
+## Consequences
 
-- Викрадений access-токен корисний щонайбільше 15 хвилин (а після зміни пароля відхиляється одразу, ADR 41).
-- Викрадений refresh-токен виявляється повторним використанням: уся родина відкликається.
-- Браузер не тримає облікових даних у `localStorage`: після перезавантаження сесію відновлює cookie.
-- Ціна: `SameSite=Strict` і `Path=/api/auth` прив'язують cookie до розгортання на тому ж origin (через проксі nginx); окремий домен API потребував би переробки.
+- A stolen access token is useful for 15 minutes at most (and is rejected immediately after a password change, ADR 41).
+- A stolen refresh token is detected by reuse: the whole family is revoked.
+- The browser holds no credentials in `localStorage`: after a reload the cookie restores the session.
+- Cost: `SameSite=Strict` and `Path=/api/auth` tie the cookie to a same-origin deployment (through the nginx proxy); a separate API domain would require rework.
 
-## Коли переглянути
+## When to revisit
 
-Якщо API переїде на інший origin, перейти на `SameSite=Lax/None` із CSRF-захистом для refresh.
+If the API moves to another origin, switch to `SameSite=Lax/None` with CSRF protection for refresh.

@@ -1,22 +1,22 @@
-# 22. Модель доступу
+# 22. Access model
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D22 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D22 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Власник проєкту — `Project.ownerId`; додаткові учасники — `ProjectMember`; перевірка доступу в сервісах. Ролі користувача — `enum Role`
+The project owner is `Project.ownerId`; additional participants are `ProjectMember`; access is checked in services. User roles are `enum Role`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Власник у `ProjectMember` теж: дублює дані
+The owner also in `ProjectMember`: duplicates data
 
-## Наслідки
+## Consequences
 
-- Власник — стовпець проєкту, учасники — рядки: один запит відповідає на «чи бачить цей користувач цей проєкт».
-- Ролі всередині проєкту, окрім власника й учасника, потребують стовпця ролі в `ProjectMember`.
+- The owner is a project column, members are rows: one query answers "can this user see this project".
+- Roles inside a project beyond owner and member need a role column in `ProjectMember`.
 
-## Коли переглянути
+## When to revisit
 
-Коли з'являться організації чи команди (користувач у групі, що володіє проєктами), моделі потрібен ще один рівень.
+When organizations or teams appear (a user in a group that owns projects), the model needs another level.

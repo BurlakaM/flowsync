@@ -1,41 +1,41 @@
 # FlowSync
 
-Пет-проєкт: трекер задач у стилі Jira (проєкти, задачі, коментарі, теги, виконавці).
-Backend на **NestJS**, frontend на **React**, база **PostgreSQL**, усе запускається через **Docker Compose**.
-Проєкт поступово переходить на нову архітектуру, план і статус: [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md).
+A pet project: a Jira-style task tracker (projects, tasks, comments, tags, assignees).
+The backend is **NestJS**, the frontend is **React**, the database is **PostgreSQL**, and everything runs through **Docker Compose**.
+The project is gradually moving to a new architecture; the plan and status: [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md).
 
-## Технології
+## Technologies
 
-| Шар | Зараз |
+| Layer | Now |
 |---|---|
 | Backend | NestJS 12, Prisma 7.10, Passport JWT, TypeScript 6, Vitest |
 | Frontend | React 19, Vite, TypeScript, Tailwind 4 + shadcn/ui, TanStack Query, Vitest |
-| БД | PostgreSQL 16 |
+| Database | PostgreSQL 16 |
 | Runtime | Node.js 24 LTS (`.nvmrc`) |
-| Інфраструктура | Docker Compose, nginx, GitHub Actions |
+| Infrastructure | Docker Compose, nginx, GitHub Actions |
 
-## Структура
+## Structure
 
 ```
 flowsync/
-├─ backend/                  NestJS API (префікс /api)
-│  ├─ prisma/                схема Prisma і seed
+├─ backend/                  NestJS API (prefix /api)
+│  ├─ prisma/                Prisma schema and seed
 │  ├─ src/, test/
-│  └─ Dockerfile             цілі: dev, build, prod
+│  └─ Dockerfile             targets: dev, build, prod
 ├─ frontend/                 React SPA
-│  ├─ nginx.conf             SPA-fallback і проксі /api → backend
-│  └─ Dockerfile             цілі: dev, build, prod
-├─ docker-compose.yml        прод-подібний стек
-├─ docker-compose.override.yml   режим розробки (підхоплюється автоматично)
-├─ docs/ARCHITECTURE_PLAN.md план переходу на нову архітектуру
-├─ AGENTS.md                 правила для AI-агентів
-└─ .github/                  CI, деплой, Dependabot
+│  ├─ nginx.conf             SPA fallback and /api → backend proxy
+│  └─ Dockerfile             targets: dev, build, prod
+├─ docker-compose.yml        production-like stack
+├─ docker-compose.override.yml   development mode (picked up automatically)
+├─ docs/ARCHITECTURE_PLAN.md the plan for moving to the new architecture
+├─ AGENTS.md                 rules for AI agents
+└─ .github/                  CI, deploy, Dependabot
 ```
 
-## Швидкий старт (розробка)
+## Quick start (development)
 
-1. Встановіть Docker (Docker Desktop з WSL2 на Windows).
-2. Створіть файли оточення з прикладів:
+1. Install Docker (Docker Desktop with WSL2 on Windows).
+2. Create the environment files from the examples:
 
    ```bash
    cp .env.example .env
@@ -43,167 +43,167 @@ flowsync/
    cp frontend/.env.example frontend/.env
    ```
 
-   Заповніть `POSTGRES_PASSWORD` у `.env` та `JWT_SECRET` у `backend/.env`. Паролі мають бути URL-безпечними:
-   пароль БД підставляється в `DATABASE_URL`. У `backend/.env` пароль у `DATABASE_URL` має збігатися з `POSTGRES_PASSWORD`.
+   Fill in `POSTGRES_PASSWORD` in `.env` and `JWT_SECRET` in `backend/.env`. Passwords must be URL-safe:
+   the DB password is substituted into `DATABASE_URL`. In `backend/.env` the password in `DATABASE_URL` must match `POSTGRES_PASSWORD`.
 
-3. Запустіть стек:
+3. Start the stack:
 
    ```bash
    docker compose up -d --build
    ```
 
-| Сервіс | Адреса |
+| Service | Address |
 |---|---|
-| Frontend (dev-сервер Vite) | http://localhost:5173 (запити `/api` проксіюються на backend) |
+| Frontend (Vite dev server) | http://localhost:5173 (`/api` requests are proxied to the backend) |
 | API | http://localhost:3000/api |
-| Swagger (лише не в production) | http://localhost:3000/api/docs |
+| Swagger (non-production only) | http://localhost:3000/api/docs |
 | Health | http://localhost:3000/api/health |
-| PostgreSQL | `localhost:5433` (користувач і пароль з `.env`, БД `flowsync`) |
-| Mailpit (фальшивий поштовий сервер: усі листи dev-режиму) | http://localhost:8025 |
-| Redis (черга) | `localhost:6380` |
+| PostgreSQL | `localhost:5433` (user and password from `.env`, DB `flowsync`) |
+| Mailpit (a fake mail server: all dev-mode emails) | http://localhost:8025 |
+| Redis (queue) | `localhost:6380` |
 
-Backend і frontend перезбираються автоматично при зміні файлів у `backend/src` та `frontend/src`.
-Під час старту контейнера backend застосовує міграції (`prisma migrate deploy`) і наповнює БД демо-даними (seed, лише в dev):
-акаунти `admin@flowsync.test` та `user@flowsync.test`, пароль `password-123`, проєкт «Demo project» із кількома задачами.
+The backend and frontend rebuild automatically when files in `backend/src` and `frontend/src` change.
+On container start the backend applies migrations (`prisma migrate deploy`) and fills the DB with demo data (seed, dev only):
+the accounts `admin@flowsync.test` and `user@flowsync.test`, password `password-123`, and a "Demo project" with a few tasks.
 
-Зупинка: `docker compose down`. **Не додавайте `-v`**: це видалить дані БД.
+To stop: `docker compose down`. **Do not add `-v`**: it deletes the DB data.
 
-## Прод-подібний запуск
+## Production-like run
 
 ```bash
 docker compose -f docker-compose.yml up -d --build
 ```
 
-Назовні опубліковано лише frontend: http://localhost:8080. nginx віддає збірку React і проксіює `/api/` на backend,
-тому CORS не потрібен. Порти backend і БД на хост не виставляються. Swagger у цьому режимі вимкнений. Під час старту backend застосовує міграції;
-демо-seed тут не запускається.
+Only the frontend is published to the outside: http://localhost:8080. nginx serves the React build and proxies `/api/` to the backend,
+so CORS is not needed. The backend and DB ports are not exposed to the host. Swagger is disabled in this mode. On start the backend applies migrations;
+the demo seed is not run here.
 
-У production-режимі `JWT_SECRET` має бути **не коротшим за 32 символи**, інакше backend не стартує. Згенерувати:
+In production mode `JWT_SECRET` must be **at least 32 characters**, otherwise the backend will not start. To generate one:
 `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
 
-## Команди без Docker
+## Commands without Docker
 
-БД при цьому має працювати в Docker (`docker compose up -d db`). Потрібен Node 22+ (рекомендовано 24).
+The DB must still run in Docker (`docker compose up -d db`). Node 22+ is required (24 recommended).
 
 ```bash
 cd backend
 npm ci
-npm run start:dev       # API з watch
+npm run start:dev       # API with watch
 npm run lint            # ESLint 9
 npm run format:check    # Prettier
 npm run typecheck       # tsc --noEmit
 npm test                # unit (Vitest)
-npm run test:e2e        # e2e на окремій БД, спершу: docker compose --profile test up -d db_test
+npm run test:e2e        # e2e on a separate DB, first: docker compose --profile test up -d db_test
 
 cd frontend
 npm ci
-npm run dev             # Vite з HMR (проксі /api → localhost:3000)
+npm run dev             # Vite with HMR (proxy /api → localhost:3000)
 npm run format:check
 npm run lint
 npm run typecheck
-npm test                # Vitest + Testing Library + MSW + axe (доступність)
-npm run api:types       # типи з ../backend/openapi.json (після зміни API; CI перевіряє)
-npm run test:e2e        # Playwright: потрібен запущений прод-подібний стек (:8080) і Chrome
+npm test                # Vitest + Testing Library + MSW + axe (accessibility)
+npm run api:types       # types from ../backend/openapi.json (after an API change; CI checks it)
+npm run test:e2e        # Playwright: needs a running production-like stack (:8080) and Chrome
 npm run build
 ```
 
 ## API
 
-Усі маршрути мають префікс `/api` і потребують `Authorization: Bearer <token>`, крім реєстрації, логіну, `refresh`, `logout` та `/health`.
-Інтерактивна документація: Swagger на `/api/docs` (лише в dev); повний опис у [backend/openapi.json](backend/openapi.json).
+All routes have the `/api` prefix and require `Authorization: Bearer <token>`, except registration, login, `refresh`, `logout` and `/health`.
+Interactive documentation: Swagger at `/api/docs` (dev only); the full description is in [backend/openapi.json](backend/openapi.json).
 
-| Ресурс | Ендпоїнти |
+| Resource | Endpoints |
 |---|---|
 | notifications | `GET /notifications` (`?unread=true`), `GET /notifications/unread-count`, `POST /notifications/:id/read`, `POST /notifications/read-all` |
 | activity | `GET /projects/:id/activity` |
-| зображення проєкту | `PUT`/`DELETE`/`GET /projects/:id/image` (multipart, поле `file`) |
+| project image | `PUT`/`DELETE`/`GET /projects/:id/image` (multipart, field `file`) |
 | auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me` |
-| users | `GET`/`PATCH /users/me`, `GET /users` (лише ADMIN: пагінація, `?search=`) |
+| users | `GET`/`PATCH /users/me`, `GET /users` (ADMIN only: pagination, `?search=`) |
 | projects | `GET`/`POST /projects`, `GET`/`PATCH`/`DELETE /projects/:id`, `GET`/`POST /projects/:id/members`, `DELETE /projects/:id/members/:userId` |
 | tasks | `GET /tasks`, `GET`/`POST /projects/:id/tasks`, `GET`/`PATCH`/`DELETE /tasks/:id` |
 | comments | `GET`/`POST /tasks/:id/comments`, `PATCH`/`DELETE /comments/:id` |
 | tags | `GET`/`POST /projects/:id/tags`, `PATCH`/`DELETE /tags/:id` |
 
-Сесія: `POST /auth/login` повертає короткий access-токен (15 хв) у тілі, а refresh-токен ставить в `httpOnly` cookie
-(`SameSite=Strict`, `Path=/api/auth`). Frontend тримає access-токен лише в пам'яті; після перезавантаження сторінки або на 401
-він викликає `POST /auth/refresh`, і сервер видає нову пару (ротація: кожен refresh-токен працює один раз). Повторне використання
-вже використаного токена вважається крадіжкою й закриває всю сесію. `POST /auth/logout` відкликає сесію. Кожна відповідь має
-заголовок `X-Request-Id` (його ж містять логи й тіло помилки).
+Session: `POST /auth/login` returns a short-lived access token (15 min) in the body and sets the refresh token in an `httpOnly` cookie
+(`SameSite=Strict`, `Path=/api/auth`). The frontend keeps the access token in memory only; after a page reload or on a 401
+it calls `POST /auth/refresh`, and the server issues a new pair (rotation: each refresh token works once). Reusing
+an already used token is treated as theft and closes the whole session. `POST /auth/logout` revokes the session. Every response has an
+`X-Request-Id` header (logs and the error body carry it too).
 
-Правила: проєкт бачать його власник і учасники (стороннім він здається неіснуючим, `404`). Учасники створюють і редагують задачі,
-коментарі та теги; проєкт, учасників і теги змінює лише власник; задачу видаляє автор або власник; коментар редагує лише автор.
-Списки мають пагінацію `?page=&limit=`, задачі ще фільтри `status`, `assigneeId`, `tagId`, `search` і сортування `sortBy`/`order`.
-Після зміни API оновіть опис: `cd backend && npm run openapi:export` (CI перевіряє, що `openapi.json` актуальний).
+Rules: a project is visible to its owner and members (to outsiders it appears not to exist, `404`). Members create and edit tasks,
+comments and tags; only the owner changes the project, members and tags; a task is deleted by its author or the owner; a comment is edited only by its author.
+Lists are paginated with `?page=&limit=`, and tasks also have the filters `status`, `assigneeId`, `tagId`, `search` and the sorting `sortBy`/`order`.
+After changing the API, update the description: `cd backend && npm run openapi:export` (CI checks that `openapi.json` is current).
 
-## Можливості, що варто знати
+## Features worth knowing
 
-- **Дошка.** Сторінка проєкту має перемикач «Список / Дошка». Перетягування картки між колонками змінює статус; кожна картка має й звичайний вибір статусу.
-- **Пошук задач.** Повнотекстовий (PostgreSQL): слова з назви, опису й коментарів, збіг за початком слова (`log` знайде `login`), усі слова мають збігатися. Сортування «Найкращий збіг» (`sortBy=relevance`).
-- **Права.** Усі правила «хто що може» описані в одному місці: `backend/src/common/casl/app-ability.ts`.
-- **Активність і події.** Сервіси публікують доменні події; на них підписані журнал аудиту (`GET /projects/:id/activity`), сповіщення й оновлення в реальному часі.
-- **Сповіщення.** Про призначення на задачу, коментарі до своїх задач і додавання до проєкту: у застосунку (дзвінок у шапці) і, якщо налаштовано пошту, листом через чергу.
-- **Реальний час.** Socket.IO за адресою `/api/socket.io`, авторизація токеном у handshake; клієнт чує лише проєкти, до яких має доступ, а події лише повідомляють, що саме змінилося (дані клієнт бере через API).
-- **Мови.** Інтерфейс англійською й українською (перемикач у шапці, вибір зберігається в браузері). Тексти — ключі-речення в коді, переклад — `frontend/src/i18n/uk.ts`; тест перевіряє, що перекладено все. Повідомлення API лишаються англійськими.
-- **Зображення проєкту.** Завантажується через API (тип перевіряється за вмістом, PNG/JPEG/WebP до 2 МБ), зберігається в S3-сумісному сховищі й віддається лише учасникам проєкту.
+- **Board.** The project page has a "List / Board" switch. Dragging a card between columns changes its status; every card also has a regular status picker.
+- **Task search.** Full-text (PostgreSQL): words from the title, description and comments, prefix matching (`log` finds `login`), all words must match. A "Best match" sort (`sortBy=relevance`).
+- **Permissions.** All the "who can do what" rules are described in one place: `backend/src/common/casl/app-ability.ts`.
+- **Activity and events.** Services publish domain events; the audit log (`GET /projects/:id/activity`), notifications and real-time updates subscribe to them.
+- **Notifications.** About assignment to a task, comments on your tasks and being added to a project: in the app (the bell in the header) and, if mail is configured, by email through the queue.
+- **Real-time.** Socket.IO at `/api/socket.io`, authorized by a token in the handshake; a client hears only projects it has access to, and events only announce what changed (the client fetches data through the API).
+- **Languages.** The interface is in English and Ukrainian (a switcher in the header, the choice is stored in the browser). Texts are sentence keys in the code, the translation is `frontend/src/i18n/uk.ts`; a test checks that everything is translated. API messages stay in English.
+- **Project image.** Uploaded through the API (the type is checked by content, PNG/JPEG/WebP up to 2 MB), stored in S3-compatible storage and served only to project members.
 
-## База даних і міграції
+## Database and migrations
 
-Схема описана в `backend/prisma/schema.prisma` (моделі PascalCase, у БД таблиці й колонки в `snake_case`). Зміни схеми йдуть лише через міграції:
+The schema is described in `backend/prisma/schema.prisma` (PascalCase models; in the DB, tables and columns are `snake_case`). Schema changes go only through migrations:
 
 ```bash
 cd backend
-npx prisma migrate dev --name add_task_due_date   # створює й застосовує міграцію (потрібна БД на :5433)
-npx prisma migrate deploy                          # застосовує наявні міграції (так стартує Docker)
-npx prisma db seed                                 # демо-дані (лише dev, ідемпотентно)
+npx prisma migrate dev --name add_task_due_date   # creates and applies a migration (needs the DB on :5433)
+npx prisma migrate deploy                          # applies existing migrations (this is how Docker starts)
+npx prisma db seed                                 # demo data (dev only, idempotent)
 ```
 
-Папку `backend/prisma/migrations/` комітимо, **вже закомічені міграції не редагуємо**. CI перевіряє, що `schema.prisma` не розійшлась
-з міграціями (без нової міграції збірка впаде). `prisma migrate reset` очищає БД, тому застосовуйте його лише до dev-бази.
+The `backend/prisma/migrations/` folder is committed, and **already committed migrations are not edited**. CI checks that `schema.prisma` has not drifted
+from the migrations (without a new migration the build fails). `prisma migrate reset` wipes the DB, so apply it only to a dev database.
 
-## Змінні середовища
+## Environment variables
 
-| Файл | Змінна | Призначення |
+| File | Variable | Purpose |
 |---|---|---|
-| `.env` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | БД у Docker і `DATABASE_URL` backend у compose |
-| `backend/.env` | `JWT_SECRET` | секрет підпису JWT; у production ≥ 32 символів. Застосунок не стартує без нього |
-| `backend/.env` | `DATABASE_URL` | БД для запуску на хості; у compose перекривається |
-| `backend/.env` | `JWT_EXPIRES_IN` | необов'язково: час життя access-токена (`15m`, `1h`), типово `15m` |
-| `backend/.env` | `REFRESH_TOKEN_TTL_DAYS` | необов'язково: час життя сесії (refresh-cookie), 1-90 днів, типово `7` |
-| `backend/.env` | `COOKIE_SECURE` | необов'язково: `true`, коли сайт працює через HTTPS (cookie тоді йде лише захищеним каналом); для `http://localhost` лишайте `false` |
-| `backend/.env` | `CORS_ORIGINS` | необов'язково: дозволені origin через кому |
-| `backend/.env` | `LOG_LEVEL`, `PORT` | необов'язково: рівень логів (типово `info`), порт (типово `3000`) |
-| `backend/.env` | `BCRYPT_ROUNDS` | необов'язково: складність bcrypt (4-15), типово `10` |
-| `backend/.env` | `TRUST_PROXY` | необов'язково: кількість reverse-proxy перед API (у прод-compose `1`), потрібне для коректного IP у rate limit |
-| `backend/.env` | `REDIS_URL` | необов'язково: Redis для черги листів (у compose задано). Без нього листи відправляються в самому процесі API, без повторів |
-| `backend/.env` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | необов'язково: пошта. Листи вмикаються, коли задано `SMTP_HOST` і `MAIL_FROM`; без них нічого не відправляється й нічого не падає (сповіщення лишаються в застосунку). Заготовки з поясненнями — у `backend/.env.example` |
-| `backend/.env` | `APP_URL` | необов'язково: куди ведуть посилання в листах (типово `http://localhost:5173`) |
-| `backend/.env` | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | необов'язково: сховище файлів (зображення проєктів) у будь-якому S3-сумісному сервісі. Завантаження вмикається, коли задано пару ключів; без неї решта працює, а завантаження відповідає `503`. У dev-compose працює локальне сховище з тестовими ключами |
-| `backend/.env` | `RATE_LIMIT_PER_MINUTE` | необов'язково: запитів на хвилину з однієї IP до API (за замовчуванням 100; логін і реєстрація мають суворіші власні ліміти). Піднімають лише для навантажувальних тестів |
-| `backend/.env` | `OUTBOX_POLL_INTERVAL_MS` | необов'язково: як часто relay outbox шукає недоставлені події, мс (за замовчуванням 2000; 0 вимикає цикл). Події доставляються й одразу після запиту; relay лише страхує |
-| `backend/.env` | `METRICS_TOKEN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SENTRY_DSN` | необов'язково: спостережуваність (токен для `/api/metrics`, куди слати трейси, Sentry). Без них вимкнено; див. `docs/OPERATIONS.md` |
-| `frontend/.env` | `VITE_SENTRY_DSN` | необов'язково: звіти про помилки з браузера (вшивається при збірці; хост треба додати в CSP) |
-| `backend/.env` | `TEST_DATABASE_URL` | необов'язково: БД для e2e (типово `localhost:5434/flowsync_test`) |
-| `frontend/.env` | `VITE_API_URL` | необов'язково: базова адреса API, типово `/api` (той самий origin; у прод-образі `/api`) |
-| `frontend/.env` | `VITE_PROXY_TARGET` | необов'язково: куди Vite-проксі веде `/api` у dev, типово `http://localhost:3000` (у compose `http://backend:3000`) |
+| `.env` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | the DB in Docker and the backend's `DATABASE_URL` in compose |
+| `backend/.env` | `JWT_SECRET` | the JWT signing secret; ≥ 32 characters in production. The app does not start without it |
+| `backend/.env` | `DATABASE_URL` | the DB for running on the host; overridden in compose |
+| `backend/.env` | `JWT_EXPIRES_IN` | optional: the access token lifetime (`15m`, `1h`), default `15m` |
+| `backend/.env` | `REFRESH_TOKEN_TTL_DAYS` | optional: the session lifetime (the refresh cookie), 1-90 days, default `7` |
+| `backend/.env` | `COOKIE_SECURE` | optional: `true` when the site runs over HTTPS (the cookie then travels only over a secure channel); keep `false` for `http://localhost` |
+| `backend/.env` | `CORS_ORIGINS` | optional: allowed origins, comma-separated |
+| `backend/.env` | `LOG_LEVEL`, `PORT` | optional: the log level (default `info`), the port (default `3000`) |
+| `backend/.env` | `BCRYPT_ROUNDS` | optional: bcrypt cost (4-15), default `10` |
+| `backend/.env` | `TRUST_PROXY` | optional: the number of reverse proxies in front of the API (`1` in the production compose), needed for a correct IP in the rate limit |
+| `backend/.env` | `REDIS_URL` | optional: Redis for the mail queue (set in compose). Without it, emails are sent inside the API process, without retries |
+| `backend/.env` | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` | optional: mail. Emails are enabled when `SMTP_HOST` and `MAIL_FROM` are set; without them nothing is sent and nothing fails (notifications stay in the app). Templates with explanations are in `backend/.env.example` |
+| `backend/.env` | `APP_URL` | optional: where the links in emails point (default `http://localhost:5173`) |
+| `backend/.env` | `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | optional: file storage (project images) in any S3-compatible service. Uploading is enabled when the key pair is set; without it everything else works and uploads answer `503`. The dev compose runs local storage with test keys |
+| `backend/.env` | `RATE_LIMIT_PER_MINUTE` | optional: requests per minute from one IP to the API (default 100; login and registration have their own stricter limits). Raised only for load tests |
+| `backend/.env` | `OUTBOX_POLL_INTERVAL_MS` | optional: how often the outbox relay looks for undelivered events, ms (default 2000; 0 disables the loop). Events are also delivered right after the request; the relay is only a safety net |
+| `backend/.env` | `METRICS_TOKEN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SENTRY_DSN` | optional: observability (a token for `/api/metrics`, where to send traces, Sentry). Disabled without them; see `docs/OPERATIONS.md` |
+| `frontend/.env` | `VITE_SENTRY_DSN` | optional: error reports from the browser (baked in at build time; the host must be added to the CSP) |
+| `backend/.env` | `TEST_DATABASE_URL` | optional: the DB for e2e (default `localhost:5434/flowsync_test`) |
+| `frontend/.env` | `VITE_API_URL` | optional: the API base address, default `/api` (same origin; `/api` in the production image) |
+| `frontend/.env` | `VITE_PROXY_TARGET` | optional: where the Vite proxy sends `/api` in dev, default `http://localhost:3000` (`http://backend:3000` in compose) |
 
-Файли `.env` не комітяться, у репозиторії лише `.env.example`. Усі змінні backend валідує zod-схема
-(`backend/src/config/env.schema.ts`): при помилці застосунок не стартує й показує, що саме не так.
+`.env` files are not committed; only `.env.example` is in the repository. All backend variables are validated by a zod schema
+(`backend/src/config/env.schema.ts`): on an error the app does not start and shows what exactly is wrong.
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`): на кожен PR і push у `main`. Backend: `prisma validate`, Prettier, ESLint, типи, unit та e2e
-  (на Postgres у service-контейнері), перевірка, що `schema.prisma` не розійшлась з міграціями, збірка. Frontend: Prettier, ESLint, перевірка згенерованих типів, типи, тести, збірка. Обидва пакети перевіряються `npm audit`. Окрема джоба `e2e` піднімає прод-подібний стек і проганяє Playwright. Потім збірка Docker-образів.
-- **Deploy** (`.github/workflows/deploy.yml`): після успішного CI на `main` публікує образи в Docker Hub:
-  `<DOCKER_USERNAME>/flowsync-back` і `<DOCKER_USERNAME>/flowsync-front` з тегами `:<sha коміту>` та `:latest`.
-  Потрібні секрети репозиторію `DOCKER_USERNAME` і `DOCKER_PASSWORD` (токен доступу Docker Hub).
-- **Dependabot** щотижня пропонує оновлення npm, Docker і GitHub Actions.
+- **CI** (`.github/workflows/ci.yml`): on every PR and push to `main`. Backend: `prisma validate`, Prettier, ESLint, types, unit and e2e
+  (on Postgres in a service container), a check that `schema.prisma` has not drifted from the migrations, the build. Frontend: Prettier, ESLint, a check of the generated types, types, tests, the build. Both packages are checked with `npm audit`. A separate `e2e` job brings up the production-like stack and runs Playwright. Then the Docker image build.
+- **Deploy** (`.github/workflows/deploy.yml`): after a successful CI on `main` it publishes images to Docker Hub:
+  `<DOCKER_USERNAME>/flowsync-back` and `<DOCKER_USERNAME>/flowsync-front` with the tags `:<commit sha>` and `:latest`.
+  The repository secrets `DOCKER_USERNAME` and `DOCKER_PASSWORD` (a Docker Hub access token) are required.
+- **Dependabot** proposes npm, Docker and GitHub Actions updates weekly.
 
-## Внесок
+## Contributing
 
-1. Форк, гілка `feat/<назва>` або `fix/<назва>`.
-2. Коміти за Conventional Commits (`feat(tasks): ...`), англійською.
-3. Перед PR локально пройдіть `lint`, `format:check`, `typecheck` і тести.
+1. Fork, a `feat/<name>` or `fix/<name>` branch.
+2. Commits follow Conventional Commits (`feat(tasks): ...`), in English.
+3. Before a PR, run `lint`, `format:check`, `typecheck` and the tests locally.
 
-## Ліцензія
+## License
 
 MIT.

@@ -1,13 +1,13 @@
-# 12. Форми
+# 12. Forms
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D12 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D12 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
 `react-hook-form` + `zod`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Formik: застарів
+Formik: outdated

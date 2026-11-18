@@ -1,13 +1,13 @@
-# 4. Стиль API
+# 4. API style
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D4 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D4 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-REST + OpenAPI (Swagger), camelCase у JSON
+REST + OpenAPI (Swagger), camelCase in JSON
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-GraphQL: один веб-клієнт, прості сутності
+GraphQL: a single web client, simple entities

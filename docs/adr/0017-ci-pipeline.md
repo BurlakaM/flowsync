@@ -1,13 +1,13 @@
 # 17. CI
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D17 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D17 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-PR-перевірки (lint, типи, тести, збірка) → деплой лише з `main` після успіху; теги образів `:<sha>` і `:latest`
+PR checks (lint, types, tests, build) → deploy only from `main` after success; image tags `:<sha>` and `:latest`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
 —

@@ -1,22 +1,22 @@
-# 7. Доступ до ресурсів
+# 7. Resource access
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D7 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D7 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Перевірка членства в проєкті в сервісах; для чужого ресурсу повертаємо 404
+Project membership is checked in services; for someone else's resource we return 404
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-CASL — лише якщо правил стане багато
+CASL — only if the rules become numerous
 
-## Наслідки
+## Consequences
 
-- Стороння людина не дізнається, що ресурс існує: відповідь `404`, а не `403`.
-- Правило живе в `ProjectsService` (див. ADR 24), а не в контролерах.
+- An outsider cannot learn that a resource exists: the response is `404`, not `403`.
+- The rule lives in `ProjectsService` (see ADR 24), not in controllers.
 
-## Коли переглянути
+## When to revisit
 
-Тонкі права з D29 перейшли в CASL; «хто бачить проєкт» лишається звичайним запитом.
+Fine-grained permissions from D29 moved to CASL; "who can see a project" remains a plain query.

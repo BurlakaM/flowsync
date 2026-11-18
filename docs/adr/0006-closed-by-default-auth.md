@@ -1,23 +1,23 @@
-# 6. Авторизація запитів
+# 6. Request authorization
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D6 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D6 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Passport JWT; глобальний guard «закрито за замовчуванням» + `@Public()`; ролі через `@Roles()`
+Passport JWT; a global "closed by default" guard + `@Public()`; roles via `@Roles()`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Окремі guard-и на кожному маршруті забувають додати (див. B4)
+Per-route guards get forgotten (see B4)
 
-## Наслідки
+## Consequences
 
-- Забути закрити маршрут неможливо за конструкцією: новий маршрут закритий, доки хтось не напише `@Public()` і коментар.
-- Кожен публічний маршрут — свідомий рядок, який видно на рев'ю (реєстрація, логін, refresh, logout, скидання пароля, підтвердження email, health, metrics).
-- Ціна: пошук користувача в БД на кожен запит у `JwtStrategy` (один запит по індексу), щоб видалення користувача чи зміна пароля діяли одразу.
+- Forgetting to protect a route is impossible by construction: a new route is closed until someone writes `@Public()` and a comment.
+- Every public route is a deliberate line visible in review (register, login, refresh, logout, password reset, email verification, health, metrics).
+- Cost: a database user lookup on every request in `JwtStrategy` (one indexed query), so that deleting a user or changing a password takes effect immediately.
 
-## Коли переглянути
+## When to revisit
 
-Якщо цей пошук стане вузьким місцем, кешувати користувача на кілька секунд і змиритися із затримкою відкликання доступу.
+If this lookup becomes a bottleneck, cache the user for a few seconds and accept a delay in revoking access.

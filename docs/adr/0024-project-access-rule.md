@@ -1,22 +1,22 @@
-# 24. Права доступу
+# 24. Access rights
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D24 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D24 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Єдине джерело правди «хто бачить проєкт» — `ProjectsService` (власник або учасник); сторонній → 404, учасник без права → 403; ADMIN не обходить доступ до проєктів
+A single source of truth for "who can see a project" — `ProjectsService` (owner or member); an outsider → 404, a member without the right → 403; ADMIN does not bypass project access
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Глобальний обхід для ADMIN: розширює поверхню атаки; CASL: зайве, правил поки мало
+A global bypass for ADMIN: widens the attack surface; CASL: overkill, few rules so far
 
-## Наслідки
+## Consequences
 
-- Одне правило в одному місці (`accessFilter`) використовують задачі, коментарі, пошук (`accessibleIds`) і сповіщення.
-- У ADMIN немає «чорного ходу» до чужих проєктів: менша поверхня атаки ціною того, що підтримка не бачить дані без доступу до БД.
+- One rule in one place (`accessFilter`) is used by tasks, comments, search (`accessibleIds`) and notifications.
+- ADMIN has no "back door" into other people's projects: a smaller attack surface, at the cost that support cannot see data without database access.
 
-## Коли переглянути
+## When to revisit
 
-Якщо підтримці знадобиться бачити проєкти клієнтів, додати журналований режим «увійти як», а не тихий обхід.
+If support needs to see customers' projects, add a logged "sign in as" mode rather than a silent bypass.

@@ -1,64 +1,64 @@
-# FlowSync — модель загроз (STRIDE)
+# FlowSync — threat model (STRIDE)
 
-Одна сторінка: що ми захищаємо, від кого, чим, і що **свідомо лишається незахищеним**. Документ потрібен не для галочки:
-він показує, куди дивитися першим, коли щось іде не так, і що ще не зроблено. Оновлюй його разом зі змінами в авторизації,
-сховищах чи інфраструктурі.
+One page: what we protect, from whom, with what, and what **is deliberately left unprotected**. This document is not a formality:
+it shows where to look first when something goes wrong and what is still not done. Update it together with changes to authorization,
+storage or infrastructure.
 
-## Що захищаємо
+## What we protect
 
-| Актив | Чому важливий |
+| Asset | Why it matters |
 |---|---|
-| Акаунти (пароль, сесія) | захоплений акаунт = доступ до всіх проєктів власника |
-| Дані проєктів: задачі, коментарі, зображення | приватність між проєктами — головна обіцянка продукту |
-| Цілісність журналу активності | на ньому тримаються довіра до змін і сповіщення |
-| Сервер і секрети (`JWT_SECRET`, БД, SMTP, S3) | компрометація секрету = підробка будь-якого токена |
-| Доступність | пет-проєкт, але нижче за SLO з `docs/SLO.md` падати не повинен |
+| Accounts (password, session) | a hijacked account = access to all of the owner's projects |
+| Project data: tasks, comments, images | privacy between projects is the product's main promise |
+| Integrity of the activity log | trust in changes and notifications rest on it |
+| The server and secrets (`JWT_SECRET`, DB, SMTP, S3) | a compromised secret = forging any token |
+| Availability | a pet project, but it must not fall below the SLO in `docs/SLO.md` |
 
-## Межі довіри та входи
+## Trust boundaries and entry points
 
 ```
-Інтернет ──► Caddy (TLS) ──► nginx (SPA, CSP) ──► API (NestJS) ──► PostgreSQL
- браузер                                              │ ├──► Redis (черга листів, Socket.IO)
- (недовірений)                                        │ ├──► S3 (зображення)
-                                                      │ └──► SMTP (листи)
-Електронна пошта користувача — окремий канал, який ми не контролюємо (на ньому тримаються скидання пароля й підтвердження).
+Internet ──► Caddy (TLS) ──► nginx (SPA, CSP) ──► API (NestJS) ──► PostgreSQL
+ browser                                              │ ├──► Redis (mail queue, Socket.IO)
+ (untrusted)                                          │ ├──► S3 (images)
+                                                      │ └──► SMTP (email)
+The user's email is a separate channel we do not control (password reset and verification rely on it).
 ```
 
-Недовірене все, що приходить із браузера (тіло, заголовки, cookie, токени з посилань) і з пошти. Довірені: БД, Redis, S3, SMTP
-у внутрішній Docker-мережі (назовні відкритий лише Caddy; БД і Redis не публікуються).
+Everything that comes from the browser (body, headers, cookies, tokens from links) and from email is untrusted. Trusted: the DB, Redis, S3, SMTP
+in the internal Docker network (only Caddy is open to the outside; the DB and Redis are not published).
 
 ## STRIDE
 
-| | Загроза | Що зроблено | Що лишилось |
+| | Threat | What is done | What remains |
 |---|---|---|---|
-| **S** Підміна особи | Підбір пароля | bcrypt; ліміт 5 спроб/хв на IP; **блокування акаунта на 15 хв після 5 невдач**; однаковий час відповіді для невідомого email (фіктивне порівняння bcrypt) | блокування дає змогу «заглушити» чужий акаунт на 15 хв (прийнята ціна; скидання пароля його знімає); немає 2FA |
-| | Викрадення сесії | access-JWT 15 хв у пам'яті; refresh-токен у `httpOnly` `SameSite=Strict` cookie з ротацією й відкликанням усієї родини при повторному використанні; **зміна/скидання пароля відкликає всі refresh-токени й анулює видані раніше access-токени** (`passwordChangedAt`) | XSS усе ще може діяти від імені користувача, поки вкладка відкрита (CSP зменшує ризик, не знімає) |
-| | Захоплення акаунта через скидання пароля | токен 32 байти, у БД лише SHA-256, діє 1 годину й один раз, старі скасовуються новим; однакова відповідь для відомого й невідомого email; 1 лист/хв на акаунт; токен у `#фрагменті`, а не в query (не потрапляє в логи й `Referer`); сторінка підтвердження вимагає кліку (сканери пошти не «спалюють» посилання) | безпека акаунта дорівнює безпеці пошти користувача |
-| | Реєстрація з чужою адресою для спаму | листи-сповіщення лише на **підтверджені** адреси | перший лист-підтвердження все одно йде на будь-яку адресу (одноразово, з ліміту 5 реєстрацій/хв на IP) |
-| **T** Підміна даних | Редагування чужого ресурсу | кожен ресурс перевіряється в сервісі (членство в проєкті), чужий → `404`; права в одній карті CASL | — |
-| | Втрачене оновлення (двоє редагують) | оптимістична конкурентність: `version` + `409` | злиття змін немає |
-| | Підміна ролі при реєстрації | роль не приймається від клієнта (`400`), завжди `USER` | адміна створюють напряму в БД |
-| | Ін'єкції | DTO-валідація з білим списком полів; Prisma параметризує запити; єдиний raw SQL (`claim` outbox, пошук) — з параметрами | — |
-| **R** Відмова від дій | «Я цього не робив» | журнал активності проєкту, `requestId` у логах і відповідях, події в outbox | журнал стосується змін у проєктах; входи й скидання паролів лише в логах (pino), без окремого журналу безпеки |
-| **I** Витік | Витік хешів/секретів через API | `password` ніколи не в `select`; лише явні `select`; логи редагують `authorization` і `cookie`; секрети лише через zod-схему | немає шифрування «у спокої» на рівні БД і S3 (покладаємось на диск/хостинг) |
-| | Перелік акаунтів | скидання пароля й логін не розкривають існування email | реєстрація відповідає `409`, якщо email зайнятий (прийнято: інакше неможливо зареєструватися) |
-| | Доступ до зображень | лише через API з перевіркою членства; ключ об'єкта клієнту не віддається; тип файлу за байтами, SVG заборонено, до 2 МБ | — |
-| | Витік метрик/Swagger | `/api/metrics` закритий nginx (404) і за бажанням токеном; Swagger вимкнений у production | — |
-| **D** Відмова в обслуговуванні | Перевантаження запитами | глобальний ліміт 100/хв на IP, суворіші на авторизації й відправці листів; `helmet`; ліміт розміру файлів | ліміти за IP не захищають від розподіленої атаки (потрібен CDN/WAF) |
-| | Збій підписника або Redis | outbox повторює доставку з backoff, `DEAD` + алерт; пошта й сокети працюють без Redis | один інстанс БД; без відмовостійкості (SLO 99,5 % це враховує) |
-| | Каскад повільного SMTP | листи йдуть у чергу (BullMQ) із повторами, запит не чекає | — |
-| **E** Підвищення привілеїв | Звичайний користувач стає адміном | `@Roles(Role.ADMIN)` глобальним guard-ом; ADMIN **не** обходить доступ до проєктів | — |
-| | Кожен новий маршрут «забули закрити» | глобальний `JwtAuthGuard`: закрито за замовчуванням, відкриває лише `@Public()` із коментарем причини | — |
-| | Ланцюг постачання | `npm audit`, Dependabot, **Trivy образів, gitleaks, CodeQL, SBOM у CI**; образи під непривілейованим користувачем | прямі залежності не зафіксовано за хешами; `latest`-теги сканерів у скрипті |
+| **S** Spoofing | Password guessing | bcrypt; a limit of 5 attempts/min per IP; **account lockout for 15 min after 5 failures**; the same response time for an unknown email (a dummy bcrypt comparison) | the lockout lets someone "silence" another person's account for 15 min (an accepted cost; a password reset lifts it); no 2FA |
+| | Session theft | a 15-min access JWT in memory; the refresh token in an `httpOnly` `SameSite=Strict` cookie with rotation and revocation of the whole family on reuse; **a password change/reset revokes all refresh tokens and invalidates previously issued access tokens** (`passwordChangedAt`) | XSS can still act on the user's behalf while the tab is open (the CSP reduces the risk, does not remove it) |
+| | Account takeover via password reset | a 32-byte token, only its SHA-256 in the DB, valid for 1 hour and once, older ones cancelled by a new one; the same response for a known and an unknown email; 1 email/min per account; the token is in the `#fragment`, not the query (does not reach logs and `Referer`); the confirmation page requires a click (mail scanners do not "burn" the link) | account security equals the security of the user's mailbox |
+| | Registering with someone else's address to spam | notification emails go only to **verified** addresses | the first verification email still goes to any address (once, under the limit of 5 registrations/min per IP) |
+| **T** Tampering | Editing someone else's resource | every resource is checked in the service (project membership), someone else's → `404`; permissions in a single CASL map | — |
+| | Lost update (two people editing) | optimistic concurrency: `version` + `409` | there is no merge of changes |
+| | Role tampering at registration | the role is not accepted from the client (`400`), it is always `USER` | an admin is created directly in the DB |
+| | Injection | DTO validation with a field whitelist; Prisma parameterizes queries; the only raw SQL (outbox `claim`, search) uses parameters | — |
+| **R** Repudiation | "I didn't do that" | the project activity log, `requestId` in logs and responses, events in the outbox | the log covers changes in projects; sign-ins and password resets are only in logs (pino), with no separate security log |
+| **I** Information disclosure | Leaking hashes/secrets through the API | `password` is never in `select`; only explicit `select`s; logs redact `authorization` and `cookie`; secrets only through the zod schema | no encryption at rest at the DB and S3 level (we rely on the disk/hosting) |
+| | Account enumeration | password reset and login do not reveal whether an email exists | registration answers `409` if the email is taken (accepted: otherwise registering is impossible) |
+| | Access to images | only through the API with a membership check; the object key is not given to the client; file type by bytes, SVG forbidden, up to 2 MB | — |
+| | Leaking metrics/Swagger | `/api/metrics` is closed by nginx (404) and optionally by a token; Swagger is disabled in production | — |
+| **D** Denial of service | Request flooding | a global limit of 100/min per IP, stricter on authorization and email sending; `helmet`; file size limits | per-IP limits do not protect against a distributed attack (a CDN/WAF is needed) |
+| | A subscriber or Redis failure | the outbox retries delivery with backoff, `DEAD` + an alert; mail and sockets work without Redis | a single DB instance; no fault tolerance (the 99.5% SLO accounts for this) |
+| | Cascade from a slow SMTP | emails go to a queue (BullMQ) with retries, the request does not wait | — |
+| **E** Elevation of privilege | An ordinary user becomes an admin | `@Roles(Role.ADMIN)` via a global guard; ADMIN does **not** bypass project access | — |
+| | Every new route "forgotten to close" | the global `JwtAuthGuard`: closed by default, only `@Public()` with a reason comment opens it | — |
+| | Supply chain | `npm audit`, Dependabot, **Trivy for images, gitleaks, CodeQL, an SBOM in CI**; images run as an unprivileged user | direct dependencies are not pinned by hash; the scanners' `latest` tags in the script |
 
-## Прийняті ризики (з датою перегляду)
+## Accepted risks (with a review date)
 
-1. Немає 2FA: компрометація пошти = компрометація акаунта. Повернутися, коли з'являться реальні користувачі.
-2. Немає WAF/CDN: розподілене DoS не відбивається.
-3. Секрети лежать у `.env` на сервері; менеджера секретів немає.
+1. No 2FA: a compromised mailbox = a compromised account. Return to this when real users appear.
+2. No WAF/CDN: a distributed DoS is not repelled.
+3. Secrets live in `.env` on the server; there is no secret manager.
 
-## Що перевіряти після змін
+## What to check after changes
 
-- Новий публічний маршрут → `@Public()` + коментар + ліміт частоти + тест «без токена».
-- Нове сховище чи канал виходу → оновити діаграму й таблицю.
-- Нова змінна середовища із секретом → тільки через `config/env.schema.ts`, ніколи в логи.
+- A new public route → `@Public()` + a comment + a rate limit + a "no token" test.
+- A new storage or outbound channel → update the diagram and the table.
+- A new environment variable with a secret → only through `config/env.schema.ts`, never into logs.

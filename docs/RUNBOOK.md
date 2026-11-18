@@ -1,118 +1,118 @@
-# FlowSync — runbook: що робити, коли…
+# FlowSync — runbook: what to do when…
 
-Для чергового (зараз це власник), який відкриває цей файл о третій ночі. Кожен розділ: **ознака → що перевірити → що робити → як переконатися**.
-Команди — з кореня репозиторію на сервері (`/opt/flowsync`) або локально для dev. Не заходьте в БД з `DROP`/`DELETE` без бекапу.
+For the on-call person (currently the owner) who opens this file at three in the morning. Each section: **symptom → what to check → what to do → how to confirm**.
+Commands are run from the repository root on the server (`/opt/flowsync`) or locally for dev. Do not run `DROP`/`DELETE` in the DB without a backup.
 
-Корисні посилання: стан і метрики `docs/OPERATIONS.md`, SLO й алерти `docs/SLO.md`, модель загроз `docs/THREAT_MODEL.md`, архітектура `docs/ARCHITECTURE.md`.
+Useful links: state and metrics `docs/OPERATIONS.md`, SLOs and alerts `docs/SLO.md`, threat model `docs/THREAT_MODEL.md`, architecture `docs/ARCHITECTURE.md`.
 
-## Швидка діагностика (з чого почати завжди)
+## Quick diagnosis (always start here)
 
 ```bash
-docker compose ps                                   # хто впав або «unhealthy»
-curl -s https://<домен>/api/health/ready            # 200 = БД і Redis відповідають, 503 = залежність
-docker compose logs --tail 100 backend              # останні рядки; кожен має requestId і trace_id
+docker compose ps                                   # what is down or "unhealthy"
+curl -s https://<domain>/api/health/ready           # 200 = DB and Redis respond, 503 = a dependency
+docker compose logs --tail 100 backend              # the latest lines; each has requestId and trace_id
 ```
 
-Один запит користувача можна простежити: `requestId` є в тілі помилки й заголовку `X-Request-Id`, `trace_id` — у кожному рядку логу
-і в Jaeger.
+A single user request can be traced: `requestId` is in the error body and the `X-Request-Id` header, `trace_id` is in every log line
+and in Jaeger.
 
-## 1. Сайт не відкривається (5xx, таймаут)
+## 1. The site does not open (5xx, timeout)
 
-- **Перевірте:** `docker compose ps`; `curl -I https://<домен>/`; `curl -s https://<домен>/api/health/live`.
-- **Caddy/сертифікат:** `docker compose logs caddy`. Помилка ACME або «certificate expired» → DNS-запис вказує на сервер? порти 80/443 відкриті?
+- **Check:** `docker compose ps`; `curl -I https://<domain>/`; `curl -s https://<domain>/api/health/live`.
+- **Caddy/certificate:** `docker compose logs caddy`. An ACME error or "certificate expired" → does the DNS record point at the server? are ports 80/443 open?
 - **nginx (frontend) unhealthy:** `docker compose logs frontend`, `docker compose restart frontend`.
-- **backend не стартує:** `docker compose logs backend`. Типові причини: невалідна змінна середовища (zod пише, яка саме), `JWT_SECRET` коротший
-  за 32 символи, міграція впала. Backend **навмисно** не стартує з поганим конфігом.
-- **Переконатися:** `./ops/smoke-test.sh https://<домен>` повертає «Smoke test passed».
+- **backend does not start:** `docker compose logs backend`. Typical causes: an invalid environment variable (zod says which one), a `JWT_SECRET` shorter
+  than 32 characters, a failed migration. The backend **deliberately** refuses to start with a bad config.
+- **Confirm:** `./ops/smoke-test.sh https://<domain>` prints "Smoke test passed".
 
-## 2. Після деплою все погано
+## 2. Everything is bad after a deploy
 
-`ops/deploy.sh` сам відкочується, якщо smoke-тест провалився. Якщо відкіт не спрацював або проблему видно пізніше:
+`ops/deploy.sh` rolls back by itself if the smoke test fails. If the rollback did not work or the problem shows up later:
 
 ```bash
-cat .deployed-tag                                         # останній тег, що пройшов smoke-тест
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.vps.yml" ./ops/deploy.sh <попередній-sha>
+cat .deployed-tag                                         # the last tag that passed the smoke test
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.vps.yml" ./ops/deploy.sh <previous-sha>
 ```
 
-**Увага:** відкіт образу **не скасовує міграцій**. Якщо нова міграція була несумісна зі старим кодом — відновлюйте БД з бекапу (розділ 8).
+**Warning:** rolling back an image does **not undo migrations**. If a new migration was incompatible with the old code, restore the DB from a backup (section 8).
 
-## 3. БД недоступна або /api/health/ready дає 503
+## 3. The DB is unavailable or /api/health/ready returns 503
 
-- **Перевірте:** `docker compose ps db`; `docker compose logs --tail 50 db`; місце на диску `df -h` (повний диск — найчастіша причина).
-- **Не відповідає, але диск вільний:** `docker compose restart db`, зачекайте healthcheck. Дані в томі `pg_data`, перезапуск їх не торкається.
-- **Заборонено без дозволу:** `docker compose down -v`, `docker volume rm`, `docker system prune` — вони знищують дані.
-- **Переконатися:** `/api/health/ready` → 200; у Grafana p95 і 5xx повертаються до норми.
+- **Check:** `docker compose ps db`; `docker compose logs --tail 50 db`; disk space `df -h` (a full disk is the most common cause).
+- **Not responding but the disk is free:** `docker compose restart db`, wait for the healthcheck. Data is in the `pg_data` volume, a restart does not touch it.
+- **Forbidden without permission:** `docker compose down -v`, `docker volume rm`, `docker system prune` — they destroy data.
+- **Confirm:** `/api/health/ready` → 200; in Grafana p95 and 5xx return to normal.
 
-## 4. Redis недоступний
+## 4. Redis is unavailable
 
-Ознака: `/api/health/ready` повертає 503 з `redis: down`; листи не йдуть; живі оновлення працюють лише в межах одного інстансу.
+Symptom: `/api/health/ready` returns 503 with `redis: down`; emails are not sent; live updates work only within one instance.
 
-- `docker compose restart redis`. Черга листів лежить у томі `redis_data` (AOF), тому поставлені листи переживуть перезапуск.
-- Застосунок без Redis **продовжує працювати** (листи йдуть одразу, без повторів), але `ready` показує 503: це сигнал оператору.
+- `docker compose restart redis`. The mail queue lives in the `redis_data` volume (AOF), so queued emails survive a restart.
+- Without Redis the app **keeps working** (emails are sent immediately, without retries), but `ready` shows 503: this is a signal to the operator.
 
-## 5. Не приходять листи (підтвердження, скидання пароля, сповіщення)
+## 5. Emails do not arrive (verification, password reset, notifications)
 
-- **SMTP не налаштований:** у логах backend при старті «Email is off (SMTP_HOST and MAIL_FROM are not set)». У проді SMTP обов'язковий (`SMTP_HOST`, `MAIL_FROM` у `backend/.env`).
-- **Черга:** метрика `flowsync_mail_queue_jobs{state="failed"}` > 0 (алерт `MailJobsFailing`) — поштовий сервер відмовляє. Завдання повторюються самі
-  (5 спроб, експоненційна затримка); після відновлення SMTP вони дійдуть.
-- **Лист «підтвердження» не дійшов:** користувач може натиснути «Надіслати посилання ще раз» (не частіше разу на хвилину).
-- **Dev:** усі листи видно в Mailpit, http://localhost:8025.
+- **SMTP is not configured:** the backend log at startup says "Email is off (SMTP_HOST and MAIL_FROM are not set)". SMTP is mandatory in production (`SMTP_HOST`, `MAIL_FROM` in `backend/.env`).
+- **The queue:** the metric `flowsync_mail_queue_jobs{state="failed"}` > 0 (the `MailJobsFailing` alert) — the mail server is refusing. Jobs retry by themselves
+  (5 attempts, exponential delay); once SMTP recovers they will go through.
+- **A "verification" email did not arrive:** the user can press "Send the link again" (no more than once a minute).
+- **Dev:** all emails are visible in Mailpit, http://localhost:8025.
 
-## 6. Подія застрягла (алерт `OutboxEventDead` / `OutboxLagging`)
+## 6. An event is stuck (the `OutboxEventDead` / `OutboxLagging` alert)
 
-Означає: зміна збережена, але аудит, сповіщення або живе оновлення для неї не доставлено.
+It means: the change was saved, but the audit entry, notification or live update for it was not delivered.
 
 ```bash
 docker compose exec db psql -U postgres -d flowsync -c \
   "SELECT id, type, attempts, last_error, next_attempt_at FROM outbox_events WHERE status <> 'DONE' ORDER BY created_at"
 ```
 
-- `last_error` каже, що саме падає. Виправте причину (наприклад, баг підписника), задеплойте виправлення.
-- Дати `DEAD`-подіям ще одну серію спроб (безпечно: підписники ідемпотентні):
+- `last_error` says what exactly is failing. Fix the cause (for example, a subscriber bug) and deploy the fix.
+- Give `DEAD` events another round of attempts (safe: subscribers are idempotent):
 
 ```bash
 docker compose exec db psql -U postgres -d flowsync -c \
   "UPDATE outbox_events SET status='PENDING', attempts=0, next_attempt_at=now() WHERE status='DEAD'"
 ```
 
-- `OutboxLagging` без `DEAD`: relay не працює або БД перевантажена — `docker compose logs backend | grep -i outbox`.
+- `OutboxLagging` without `DEAD`: the relay is not running or the DB is overloaded — `docker compose logs backend | grep -i outbox`.
 
-## 7. Повільно або багато помилок (алерти `SlowRequests`, `HighErrorRatio`)
+## 7. Slow or many errors (the `SlowRequests`, `HighErrorRatio` alerts)
 
-1. Grafana «FlowSync API»: який маршрут (панель «Slowest routes»), відколи.
-2. Jaeger: знайти повільний трейс цього маршруту; довгі `prisma:client:db_query` — проблема в SQL.
-3. Перевірити навантаження на БД (`docker stats`, `pg_stat_activity`). Типова причина — запит без індексу або `COUNT` по великій таблиці
-   (див. `docs/PERFORMANCE.md`: так знайшли повне сканування лічильників).
-4. Якщо почалось після деплою — відкіт (розділ 2).
-5. Вимірювання на копії з даними: `./ops/load/run.sh`.
+1. Grafana "FlowSync API": which route (the "Slowest routes" panel), since when.
+2. Jaeger: find a slow trace of that route; long `prisma:client:db_query` spans mean the problem is in SQL.
+3. Check the DB load (`docker stats`, `pg_stat_activity`). A typical cause is a query without an index or a `COUNT` over a large table
+   (see `docs/PERFORMANCE.md`: that is how a full count scan was found).
+4. If it started after a deploy — roll back (section 2).
+5. Measure on a copy with data: `./ops/load/run.sh`.
 
-## 8. Відновлення з бекапу
+## 8. Restoring from a backup
 
 ```bash
-ls -lt backups/ | head                                  # доступні дампи
-./ops/restore-verify.sh backups/flowsync-<час>.dump     # СПЕРШУ перевірити, що дамп відновлюється (тимчасова БД, прод не чіпає)
+ls -lt backups/ | head                                  # available dumps
+./ops/restore-verify.sh backups/flowsync-<time>.dump    # FIRST check that the dump restores (a temporary DB, does not touch prod)
 ```
 
-Відновлення в прод **руйнує поточні дані**, тому це свідома дія власника: зупиніть backend, створіть порожню БД, `pg_restore` у неї,
-перемкніть `POSTGRES_DB` або перейменуйте БД, запустіть backend. Перед будь-яким відновленням зробіть ще один бекап поточного стану.
-Бекап робиться перед кожним деплоєм (`ops/deploy.sh`) і за розкладом cron (приклад у `docs/OPERATIONS.md`; на VPS його ще треба налаштувати); дампи зберігаються 14 днів.
+Restoring into production **destroys the current data**, so this is a deliberate action by the owner: stop the backend, create an empty DB, `pg_restore` into it,
+switch `POSTGRES_DB` or rename the DB, start the backend. Before any restore, take one more backup of the current state.
+A backup is taken before every deploy (`ops/deploy.sh`) and on a cron schedule (an example is in `docs/OPERATIONS.md`; it still has to be set up on the VPS); dumps are kept for 14 days.
 
-## 9. Користувач не може увійти
+## 9. A user cannot sign in
 
-| Ознака | Причина й дія |
+| Symptom | Cause and action |
 |---|---|
-| «Too many failed sign-in attempts» (429) | акаунт заблоковано на 15 хв після 5 невдач; саме мине, або користувач скидає пароль («Забули пароль?»). Зняти вручну: `UPDATE users SET locked_until=NULL, failed_login_attempts=0 WHERE email='…'` |
-| «Invalid email or password» | звичайна помилка пароля; перевірте, що email без друкарських помилок |
-| Лист скидання не приходить | розділ 5; зверніть увагу: форма відповідає однаково для будь-якої адреси (це навмисно, щоб не розкривати акаунти) |
-| Після зміни пароля «вилетіли» всі пристрої | так задумано: зміна пароля завершує всі сесії |
+| "Too many failed sign-in attempts" (429) | the account is locked for 15 min after 5 failures; it expires by itself, or the user resets the password ("Forgot password?"). To lift it manually: `UPDATE users SET locked_until=NULL, failed_login_attempts=0 WHERE email='…'` |
+| "Invalid email or password" | an ordinary wrong password; check the email for typos |
+| The reset email does not arrive | section 5; note that the form responds the same for any address (deliberate, so as not to reveal accounts) |
+| After a password change all devices were "kicked out" | by design: a password change ends all sessions |
 
-## 10. Підозра на компрометацію
+## 10. Suspected compromise
 
-- **Секрет витік (`JWT_SECRET`, SMTP, S3, БД):** змініть значення в `.env`, перезапустіть (`docker compose up -d`). Зміна `JWT_SECRET` завершує всі сесії.
-- **Підозрілий вхід:** `docker compose logs backend | grep -i "locked\|failed"`; користувачу — скинути пароль (це відкликає всі його сесії).
-- **Витік у git:** `./ops/security-scan.sh secrets`; витік вважайте остаточним — змінюйте секрет, а не лише видаляйте файл з історії.
+- **A secret leaked (`JWT_SECRET`, SMTP, S3, DB):** change the value in `.env`, restart (`docker compose up -d`). Changing `JWT_SECRET` ends all sessions.
+- **A suspicious sign-in:** `docker compose logs backend | grep -i "locked\|failed"`; have the user reset the password (this revokes all their sessions).
+- **A leak in git:** `./ops/security-scan.sh secrets`; treat the leak as final — change the secret, do not merely delete the file from history.
 
-## Після кожної аварії
+## After every incident
 
-Запишіть у `docs/ARCHITECTURE_PLAN.md` (журнал) або окремий пост-мортем: що сталося, як помітили, як виправили, що зробити, щоб не повторилось
-(алерт, тест, перевірка). Аварія без висновків повториться.
+Record it in `docs/ARCHITECTURE_PLAN.md` (the log) or a separate post-mortem: what happened, how it was noticed, how it was fixed, what to do so it does not recur
+(an alert, a test, a check). An incident without conclusions will happen again.

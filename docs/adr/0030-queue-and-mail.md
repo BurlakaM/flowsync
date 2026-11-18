@@ -1,22 +1,22 @@
-# 30. Черга й пошта
+# 30. Queue and mail
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D30 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D30 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-BullMQ + Redis (`bullmq`, `ioredis`) і `nodemailer`; без Redis листи йдуть у процесі API, без `SMTP_HOST`+`MAIL_FROM` — не йдуть зовсім і нічого не падає; транспорт підміняється токеном (тести). Без `@nestjs/bullmq`: керуємо `Queue`/`Worker` самі, щоб не підключатись до Redis, коли пошта вимкнена
+BullMQ + Redis (`bullmq`, `ioredis`) and `nodemailer`; without Redis, mail is sent inside the API process; without `SMTP_HOST` + `MAIL_FROM`, it is not sent at all and nothing fails; the transport can be replaced via a token (tests). No `@nestjs/bullmq`: we manage `Queue`/`Worker` ourselves so as not to connect to Redis when mail is disabled
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-`@nestjs/bullmq` (з'єднується з Redis завжди); Kafka/RabbitMQ (зайве для одного сервісу)
+`@nestjs/bullmq` (always connects to Redis); Kafka/RabbitMQ (overkill for a single service)
 
-## Наслідки
+## Consequences
 
-- Лист ніколи не гальмує запит і переживає перезапуск, коли є Redis.
-- Redis необов'язковий навмисно: без нього застосунок працює (без повторів), що полегшує локальну розробку.
+- An email never slows down a request and survives a restart when Redis is present.
+- Redis is optional on purpose: the app works without it (without retries), which eases local development.
 
-## Коли переглянути
+## When to revisit
 
-Якщо листів стане багато, винести воркер в окремий процес (код черги не змінюється).
+If there are many emails, move the worker to a separate process (the queue code does not change).

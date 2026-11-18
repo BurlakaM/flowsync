@@ -1,13 +1,13 @@
-# 9. Роутинг
+# 9. Routing
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D9 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D9 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`react-router` v8 (library mode, lazy-маршрути; `RouterProvider` з `react-router/dom`)
+`react-router` v8 (library mode, lazy routes; `RouterProvider` from `react-router/dom`)
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-TanStack Router: теж добрий, але менше прикладів у проєктах із цього огляду
+TanStack Router: also good, but fewer examples in the projects from this survey

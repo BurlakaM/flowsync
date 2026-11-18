@@ -1,4 +1,4 @@
 # Changelog
 
-Усі помітні зміни FlowSync. Файл веде release-please з Conventional Commits: вручну його не редагують
-(див. `CONTRIBUTING.md`, розділ «Релізи»). Історія до першого релізу — у `docs/ARCHITECTURE_PLAN.md` (журнал прогресу).
+All notable changes to FlowSync. This file is maintained by release-please from Conventional Commits: do not edit it by hand
+(see `CONTRIBUTING.md`, the "Releases" section). The history before the first release is in `docs/ARCHITECTURE_PLAN.md` (the progress log).

@@ -1,13 +1,13 @@
-# 2. БД та міграції
+# 2. Database and migrations
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D2 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D2 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-PostgreSQL 16 + Prisma, міграції через `prisma migrate`
+PostgreSQL 16 + Prisma, migrations via `prisma migrate`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-`db push` лише для швидких експериментів
+`db push` only for quick experiments

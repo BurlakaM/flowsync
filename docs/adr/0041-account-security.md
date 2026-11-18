@@ -1,24 +1,24 @@
-# 41. Акаунт і сесії
+# 41. Account and sessions
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D41 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D41 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Скидання пароля й підтвердження email — одноразові токени з листа (`user_tokens`, SHA-256, 1 год / 24 год, один раз), у `#фрагменті` посилання; відповіді не розкривають існування акаунта; блокування 5 невдач → 15 хв (`429`); зміна/скидання пароля в одній транзакції анулює refresh-токени й видані раніше access-токени (`passwordChangedAt`); листи-сповіщення лише на підтверджені адреси; наявні акаунти вважаються підтвердженими
+Password reset and email verification are one-time tokens from an email (`user_tokens`, SHA-256, 1 h / 24 h, single use), placed in the link's `#fragment`; responses do not reveal whether an account exists; lockout after 5 failures for 15 min (`429`); a password change/reset in one transaction invalidates refresh tokens and previously issued access tokens (`passwordChangedAt`); notification emails go only to verified addresses; existing accounts are considered verified
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Токен у query-рядку (потрапляє в логи й `Referer`); автоматичне підтвердження при відкритті посилання (його «спалюють» сканери пошти); блокування лише за IP (обходиться ротацією адрес); блокування без скидання (користувач без виходу)
+A token in the query string (ends up in logs and `Referer`); automatic verification when the link is opened (mail scanners "burn" it); lockout by IP only (bypassed by rotating addresses); lockout without a reset (a user with no way out)
 
-## Наслідки
+## Consequences
 
-- Посилання для скидання нічого не розкриває: однакова відповідь для відомої й невідомої адреси, один лист на хвилину.
-- Зміна чи скидання пароля одразу завершує всі сесії, зокрема раніше видані access-токени.
-- Блокування після 5 невдач сповільнює підбір, але дозволяє комусь дошкуляти користувачу 15 хвилин; посилання скидання знімає блокування.
-- Листи-сповіщення йдуть лише на підтверджені адреси, тож реєстрація з чужою адресою не годиться для спаму.
+- The reset link reveals nothing: the same response for a known and an unknown address, one email per minute.
+- A password change or reset immediately ends all sessions, including previously issued access tokens.
+- Lockout after 5 failures slows brute force but lets someone harass a user for 15 minutes; the reset link lifts the lockout.
+- Notification emails go only to verified addresses, so registering with someone else's address is not useful for spam.
 
-## Коли переглянути
+## When to revisit
 
-Додати TOTP-двофакторну автентифікацію, коли з'являться реальні користувачі (потрібна сторінка налаштувань безпеки; не зроблено).
+Add TOTP two-factor authentication when real users appear (needs a security settings page; not done).

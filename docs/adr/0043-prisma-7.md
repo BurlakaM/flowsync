@@ -1,24 +1,24 @@
 # 43. Prisma 7
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D43 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D43 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Prisma 7.10 (стабільна; `latest` у npm указує на 8.0 RC), клієнт через драйвер `pg` (`@prisma/adapter-pg`), `prisma.config.ts` замість `package.json#prisma` і `url` у схемі, генератор `prisma-client-js` лишився
+Prisma 7.10 (stable; `latest` on npm points to 8.0 RC), the client through the `pg` driver (`@prisma/adapter-pg`), `prisma.config.ts` instead of `package.json#prisma` and `url` in the schema, the `prisma-client-js` generator is kept
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Лишитись на 6.x (вразливість `deepmerge-ts` у CLI без виправлення); Prisma 8 RC (ще не стабільна); новий генератор `prisma-client` (змінює всі імпорти, без виграшу тут)
+Stay on 6.x (an unfixed `deepmerge-ts` vulnerability in the CLI); Prisma 8 RC (not yet stable); the new `prisma-client` generator (changes all imports, no gain here)
 
-## Наслідки
+## Consequences
 
-- Вразливість `deepmerge-ts` у CLI Prisma 6 зникла; Trivy чистий.
-- Prisma 7 виконує запити через драйвер `pg` на TypeScript: без Rust-рушія, інше місце для налаштування (пул `pg`).
-- CLI читає `prisma.config.ts`; `prisma generate` вимагає `DATABASE_URL` (під час збірки образу підставлено заглушку).
-- Прод-образ більший (~1,1 ГБ), бо CLI потрібен для `migrate deploy`.
+- The `deepmerge-ts` vulnerability in the Prisma 6 CLI is gone; Trivy is clean.
+- Prisma 7 runs queries through the `pg` driver in TypeScript: no Rust engine, and a different place to tune (the `pg` pool).
+- The CLI reads `prisma.config.ts`; `prisma generate` requires `DATABASE_URL` (a placeholder is supplied during the image build).
+- The production image is larger (~1.1 GB) because the CLI is needed for `migrate deploy`.
 
-## Коли переглянути
+## When to revisit
 
-Запускати міграції з одноразового образу, щоб зменшити робочий; перейти на Prisma 8, коли вона стане стабільною.
+Run migrations from a disposable image to shrink the runtime one; move to Prisma 8 once it is stable.

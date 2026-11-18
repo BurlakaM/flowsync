@@ -1,13 +1,13 @@
-# 14. Контракт front↔back
+# 14. Front↔back contract
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D14 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D14 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-OpenAPI → згенерований TS-клієнт (`openapi-typescript`), фаза 7
+OpenAPI → a generated TS client (`openapi-typescript`), phase 7
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Спільний пакет типів: потребує монорепо-інструментів
+A shared types package: requires monorepo tooling

@@ -1,13 +1,13 @@
-# 1. Шари backend
+# 1. Backend layers
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D1 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D1 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Controller → Service → Prisma. Окремий `*.repository.ts` лише коли запит складний або повторюється
+Controller → Service → Prisma. A separate `*.repository.ts` only when a query is complex or reused
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Hexagonal (brocoders), use-case класи (Novu): забагато файлів для CRUD
+Hexagonal (brocoders), use-case classes (Novu): too many files for CRUD

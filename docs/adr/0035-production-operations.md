@@ -1,23 +1,23 @@
-# 35. Прод-операції
+# 35. Production operations
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D35 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D35 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Скрипти в `ops/` на чистому bash + Docker Compose; `docker-compose.vps.yml` (образи з реєстру + Caddy); бекап `pg_dump` із файлом лічильників рядків і `restore-verify.sh`; деплой вручну (`workflow_dispatch`) з автовідкатом за smoke-тестом; liveness не торкається залежностей, readiness перевіряє БД і Redis (якщо налаштований)
+Scripts in `ops/` in plain bash + Docker Compose; `docker-compose.vps.yml` (images from a registry + Caddy); `pg_dump` backup with a row-count file and `restore-verify.sh`; manual deploy (`workflow_dispatch`) with automatic rollback on a smoke test; liveness does not touch dependencies, readiness checks the DB and Redis (if configured)
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Kubernetes/Ansible/Terraform (зайве для одного VPS); `pgBackRest`/WAL-архів (PITR потрібен, коли дані важливі, а не в пет-проєкті); автодеплой на кожен push (власник хоче керувати моментом)
+Kubernetes/Ansible/Terraform (overkill for one VPS); `pgBackRest`/WAL archiving (PITR is needed when the data matters, not in a pet project); auto-deploy on every push (the owner wants to control the moment)
 
-## Наслідки
+## Consequences
 
-- Відкат після невдалого smoke-тесту не потребує ні людини, ні запитів до реєстру.
-- Відкат не скасовує міграцій: міграції мусять бути сумісними назад, а бекап робиться перед кожним деплоєм.
-- Деплой — ручна свідома дія (`workflow_dispatch`).
+- Rolling back after a failed smoke test needs neither a human nor registry requests.
+- A rollback does not undo migrations: migrations must be backward compatible, and a backup is taken before every deploy.
+- A deploy is a deliberate manual action (`workflow_dispatch`).
 
-## Коли переглянути
+## When to revisit
 
-Коли серверів стане кілька або знадобиться деплой без простою, перейти на оркестрацію (blue/green) замість одного `compose up`.
+When there are several servers or zero-downtime deploys are needed, move to orchestration (blue/green) instead of a single `compose up`.

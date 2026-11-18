@@ -1,13 +1,13 @@
 # 19. Runtime
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D19 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D19 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Node 24 LTS (або 22, якщо залежність не підтримує 24)
+Node 24 LTS (or 22 if a dependency does not support 24)
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Node 20 — EOL. Node 26 уже LTS (з листопада 2026), але CRA на ній не перевірений (backend уже на Nest 12 / Prisma 6.19): повернутися після фази 5
+Node 20 is EOL. Node 26 is already LTS (since November 2026), but CRA is not verified on it (the backend is already on Nest 12 / Prisma 6.19): return to it after phase 5

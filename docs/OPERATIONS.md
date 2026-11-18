@@ -1,135 +1,135 @@
-# FlowSync — експлуатація (прод на VPS)
+# FlowSync — operations (production on a VPS)
 
-Скрипти лежать у `ops/`, працюють із Docker Compose і не потребують нічого, крім bash та Docker.
-**Деплой на прод ще не робився** (за вказівкою власника): усе нижче перевірено локально, крім кроків, позначених «лише на VPS».
+The scripts live in `ops/`, work with Docker Compose and need nothing but bash and Docker.
+**Production has not been deployed yet** (at the owner's instruction): everything below was verified locally, except the steps marked "VPS only".
 
-## Перевірки здоров'я
+## Health checks
 
-| Ендпоїнт | Що означає | Коли падає |
+| Endpoint | What it means | When it fails |
 |---|---|---|
-| `GET /api/health/live` | процес живий, відповідає | лише якщо завис сам процес |
-| `GET /api/health/ready` (і `GET /api/health`) | API може обслуговувати трафік: БД відповідає, Redis відповідає (лише якщо задано `REDIS_URL`) | `503`, коли відмовила залежність |
+| `GET /api/health/live` | the process is alive and responding | only if the process itself hangs |
+| `GET /api/health/ready` (and `GET /api/health`) | the API can serve traffic: the DB responds, Redis responds (only if `REDIS_URL` is set) | `503` when a dependency fails |
 
-Чому два: liveness навмисно не торкається БД. Інакше збій Postgres змусив би оркестратор безкінечно
-перезапускати здоровий API. Readiness лише забирає інстанс із балансування (Caddy перевіряє його кожні 10 с).
+Why two: liveness deliberately does not touch the DB. Otherwise a Postgres outage would make the orchestrator restart a healthy API
+endlessly. Readiness only takes the instance out of load balancing (Caddy checks it every 10 s).
 
-## Бекап і відновлення
+## Backup and restore
 
 ```bash
-./ops/backup.sh            # pg_dump → backups/flowsync-<UTC>.dump + .counts, старші за RETENTION_DAYS (14) видаляються
-./ops/restore-verify.sh    # відновлює найновіший дамп у тимчасову БД і порівнює кількість рядків та міграції
+./ops/backup.sh            # pg_dump → backups/flowsync-<UTC>.dump + .counts, files older than RETENTION_DAYS (14) are deleted
+./ops/restore-verify.sh    # restores the newest dump into a temporary DB and compares row counts and migrations
 ```
 
-- Файл отримує остаточне ім'я лише після того, як `pg_restore --list` зміг його прочитати: обірваний дамп не маскується під бекап.
-- `restore-verify.sh` — це і є доказ, що бекап придатний. Запускайте його за розкладом, а не лише «колись».
-- Розклад (cron на VPS): `0 3 * * * cd /opt/flowsync && ./ops/backup.sh >> backups/backup.log 2>&1`, перевірка відновлення раз на тиждень.
-- Дампи лежать на тому ж сервері: для реальної стійкості їх треба копіювати на інше сховище (лише на VPS; не налаштовано).
+- A file gets its final name only after `pg_restore --list` was able to read it: a truncated dump does not pass as a backup.
+- `restore-verify.sh` is the proof that a backup is usable. Run it on a schedule, not just "sometime".
+- Schedule (cron on the VPS): `0 3 * * * cd /opt/flowsync && ./ops/backup.sh >> backups/backup.log 2>&1`, a restore check once a week.
+- Dumps sit on the same server: for real resilience they must be copied to other storage (VPS only; not configured).
 
-## Деплой і відкат
+## Deploy and rollback
 
-1. CI зелений → workflow `Deploy` публікує образи `flowsync-back|front:<sha>`.
-2. Власник вручну запускає workflow **Deploy to production** (`workflow_dispatch`) з тегом `<sha>`.
-3. На VPS виконується `ops/deploy.sh <sha>`: свіжий бекап → `docker compose up -d` → `ops/smoke-test.sh`.
-4. Smoke-тест провалився → автоматично повертається попередній тег (він зберігається в `.deployed-tag`).
+1. CI is green → the `Deploy` workflow publishes the images `flowsync-back|front:<sha>`.
+2. The owner manually runs the **Deploy to production** workflow (`workflow_dispatch`) with the `<sha>` tag.
+3. On the VPS, `ops/deploy.sh <sha>` runs: a fresh backup → `docker compose up -d` → `ops/smoke-test.sh`.
+4. If the smoke test fails, the previous tag is restored automatically (it is kept in `.deployed-tag`).
 
-Важливо: відкат образу **не відкочує міграції БД**. Тому міграції пишемо сумісними назад
-(спочатку додати, потім у наступному релізі прибрати), а перед кожним деплоєм робиться бекап.
+Important: rolling back an image does **not roll back DB migrations**. That is why migrations are written to be backward compatible
+(first add, then remove in the next release), and a backup is taken before every deploy.
 
-### Одноразове налаштування VPS (лише на VPS, ще не зроблено)
+### One-time VPS setup (VPS only, not done yet)
 
-1. Docker + Compose, клон репозиторію в `/opt/flowsync`, DNS `A`-запис на сервер.
-2. Кореневий `.env`: `POSTGRES_PASSWORD`, `DOCKER_USERNAME`, `DOMAIN`, `ACME_EMAIL`; `backend/.env`: `JWT_SECRET` ≥ 32 символів, `COOKIE_SECURE=true`, `NODE_ENV=production`, `CORS_ORIGINS` на ваш домен.
-3. Секрети репозиторію GitHub: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (окремий ключ лише для деплою), `VPS_KNOWN_HOSTS` (вивід `ssh-keyscan`).
-4. Середовище `production` у GitHub із обов'язковим рецензентом (за бажанням).
-5. Перший запуск: `COMPOSE_FILES="-f docker-compose.yml -f docker-compose.vps.yml" ./ops/deploy.sh <sha>`.
+1. Docker + Compose, clone the repository to `/opt/flowsync`, a DNS `A` record pointing at the server.
+2. Root `.env`: `POSTGRES_PASSWORD`, `DOCKER_USERNAME`, `DOMAIN`, `ACME_EMAIL`; `backend/.env`: `JWT_SECRET` ≥ 32 characters, `COOKIE_SECURE=true`, `NODE_ENV=production`, `CORS_ORIGINS` set to your domain.
+3. GitHub repository secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (a separate key for deploys only), `VPS_KNOWN_HOSTS` (the `ssh-keyscan` output).
+4. A `production` environment in GitHub with a required reviewer (optional).
+5. First run: `COMPOSE_FILES="-f docker-compose.yml -f docker-compose.vps.yml" ./ops/deploy.sh <sha>`.
 
-## Smoke-тест
+## Smoke test
 
-`./ops/smoke-test.sh <base-url>` перевіряє: liveness, readiness, головну сторінку, SPA-fallback на глибокому посиланні,
-`401` на закритому API, `404` на Swagger, заголовки CSP і `X-Content-Type-Options`. Дає код виходу ≠ 0 при будь-якому провалі.
+`./ops/smoke-test.sh <base-url>` checks: liveness, readiness, the home page, the SPA fallback on a deep link,
+`401` on a protected API, `404` on Swagger, the CSP and `X-Content-Type-Options` headers. It exits non-zero on any failure.
 
-## Спостережуваність
+## Observability
 
-Три сигнали: **метрики** (що відбувається в цілому), **трейси** (що сталося з одним запитом), **логи** (деталі).
-Їх зв'язує `requestId` і `trace_id`: pino додає `trace_id` у кожен рядок логу, а `X-Request-Id` повертається клієнту й у тілі помилки.
+Three signals: **metrics** (what is happening overall), **traces** (what happened to one request), **logs** (details).
+They are tied together by `requestId` and `trace_id`: pino adds `trace_id` to every log line, and `X-Request-Id` is returned to the client and in the error body.
 
 ```bash
-# Dev: бекенд шле трейси, Prometheus збирає метрики, Grafana їх показує
+# Dev: the backend sends traces, Prometheus collects metrics, Grafana shows them
 OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 docker compose --profile observability up -d
 ```
 
-| Що | Де |
+| What | Where |
 |---|---|
-| Дашборд «FlowSync API» (RPS, 5xx, p50/p95/p99, повільні маршрути, черга пошти, сокети, event loop, пам'ять) | http://localhost:3001 |
-| Prometheus: цілі й алерти | http://localhost:9090 |
-| Jaeger: трейси (HTTP → Prisma → Redis → BullMQ → Socket.IO в одному trace) | http://localhost:16686 |
-| Сирі метрики | `GET /api/metrics` на backend (:3000); nginx віддає там 404 |
+| The "FlowSync API" dashboard (RPS, 5xx, p50/p95/p99, slow routes, mail queue, sockets, event loop, memory) | http://localhost:3001 |
+| Prometheus: targets and alerts | http://localhost:9090 |
+| Jaeger: traces (HTTP → Prisma → Redis → BullMQ → Socket.IO in one trace) | http://localhost:16686 |
+| Raw metrics | `GET /api/metrics` on the backend (:3000); nginx returns 404 there |
 
-- **Метрики:** `prom-client`; мітка `route` — шаблон маршруту (`/api/projects/:id`), невідомі URL зводяться до `unmatched`:
-  інакше кожен id чи сканер створював би нову часову серію. Черга пошти й сокети читаються в момент scrape, без фонового опитування.
-- **Трейси:** OpenTelemetry (`src/config/instrument.ts`, перший імпорт `main.ts`); вимкнені, доки порожня `OTEL_EXPORTER_OTLP_ENDPOINT`.
-  Prisma має власний інструментатор, BullMQ — `bullmq-otel`: трейс листа тягнеться від HTTP-запиту до воркера.
-- **Помилки:** Sentry (`SENTRY_DSN` для backend, `VITE_SENTRY_DSN` для frontend при збірці). Лише помилки: без трасування й запису сесій.
-  Backend відправляє тільки `5xx`; frontend — винятки маршрутів (не 404/403).
-  **У проді додайте хост DSN у `connect-src` у `frontend/security-headers.conf`**, інакше CSP блокуватиме звіти.
-- `METRICS_TOKEN` додає перевірку bearer-токена на `/api/metrics`, якщо Prometheus стоїть поза Docker-мережею.
-- SLO й алерти: `docs/SLO.md`.
+- **Metrics:** `prom-client`; the `route` label is the route template (`/api/projects/:id`), unknown URLs collapse to `unmatched`:
+  otherwise every id or scanner would create a new time series. The mail queue and sockets are read at scrape time, with no background polling.
+- **Traces:** OpenTelemetry (`src/config/instrument.ts`, the first import of `main.ts`); disabled while `OTEL_EXPORTER_OTLP_ENDPOINT` is empty.
+  Prisma has its own instrumentation, BullMQ has `bullmq-otel`: a mail trace runs from the HTTP request to the worker.
+- **Errors:** Sentry (`SENTRY_DSN` for the backend, `VITE_SENTRY_DSN` for the frontend at build time). Errors only: no tracing or session replay.
+  The backend sends only `5xx`; the frontend sends route exceptions (not 404/403).
+  **In production, add the DSN host to `connect-src` in `frontend/security-headers.conf`**, otherwise the CSP will block the reports.
+- `METRICS_TOKEN` adds a bearer-token check on `/api/metrics` if Prometheus sits outside the Docker network.
+- SLOs and alerts: `docs/SLO.md`.
 
-## Outbox подій
+## Event outbox
 
-Кожна зміна даних пише подію в таблицю `outbox_events` **в тій самій транзакції**, що й зміну. Одразу після коміту подію
-доставляють підписникам (аудит, сповіщення, real-time); те, що не вдалося, повторює `OutboxRelayService` (раз на 2 с).
-Доставка «щонайменше один раз», тому підписники ідемпотентні (унікальні `eventId` в аудиті й сповіщеннях).
+Every data change writes an event to the `outbox_events` table **in the same transaction** as the change. Right after the commit the event
+is delivered to subscribers (audit, notifications, real-time); whatever fails is retried by `OutboxRelayService` (every 2 s).
+Delivery is "at least once", so subscribers are idempotent (unique `eventId` in audit and notifications).
 
-| Статус | Значення |
+| Status | Meaning |
 |---|---|
-| `PENDING` | чекає доставки; `attempts`, `last_error`, `next_attempt_at` показують, що пішло не так і коли наступна спроба (2, 4, 8 … 128 с) |
-| `DONE` | доставлено; записи старші за 7 днів видаляються |
-| `DEAD` | 8 невдалих спроб; **потрібна людина** (алерт `OutboxEventDead`) |
+| `PENDING` | waiting for delivery; `attempts`, `last_error`, `next_attempt_at` show what went wrong and when the next attempt is (2, 4, 8 … 128 s) |
+| `DONE` | delivered; records older than 7 days are deleted |
+| `DEAD` | 8 failed attempts; **a human is needed** (the `OutboxEventDead` alert) |
 
 ```bash
-# Що застрягло і чому
+# What is stuck and why
 docker compose exec db psql -U postgres -d flowsync -c "SELECT id, type, attempts, last_error, next_attempt_at FROM outbox_events WHERE status <> 'DONE' ORDER BY created_at"
 
-# Після виправлення причини (наприклад, повернули підписника): дати DEAD-подіям ще одну серію спроб
+# After fixing the cause (for example, a subscriber was restored): give DEAD events another round of attempts
 docker compose exec db psql -U postgres -d flowsync -c "UPDATE outbox_events SET status='PENDING', attempts=0, next_attempt_at=now() WHERE status='DEAD'"
 ```
 
-Безпечно повторювати довільну подію: підписники не створять дублів. Метрики: `flowsync_outbox_events{status}`,
-`flowsync_outbox_oldest_pending_age_seconds`; алерти `OutboxEventDead`, `OutboxLagging`.
+It is safe to replay any event: subscribers will not create duplicates. Metrics: `flowsync_outbox_events{status}`,
+`flowsync_outbox_oldest_pending_age_seconds`; alerts `OutboxEventDead`, `OutboxLagging`.
 
-## Кілька інстансів API
+## Several API instances
 
-З `REDIS_URL` Socket.IO працює через Redis-адаптер: оновлення, яке обробив один інстанс, доходить до браузерів, підключених до
-іншого. Воркери outbox теж безпечні для кількох інстансів (`SKIP LOCKED`). Без Redis API має працювати **одним інстансом**:
-інакше частина користувачів не отримуватиме живих оновлень.
+With `REDIS_URL`, Socket.IO works through the Redis adapter: an update handled by one instance reaches browsers connected to
+another. The outbox workers are also safe for several instances (`SKIP LOCKED`). Without Redis the API must run as **a single instance**:
+otherwise some users will not receive live updates.
 
-## Конфлікти редагування й курсори
+## Edit conflicts and cursors
 
-- `PATCH /tasks/:id` вимагає `version`; якщо хтось зберіг задачу раніше, відповідь `409` (UI показує повідомлення й перезавантажує задачу).
-- Активність і коментарі читаються за курсором (`?limit=&cursor=`); `nextCursor: null` означає останню сторінку.
+- `PATCH /tasks/:id` requires `version`; if someone saved the task earlier, the response is `409` (the UI shows a message and reloads the task).
+- Activity and comments are read by cursor (`?limit=&cursor=`); `nextCursor: null` means the last page.
 
-## Безпека: скани й акаунти
+## Security: scans and accounts
 
 ```bash
-./ops/security-scan.sh images    # збирає прод-образи й сканує Trivy: падає на HIGH/CRITICAL, для яких уже є виправлення
-./ops/security-scan.sh secrets   # gitleaks по всій історії git (.gitleaks.toml: відомі хибні спрацювання)
-./ops/security-scan.sh sbom      # CycloneDX-опис складу образів у sbom/ (у CI це артефакт на 90 днів)
+./ops/security-scan.sh images    # builds the production images and scans them with Trivy: fails on HIGH/CRITICAL that already have a fix
+./ops/security-scan.sh secrets   # gitleaks over the whole git history (.gitleaks.toml: known false positives)
+./ops/security-scan.sh sbom      # a CycloneDX bill of materials of the images in sbom/ (in CI it is a 90-day artifact)
 ```
 
-У CI те саме робить джоба `security`; `codeql.yml` (статичний аналіз) працює на push, PR і щотижня. Прийняті винятки — у
-`.trivyignore` із причиною й датою перегляду (зараз порожній). Знайшли вразливість в образі: оновіть пакет у `package.json`/Dockerfile,
-а не додавайте в ignore без причини.
+In CI the same is done by the `security` job; `codeql.yml` (static analysis) runs on push, PR and weekly. Accepted exceptions are in
+`.trivyignore` with a reason and a review date (currently empty). If you find a vulnerability in an image: update the package in `package.json`/Dockerfile,
+do not add it to the ignore list without a reason.
 
-**Користувач заблокований** (5 невдалих входів): блокування саме знімається за 15 хв, або користувач скидає пароль («Забули пароль?»).
-Зняти вручну:
+**A user is locked out** (5 failed sign-ins): the lock clears itself after 15 min, or the user resets the password ("Forgot password?").
+To lift it manually:
 
 ```bash
 docker compose exec db psql -U postgres -d flowsync -c "UPDATE users SET locked_until = NULL, failed_login_attempts = 0 WHERE email = 'user@example.com'"
 ```
 
-**Листи підтвердження й скидання пароля** — звичайні листи через ту саму чергу (див. «Outbox» і BullMQ вище); у dev їх видно в Mailpit
-(http://localhost:8025). Без налаштованого SMTP листи не йдуть, тож скидання пароля й підтвердження недоступні: у проді SMTP обов'язковий.
+**Verification and password-reset emails** are ordinary emails through the same queue (see "Outbox" and BullMQ above); in dev they are visible in Mailpit
+(http://localhost:8025). Without a configured SMTP, emails are not sent, so password reset and verification are unavailable: SMTP is mandatory in production.
 
-**Міграції Prisma 7:** `prisma migrate deploy` береться з `prisma.config.ts` (копіюється в прод-образ). Образ містить CLI Prisma заради
-цієї команди, тому він великий (~1,1 ГБ); якщо це заважатиме, винести міграції в окремий одноразовий образ.
+**Prisma 7 migrations:** `prisma migrate deploy` takes its settings from `prisma.config.ts` (copied into the production image). The image contains the Prisma CLI for
+this command, which is why it is large (~1.1 GB); if that gets in the way, move migrations to a separate disposable image.

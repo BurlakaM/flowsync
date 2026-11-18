@@ -1,16 +1,16 @@
-# Frontend (React) — правила
+# Frontend (React) — rules
 
-Спільні правила: `../AGENTS.md`. План і поточна фаза: `../docs/ARCHITECTURE_PLAN.md`.
-Цей файл описує архітектуру frontend (Vite + React 19 + TypeScript). Фундамент готовий (фаза 5); фічі додаються у фазі 6.
+Shared rules: `../AGENTS.md`. The plan and current phase: `../docs/ARCHITECTURE_PLAN.md`.
+This file describes the frontend architecture (Vite + React 19 + TypeScript). The foundation is ready (phase 5); features are added in phase 6.
 
-## Стек
+## Stack
 
-Vite · React 19 · TypeScript strict · `react-router` v8 (імпорт з `react-router`, `RouterProvider` з `react-router/dom`) ·
+Vite · React 19 · TypeScript strict · `react-router` v8 (import from `react-router`, `RouterProvider` from `react-router/dom`) ·
 TanStack Query v5 · `react-hook-form` + `zod` · Tailwind CSS 4 + shadcn/ui · axios ·
-Vitest + Testing Library + MSW · Playwright (e2e, фаза 7). Потрібен Node ≥ 22.22.
-Не додавай Redux, Bootstrap, jQuery, styled-components; нову бібліотеку спершу запропонуй власнику.
+Vitest + Testing Library + MSW · Playwright (e2e, phase 7). Node ≥ 22.22 is required.
+Do not add Redux, Bootstrap, jQuery, styled-components; propose a new library to the owner first.
 
-## Структура
+## Structure
 
 ```
 src/
@@ -19,26 +19,26 @@ src/
 ├─ components/  ui/ (shadcn), layouts/, errors/
 ├─ config/      env.ts
 ├─ features/<feature>/
-│  ├─ api/         функції запитів + query keys + useQuery/useMutation хуки
-│  ├─ components/  UI цієї фічі
-│  ├─ hooks/       (якщо потрібні)
+│  ├─ api/         request functions + query keys + useQuery/useMutation hooks
+│  ├─ components/  this feature's UI
+│  ├─ hooks/       (if needed)
 │  ├─ types/
-│  └─ index.ts     публічний API фічі
-├─ hooks/       спільні хуки
+│  └─ index.ts     the feature's public API
+├─ hooks/       shared hooks
 ├─ lib/         api-client.ts, query-client.ts, auth-storage.ts, utils.ts
 ├─ testing/     setup.ts, test-utils.tsx, mocks/
 └─ types/
 ```
 
-**Напрямок імпортів:** `components, hooks, lib, config, types` → `features` → `app`.
-Фіча **не імпортує іншу фічу** (правило ESLint `no-restricted-imports`): їх складають разом на рівні `app/routes`.
-Лінтер ловить імпорти через `@/features/...` і `@/app`, але не ловить відносні шляхи на кшталт `../../tasks/x`: у фічах використовуй лише `@/`.
-Дані однієї фічі, потрібні іншій, передає сторінка в `app/routes` через пропси (наприклад, учасники проєкту → `assignees` форми задачі); скинути кеш чужої фічі можна лише через її експортований хук `useRefresh*`.
-Із фічі назовні експортується лише те, що перелічено в її `index.ts`; з інших місць не імпортуй її внутрішні файли.
+**Import direction:** `components, hooks, lib, config, types` → `features` → `app`.
+A feature **does not import another feature** (the ESLint `no-restricted-imports` rule): they are assembled together at the `app/routes` level.
+The linter catches imports through `@/features/...` and `@/app`, but not relative paths like `../../tasks/x`: inside features use only `@/`.
+Data of one feature needed by another is passed by the page in `app/routes` through props (for example, project members → the task form's `assignees`); another feature's cache can be reset only through its exported `useRefresh*` hook.
+Only what is listed in a feature's `index.ts` is exported from it; do not import its internal files from elsewhere.
 
-## Шаблони
+## Templates
 
-API-шар фічі (запит + ключі + хук в одному місці; `api-client` повертає `response.data`):
+A feature's API layer (the request + keys + the hook in one place; `api-client` returns `response.data`):
 
 ```ts
 // features/tasks/api/get-tasks.ts
@@ -54,7 +54,7 @@ export const useTasks = (projectId: number) =>
   useQuery({ queryKey: tasksKeys.list(projectId), queryFn: () => getTasks(projectId) });
 ```
 
-Мутація з інвалідацією кешу:
+A mutation with cache invalidation:
 
 ```ts
 export const useCreateTask = (projectId: number) => {
@@ -66,7 +66,7 @@ export const useCreateTask = (projectId: number) => {
 };
 ```
 
-Форма (схема `zod` — єдине джерело правди для типів і валідації):
+A form (the `zod` schema is the single source of truth for types and validation):
 
 ```tsx
 const schema = z.object({
@@ -78,70 +78,70 @@ type Values = z.infer<typeof schema>;
 const form = useForm<Values>({ resolver: zodResolver(schema) });
 ```
 
-## Правила
+## Rules
 
-**Дані й стан**
-- Запити до API — лише через `lib/api-client.ts` і хуки TanStack Query в `features/*/api`. Жодного `fetch`/`axios` у компонентах і жодного `useEffect` для завантаження даних.
-- Серверний стан живе в TanStack Query й не дублюється в `useState`/`zustand`. Фільтри, сторінка, сортування — в URL (search params).
-- Access-токен живе лише в пам'яті (`lib/auth-storage.ts`), у `localStorage`/`sessionStorage` його не пишуть. Refresh-токен — `httpOnly` cookie, JS його не бачить: сесію після перезавантаження відновлює `useRestoreSession`, а прострочений токен оновлює `api-client` (один спільний `POST /auth/refresh` на всі паралельні запити).
-- Змінні середовища — лише `VITE_*`, читаються через `config/env.ts`. У фронтенді секретів не буває.
+**Data and state**
+- API requests only through `lib/api-client.ts` and the TanStack Query hooks in `features/*/api`. No `fetch`/`axios` in components and no `useEffect` for loading data.
+- Server state lives in TanStack Query and is not duplicated in `useState`/`zustand`. Filters, page, sorting — in the URL (search params).
+- The access token lives only in memory (`lib/auth-storage.ts`) and is not written to `localStorage`/`sessionStorage`. The refresh token is an `httpOnly` cookie that JS cannot see: after a reload the session is restored by `useRestoreSession`, and an expired token is refreshed by `api-client` (one shared `POST /auth/refresh` for all parallel requests).
+- Environment variables are only `VITE_*`, read through `config/env.ts`. There are no secrets in the frontend.
 
-**Компоненти**
-- Функціональні компоненти, іменований експорт (default лише для lazy-сторінок у `app/routes`). Один компонент на файл.
-- Файли kebab-case (`create-task-dialog.tsx`), компоненти PascalCase, хуки `use-*.ts`, типи пропсів — `interface XProps`.
-- Кожен екран обробляє три стани: завантаження, помилка, порожньо. Не показуй порожню таблицю замість помилки.
-- Складність розв'язуй композицією (children, slots), а не десятком булевих пропсів; prop drilling глибше 2 рівнів → Context або композиція.
-- Не додавай `useMemo`/`useCallback`/`memo` без виміряної проблеми.
-- `key` у списках — стабільний id, не індекс.
+**Components**
+- Function components, named exports (default only for lazy pages in `app/routes`). One component per file.
+- Files are kebab-case (`create-task-dialog.tsx`), components PascalCase, hooks `use-*.ts`, props types `interface XProps`.
+- Every screen handles three states: loading, error, empty. Do not show an empty table instead of an error.
+- Solve complexity with composition (children, slots), not a dozen boolean props; prop drilling deeper than 2 levels → Context or composition.
+- Do not add `useMemo`/`useCallback`/`memo` without a measured problem.
+- A list `key` is a stable id, not an index.
 
-**Стилі та UI**
-- Tailwind-класи й токени теми; без inline-стилів і власних CSS-файлів, крім `index.css` із темою.
-- Компоненти shadcn додаємо в `components/ui` командою CLI (`npx shadcn@latest add <name>`) й не переписуємо без потреби.
-  У новому реєстрі немає компонента `form`: для форм використовуй `field` разом із `react-hook-form`.
+**Styles and UI**
+- Tailwind classes and theme tokens; no inline styles and no custom CSS files except `index.css` with the theme.
+- shadcn components are added to `components/ui` with the CLI command (`npx shadcn@latest add <name>`) and not rewritten without need.
+  The new registry has no `form` component: for forms use `field` together with `react-hook-form`.
 
-**Дизайн «Aurora» (D34)**
-- Кольори — лише токени з `index.css` (`bg-primary`, `text-muted-foreground`, `bg-status-done-soft`…), без hex/oklch у компонентах. Градієнт бренду — `bg-brand-gradient` / `text-brand-gradient`; акцентний текст на поверхні — `text-primary-ink` (у темній темі він світліший за заливку кнопки).
-- Дві теми: клас `.dark` на `<html>` ставить `public/theme-init.js` (до першого малювання; inline-скрипт заборонено CSP) і хук `useTheme`. Токени перемикаються самі, тож `dark:` потрібне лише там, де токена мало (наприклад, прозорі кольори тегів). Новий екран перевіряй в обох темах і на ширині телефона.
-- Статуси — `StatusIcon` і токени `status-*`: сенс несе форма піктограми, а не лише колір. Колір людини, проєкту й тега виводить `lib/identity.ts` (`Avatar`, `TagChip`, `ProjectImage`): не додавай колір у API й не зберігай його.
-- Заголовки — `font-heading` (Manrope; `h1`–`h3` його вже мають), текст — Inter, числа в лічильниках — `tabular-nums`.
-- Випадні списки — `OptionSelect` (`field` для форм, `pill` для фільтрів, `icon` для піктограми); кілька видимих варіантів — `SegmentedControl`. Radix ігнорує `className` на `SelectValue`: стилізуй тригер.
-- Анімації — лише ключові кадри з `index.css`; `prefers-reduced-motion` глобально вимикає їх. Суто декоративне ховай від скрінрідерів (`aria-hidden`).
-- Стани екрана: завантаження — `LoadingState` (скелетони), порожньо — `EmptyState` (з піктограмою), помилка — `ErrorState`.
+**The "Aurora" design (D34)**
+- Colors are only tokens from `index.css` (`bg-primary`, `text-muted-foreground`, `bg-status-done-soft`…), with no hex/oklch in components. The brand gradient is `bg-brand-gradient` / `text-brand-gradient`; accent text on a surface is `text-primary-ink` (in the dark theme it is lighter than the button fill).
+- Two themes: the `.dark` class on `<html>` is set by `public/theme-init.js` (before the first paint; inline scripts are forbidden by the CSP) and the `useTheme` hook. The tokens switch by themselves, so `dark:` is needed only where there are too few tokens (for example, the translucent tag colors). Check a new screen in both themes and at phone width.
+- Statuses are `StatusIcon` and the `status-*` tokens: meaning is carried by the icon's shape, not by color alone. The color of a person, project and tag is derived by `lib/identity.ts` (`Avatar`, `TagChip`, `ProjectImage`): do not add a color to the API and do not store it.
+- Headings are `font-heading` (Manrope; `h1`–`h3` already have it), text is Inter, numbers in counters are `tabular-nums`.
+- Dropdowns are `OptionSelect` (`field` for forms, `pill` for filters, `icon` for an icon); several visible options — `SegmentedControl`. Radix ignores `className` on `SelectValue`: style the trigger.
+- Animations are only keyframes from `index.css`; `prefers-reduced-motion` disables them globally. Hide purely decorative things from screen readers (`aria-hidden`).
+- Screen states: loading is `LoadingState` (skeletons), empty is `EmptyState` (with an icon), error is `ErrorState`.
 
-**Типи**
-- Без `any` і `@ts-ignore`; типи відповідей API беруться з `src/types/api.generated.ts` (генерується з `backend/openapi.json`: `npm run api:types`, файл не редагують). У `features/*/types` лише аліаси на згенеровані схеми й суто UI-типи.
+**Types**
+- No `any` and no `@ts-ignore`; API response types come from `src/types/api.generated.ts` (generated from `backend/openapi.json`: `npm run api:types`, the file is not edited). `features/*/types` hold only aliases to the generated schemas and purely UI types.
 
-**Доступність**
-- Кожне поле має `<label>`; кнопки — `<button>`, посилання — `<a>/<Link>`, не `div` з `onClick`.
-- Діалоги й меню — через shadcn/Radix (фокус і клавіатура готові). Іконка-кнопка має `aria-label`.
+**Accessibility**
+- Every field has a `<label>`; buttons are `<button>`, links are `<a>/<Link>`, not a `div` with `onClick`.
+- Dialogs and menus go through shadcn/Radix (focus and keyboard are ready). An icon button has an `aria-label`.
 
-## Мови (i18n)
+## Languages (i18n)
 
-- Усі тексти інтерфейсу — `t('English sentence')` (`useTranslation`); текст і є ключем. Поза компонентами (схеми zod, константи) — `tKey('…')`, переклад відбувається під час показу (`FormFieldError`, `t(STATUS_LABELS[…])`).
-- Новий текст = рядок у `src/i18n/uk.ts` у тому ж коміті: тест `translations.test.ts` падає, якщо щось не перекладено або словник містить зайве. Множини — ключі з `_one/_few/_many/_other` (`tasks_count`).
-- Дати форматуй через `lib/format-date.ts`, не `toLocale…(undefined)`. Повідомлення API не перекладаємо.
+- All interface texts are `t('English sentence')` (`useTranslation`); the text is the key. Outside components (zod schemas, constants) use `tKey('…')`, and the translation happens at display time (`FormFieldError`, `t(STATUS_LABELS[…])`).
+- A new text = a row in `src/i18n/uk.ts` in the same commit: the `translations.test.ts` test fails if something is untranslated or the dictionary has extras. Plurals are keys with `_one/_few/_many/_other` (`tasks_count`).
+- Format dates through `lib/format-date.ts`, not `toLocale…(undefined)`. We do not translate API messages.
 
-## Реальний час
+## Real-time
 
-- `app/realtime/use-realtime-sync.ts` слухає сокет і скидає кеш TanStack Query за картою `query-keys-for.ts` (фічі одна одну не знають, мапу тримає `app`). Сокет — покращення, не вимога: застосунок працює й без нього. У тестах сокет підмінено (`testing/fake-socket.ts`).
+- `app/realtime/use-realtime-sync.ts` listens to the socket and resets the TanStack Query cache according to the `query-keys-for.ts` map (features do not know each other, `app` holds the map). The socket is an enhancement, not a requirement: the app works without it too. In tests the socket is replaced (`testing/fake-socket.ts`).
 
-## Тести
+## Tests
 
-- Vitest + Testing Library: шукай елементи за роллю й підписом (`getByRole`, `getByLabelText`), а не за класами чи `data-testid`. Випадний список відкриває й вибирає `chooseOption` із `testing/test-utils.tsx` (Radix Select у jsdom потребує заглушок із `testing/setup.ts`).
-- Мережу мокай через MSW (`testing/mocks`), а не мокай `axios` чи хуки.
-- Покривай: хуки/мутації фіч, форми (валідація, успіх, помилка сервера), захищений маршрут.
-- Рендер у тестах — через `testing/test-utils.tsx` (QueryClient, Router).
-- Доступність: нова сторінка чи діалог додається в `app/accessibility.test.tsx` (`expectNoA11yViolations`, axe; контраст у jsdom не перевіряється).
-- Playwright: людей створює worker-фікстура `people` (`e2e/fixtures.ts`), у браузер вони заходять через refresh-cookie (`browserFor`), а не через форму: реєстрація й вхід мають ліміт 5/хв.
-  Візуальні знімки (`e2e/visual.spec.ts`) створюються й порівнюються лише через `./ops/visual.sh` (Linux-контейнер); не запускай їх на хості.
-- Наскрізні сценарії — Playwright у `e2e/` проти прод-подібного стеку (`npm run test:e2e`); локально береться встановлений Chrome.
+- Vitest + Testing Library: find elements by role and label (`getByRole`, `getByLabelText`), not by classes or `data-testid`. A dropdown is opened and chosen with `chooseOption` from `testing/test-utils.tsx` (Radix Select in jsdom needs the stubs from `testing/setup.ts`).
+- Mock the network through MSW (`testing/mocks`), do not mock `axios` or hooks.
+- Cover: the features' hooks/mutations, forms (validation, success, a server error), the protected route.
+- Render in tests through `testing/test-utils.tsx` (QueryClient, Router).
+- Accessibility: a new page or dialog is added to `app/accessibility.test.tsx` (`expectNoA11yViolations`, axe; contrast is not checked in jsdom).
+- Playwright: people are created by the `people` worker fixture (`e2e/fixtures.ts`), and they enter the browser through the refresh cookie (`browserFor`), not through the form: registration and sign-in have a 5/min limit.
+  Visual snapshots (`e2e/visual.spec.ts`) are created and compared only through `./ops/visual.sh` (a Linux container); do not run them on the host.
+- End-to-end scenarios are Playwright in `e2e/` against a production-like stack (`npm run test:e2e`); locally the installed Chrome is used.
 
-## Чекліст нової фічі
+## New feature checklist
 
-1. `features/<name>/` зі структурою вище; публічний API в `index.ts`.
-2. `api/`: функції, query keys, хуки; типи.
-3. Компоненти з трьома станами (loading / error / empty).
-4. Маршрут у `app/routes`, lazy-завантаження.
-5. Тести (компонент/хук + MSW).
-6. Жодного імпорту з інших фіч; lint проходить.
-7. Видалено старий код; відмічено пункт у плані.
+1. `features/<name>/` with the structure above; the public API in `index.ts`.
+2. `api/`: functions, query keys, hooks; types.
+3. Components with three states (loading / error / empty).
+4. A route in `app/routes`, lazy loaded.
+5. Tests (component/hook + MSW).
+6. No imports from other features; lint passes.
+7. The old code is removed; the item is ticked in the plan.

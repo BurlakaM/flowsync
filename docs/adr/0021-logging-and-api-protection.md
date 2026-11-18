@@ -1,13 +1,13 @@
-# 21. Логування й захист API
+# 21. Logging and API protection
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D21 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D21 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`nestjs-pino` (JSON у production, pretty у dev, токени редагуються), `helmet`, `@nestjs/throttler` (100/хв глобально, 5/хв для логіну й реєстрації), `TRUST_PROXY` за nginx
+`nestjs-pino` (JSON in production, pretty in dev, tokens redacted), `helmet`, `@nestjs/throttler` (100/min globally, 5/min for login and registration), `TRUST_PROXY` behind nginx
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Власний логер/middleware: дублює готове
+A custom logger/middleware: duplicates what already exists

@@ -1,13 +1,13 @@
-# 5. Валідація
+# 5. Validation
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D5 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D5 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`class-validator` у DTO + глобальний `ValidationPipe`; env через `zod`
+`class-validator` in DTOs + a global `ValidationPipe`; env via `zod`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-`nestjs-zod`: зайва міграція DTO
+`nestjs-zod`: needless DTO migration

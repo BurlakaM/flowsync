@@ -1,13 +1,13 @@
-# 3. Ролі
+# 3. Roles
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D3 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D3 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`enum Role { USER ADMIN }` у моделі `User` замість таблиці `role`
+`enum Role { USER ADMIN }` on the `User` model instead of a `role` table
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Таблиця ролей виправдана лише з динамічними правами; seed ролей тоді стає непотрібним
+A roles table is only justified with dynamic permissions; role seeding then becomes unnecessary

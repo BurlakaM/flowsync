@@ -1,23 +1,23 @@
-# 29. Події й права
+# 29. Events and permissions
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D29 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D29 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Сервіси публікують доменні події (`@nestjs/event-emitter`), на них підписані аудит, сповіщення й real-time; права — `@casl/ability` в одній карті `app-ability.ts`
+Services publish domain events (`@nestjs/event-emitter`); audit, notifications and real-time subscribe to them; permissions — `@casl/ability` in a single map, `app-ability.ts`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Виклики підписників напряму з сервісів (зв'язність); use-case класи (зайві абстракції)
+Calling subscribers directly from services (coupling); use-case classes (needless abstractions)
 
-## Наслідки
+## Consequences
 
-- Журнал аудиту, сповіщення й живі оновлення — підписники: сервіс не знає, кому це цікаво.
-- Права — одна карта (`app-ability.ts`), яку легко читати й тестувати.
-- Події в пам'яті були недовговічні: виправлено outbox-ом (ADR 37).
+- The audit log, notifications and live updates are subscribers: a service does not know who is interested.
+- Permissions are one map (`app-ability.ts`) that is easy to read and test.
+- In-memory events were not durable: fixed by the outbox (ADR 37).
 
-## Коли переглянути
+## When to revisit
 
-Якщо підписник житиме в іншому сервісі, публікувати outbox у брокер замість внутрішнього emitter-а.
+If a subscriber lives in another service, publish the outbox to a broker instead of the internal emitter.

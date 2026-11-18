@@ -1,13 +1,13 @@
-# 23. Міграції
+# 23. Migrations
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D23 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D23 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`prisma migrate` (SQL у репозиторії), у Docker `migrate deploy` на старті; CI перевіряє розбіжність схеми й міграцій
+`prisma migrate` (SQL in the repository), `migrate deploy` on start in Docker; CI checks for drift between schema and migrations
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-`db push`: не лишає історії й небезпечний для даних
+`db push`: leaves no history and is dangerous for data

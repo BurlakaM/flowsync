@@ -1,13 +1,13 @@
-# 15. Репозиторій
+# 15. Repository
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D15 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D15 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Два незалежні пакети, лише `npm`, без Nx/Turborepo
+Two independent packages, `npm` only, no Nx/Turborepo
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Монорепо-інструменти окупаються з 3+ пакетами
+Monorepo tooling pays off with 3+ packages

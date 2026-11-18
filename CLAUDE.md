@@ -2,7 +2,8 @@
 
 # Claude Code
 
-- Перед роботою над будь-яким завданням із плану відкрий потрібну фазу в `docs/ARCHITECTURE_PLAN.md` і веди кроки фази в task list.
-- Якщо зміна зачіпає понад 3 файли або кілька модулів, спершу склади короткий план і узгодь його.
-- Правила backend/frontend підтягуються автоматично з вкладених `CLAUDE.md`, коли ти працюєш у відповідній папці.
-- Відповідай українською; перед завершенням завжди звітуй, що перевірено, а що ні.
+- Before working on any task from the plan, open the relevant phase in `docs/ARCHITECTURE_PLAN.md` and track the phase's steps in the task list.
+- If a change touches more than 3 files or several modules, first draft a short plan and agree on it.
+- The backend/frontend rules are pulled in automatically from the nested `CLAUDE.md` files when you work in the corresponding folder.
+- Reply to the owner in Ukrainian; before finishing, always report what was verified and what was not.
+- Never add a `Co-Authored-By` trailer or a "Generated with Claude Code" line to commits or pull requests.

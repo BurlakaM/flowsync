@@ -1,13 +1,13 @@
-# 40. Кілька інстансів real-time
+# 40. Real-time across several instances
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-17
-- **У журналі плану:** D40 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-17
+- **In the plan log:** D40 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`@socket.io/redis-adapter` лише з `REDIS_URL`, підключається в `main.ts`; без Redis — один інстанс
+`@socket.io/redis-adapter` only with `REDIS_URL`, wired in `main.ts`; without Redis — a single instance
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Sticky sessions без адаптера (події все одно губляться між інстансами); власна шина
+Sticky sessions without an adapter (events are still lost between instances); a custom bus

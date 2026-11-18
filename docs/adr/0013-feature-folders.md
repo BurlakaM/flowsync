@@ -1,13 +1,13 @@
-# 13. Структура фронтенду
+# 13. Frontend structure
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D13 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D13 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Feature-папки за bulletproof-react; заборона імпортів між фічами (ESLint)
+Feature folders following bulletproof-react; imports between features are forbidden (ESLint)
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Плоска структура CRA
+The flat CRA structure

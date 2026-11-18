@@ -1,13 +1,13 @@
-# 33. i18n і дошка
+# 33. i18n and the board
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D33 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D33 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-`i18next` + `react-i18next`, тексти-ключі в коді, словник `uk.ts` із тестом повноти; канбан на `@dnd-kit/core`
+`i18next` + `react-i18next`, text-as-key in code, a `uk.ts` dictionary with a completeness test; the kanban board on `@dnd-kit/core`
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Файли JSON із семантичними ключами (легко розійтись із кодом); `react-beautiful-dnd` (не підтримується)
+JSON files with semantic keys (easy to drift from the code); `react-beautiful-dnd` (unmaintained)

@@ -1,13 +1,13 @@
-# 10. Стан
+# 10. State
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D10 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D10 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Серверний стан — TanStack Query v5; клієнтський — `useState`/Context, `zustand` лише для справді глобального
+Server state — TanStack Query v5; client state — `useState`/Context, `zustand` only for truly global state
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Redux/Recoil: зайве
+Redux/Recoil: overkill

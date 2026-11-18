@@ -1,23 +1,23 @@
-# 16. Тести
+# 16. Tests
 
-- **Статус:** прийнято
-- **Дата:** 2026-11-16
-- **У журналі плану:** D16 (`docs/ARCHITECTURE_PLAN.md`, розділ 3)
+- **Status:** accepted
+- **Date:** 2026-11-16
+- **In the plan log:** D16 (`docs/ARCHITECTURE_PLAN.md`, section 3)
 
-## Рішення
+## Decision
 
-Backend і frontend: Vitest (+ supertest, Testing Library, MSW); e2e: Playwright. Backend на Vitest + SWC, бо пакети Nest 12 стали ESM (`import.meta`) і Jest їх не завантажує
+Backend and frontend: Vitest (+ supertest, Testing Library, MSW); e2e: Playwright. The backend uses Vitest + SWC because Nest 12 packages became ESM (`import.meta`) and Jest cannot load them
 
-## Що розглядали й чому ні
+## Alternatives considered and why not
 
-Jest: несумісний із Nest 12
+Jest: incompatible with Nest 12
 
-## Наслідки
+## Consequences
 
-- Тести ходять у справжній PostgreSQL (окрема одноразова БД): SQL, міграції й обмеження перевіряються, а не мокаються.
-- Unit-тести мокають Prisma (`vitest-mock-extended`); e2e використовують справжній `AppModule`.
-- Мутаційні тести (Stryker) і поріг покриття перевіряють, що тести справді падатимуть, якщо код неправильний (`docs/QUALITY.md`).
+- Tests hit a real PostgreSQL (a separate disposable database): SQL, migrations and constraints are verified, not mocked.
+- Unit tests mock Prisma (`vitest-mock-extended`); e2e tests use the real `AppModule`.
+- Mutation tests (Stryker) and the coverage threshold check that tests would actually fail if the code were wrong (`docs/QUALITY.md`).
 
-## Коли переглянути
+## When to revisit
 
-Коли Nest отримає зручну ESM-підтримку для Jest, міняти нічого не треба: Vitest лишається швидшим.
+When Nest gets convenient ESM support for Jest, nothing needs to change: Vitest remains faster.
